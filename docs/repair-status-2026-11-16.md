@@ -117,6 +117,6 @@ HKLM\Software\Microsoft\Windows\CurrentVersion\App Paths\ram-control-center.exe
 
 触摸板控制改为读取 Windows PrecisionTouchPad 状态后执行目标状态：相同状态跳过快捷键；Windows 确认后才写厂商镜像。镜像写失败尝试恢复此前已确认的 Windows 状态。发送输入统一使用 SendInput，带 FlexiKey 标记，保留已按住的修饰键，并为部分插入准备释放序列。unsafe 总计保持 102，两个边界移入共用输入模块并相应收紧 FlexiKey 上限。
 
-`windows-touchpad.log`：Windows 初始 Enabled=0；原值请求 0 ms；开启后 Windows 和镜像均为 true，整条链路 860 ms；重复开启 0 ms；最后恢复 Enabled=0。测试时厂商 FnKey 运行中。厂商退出后的独立性、物理键重叠和完整功能覆盖尚未据此验收。
+`windows-touchpad.log`：Windows 初始 Enabled=0；原值请求 0 ms；开启后 Windows 和镜像均为 true，整条链路 860 ms；重复开启 0 ms；最后恢复 Enabled=0。随后停止 FnKey.exe 做独立性对照，触摸板仍完成切换：原值请求 0 ms，关闭到开启约 6 ms，重复开启 0 ms，最后恢复 Enabled=0；测试结束后 FnKey.exe 已重新拉起。物理按住修饰键的运行时对照和完整功能覆盖仍按清单验收。
 
 触摸板改动的本机验证：格式、64 项主机测试、Windows Clippy 与 Release 构建通过；Windows 原生测试 67 项通过（应用 37、协议 27、卸载器 3）。回归覆盖相同目标去重、延迟回读、无状态/拒绝输入、超时、镜像失败恢复、已按住修饰键以及每个部分插入前缀的释放计划。实机切换记录与单元测试分别作为行为和故障路径证据。Release SHA-256：`ed4b6e47fd46e420d923d60b1a5eb4b200b35c9d4e716e92bebf9f70182332fe`。

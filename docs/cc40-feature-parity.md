@@ -123,10 +123,10 @@ persisting the mirror fails. Injected events share the FlexiKey marker; keys
 already held by the user are excluded from the generated press/release batch.
 
 The dedicated `--touchpad-smoke` test repeats a target and restores the initial
-Windows state. On the reference machine it passed with FnKey running. The
-first off-to-on transition took 860 ms including the platform mirror write;
-the repeated on request took 0 ms. Operation with FnKey stopped and physical
-modifier-key overlap require separate verification.
+Windows state. On the reference machine it passed with FnKey running and again after FnKey.exe
+was stopped. With FnKey stopped, off-to-on took about 6 ms and a repeated on
+request took 0 ms; the initial state was restored and FnKey.exe was relaunched.
+A physical held-modifier runtime comparison remains separate.
 
 ### Fan policies
 
