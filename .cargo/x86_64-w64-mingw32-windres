@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-exec llvm-windres --preprocessor=cc --preprocessor-arg=-E --preprocessor-arg=-x --preprocessor-arg=c "$@"
+# LLVM selects GNU-compatible resource arguments by argv[0]. Ubuntu packages
+# llvm-rc without the llvm-windres symlink provided by other distributions.
+exec -a llvm-windres llvm-rc --preprocessor=cc --preprocessor-arg=-E --preprocessor-arg=-x --preprocessor-arg=c "$@"

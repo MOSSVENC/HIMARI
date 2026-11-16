@@ -8,3 +8,9 @@ rustc --edition=2024 --target x86_64-pc-windows-gnu \
     scripts/test-cross-linker.rs \
     -o target/cross-linker-smoke/synchronization.exe
 echo "Windows synchronization imports linked successfully"
+(
+    cd crates/app
+    x86_64-w64-mingw32-windres --input app.rc --output-format=coff \
+        --output ../../target/cross-linker-smoke/portrait.lib
+)
+echo "Windows application icon compiled successfully"
