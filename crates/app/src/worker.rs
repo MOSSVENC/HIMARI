@@ -123,27 +123,32 @@ impl WorkerRuntime {
     }
 
     fn run(mut self, receiver: CommandReceiver) {
+        let mut next_sample = Instant::now() + Duration::from_secs(1);
         loop {
-            match receiver.receiver.recv_timeout(Duration::from_secs(1)) {
+            match receiver
+                .receiver
+                .recv_timeout(next_sample.saturating_duration_since(Instant::now()))
+            {
                 Ok(request) => {
                     let commands::QueuedCommand { command, ticket } = request;
                     let refresh = matches!(&command, WorkerCommand::Refresh);
-                    let display = matches!(&command, WorkerCommand::ApplyDisplayToggle(_, _));
+                    let scope = command.controls();
                     if refresh {
                         drop(ticket);
                         self.refresh();
-                        continue;
-                    }
-                    let outcome = self.execute(command);
-                    drop(ticket);
-                    if display {
-                        self.finish_display_toggle(outcome);
                     } else {
-                        self.finish(outcome);
+                        let outcome = self.execute(command);
+                        drop(ticket);
+                        self.finish(outcome, scope);
                     }
                 }
-                Err(RecvTimeoutError::Timeout) => self.on_timeout(),
+                Err(RecvTimeoutError::Timeout) => {}
                 Err(RecvTimeoutError::Disconnected) => break,
+            }
+            // Input commands must not postpone periodic telemetry indefinitely.
+            if Instant::now() >= next_sample {
+                self.on_timeout();
+                next_sample = Instant::now() + Duration::from_secs(1);
             }
         }
     }
@@ -222,17 +227,12 @@ impl WorkerRuntime {
         }
     }
 
-    fn finish(&mut self, outcome: CommandOutcome) {
+    fn finish(&mut self, outcome: CommandOutcome, read_scope: Controls) {
         self.status = outcome.status;
-        self.push_quick();
+        self.push(read_scope);
     }
 
-    fn finish_display_toggle(&mut self, outcome: CommandOutcome) {
-        self.status = outcome.status;
-        self.push_quick_with_display_care();
-    }
-
-    fn push(&mut self, extended_reads: bool) {
+    fn push(&mut self, read_scope: Controls) {
         snapshot::push_snapshot(
             &self.weak,
             &mut self.sampler,
@@ -243,32 +243,7 @@ impl WorkerRuntime {
                 driver_health: &self.driver_health,
                 control_sync: &self.control_sync,
             },
-            extended_reads,
-            extended_reads,
-        );
-    }
-
-    fn push_quick(&mut self) {
-        self.push_quick_inner(false);
-    }
-
-    fn push_quick_with_display_care(&mut self) {
-        self.push_quick_inner(true);
-    }
-
-    fn push_quick_inner(&mut self, refresh_display_care: bool) {
-        snapshot::push_snapshot(
-            &self.weak,
-            &mut self.sampler,
-            self.dchu.as_ref(),
-            snapshot::SnapshotInput {
-                status: self.status.clone(),
-                thermal: self.thermal.current(Instant::now()),
-                driver_health: &self.driver_health,
-                control_sync: &self.control_sync,
-            },
-            false,
-            refresh_display_care,
+            read_scope,
         );
     }
 
@@ -286,7 +261,7 @@ impl WorkerRuntime {
         self.refresh_thermal();
         self.driver_health = driver_manager::detect(self.dchu.is_some());
         drop(self.control_sync.issue(Controls::ALL));
-        self.push(true);
+        self.push(Controls::ALL);
     }
 
     fn on_timeout(&mut self) {
@@ -303,7 +278,11 @@ impl WorkerRuntime {
             self.refresh_thermal();
             self.driver_health = driver_manager::detect(self.dchu.is_some());
         }
-        self.push(full_read);
+        self.push(if full_read {
+            Controls::ALL
+        } else {
+            Controls::NONE
+        });
     }
 
     fn refresh_thermal(&mut self) {

@@ -1,10 +1,10 @@
 use std::time::Instant;
 
-use ram_control_center_protocol::{Dchu, PlatformState, QuickToggleState, ThermalSample};
+use ram_control_center_protocol::{Dchu, ThermalSample};
 use slint::Weak;
 
 use crate::MainWindow;
-use crate::control_sync::ControlSync;
+use crate::control_sync::{Control, ControlSync, Controls};
 use crate::diagnostics::log_action;
 use crate::driver_manager::DriverHealth;
 use crate::formatting::shorten_path;
@@ -26,8 +26,7 @@ pub(super) fn push_snapshot(
     sampler: &mut SystemSampler,
     dchu: Option<&Dchu>,
     input: SnapshotInput<'_>,
-    extended_reads: bool,
-    refresh_display_care: bool,
+    read_scope: Controls,
 ) {
     let SnapshotInput {
         status,
@@ -36,6 +35,7 @@ pub(super) fn push_snapshot(
         control_sync,
     } = input;
     let read_stamp = control_sync.snapshot();
+    let extended_reads = read_scope != Controls::NONE;
     log_action(if extended_reads {
         "worker: snapshot begin full"
     } else {
@@ -46,112 +46,88 @@ pub(super) fn push_snapshot(
         "worker: system sampled cpu={:.0}% clock={} MHz max={} MHz",
         system.cpu_load_percent, system.cpu_clock_mhz, system.cpu_max_clock_mhz
     ));
-    let (
-        platform,
-        quick_toggles,
-        fan_curve,
-        rpm_fan_table,
-        gpu_switch,
-        capabilities,
-        rgb_keyboard,
-        camera_enabled,
-        touchpad_enabled,
-        airplane_enabled,
-        brightness,
-        blue_light,
-        audio,
-        anti_dust_schedule,
-    ) = if extended_reads {
-        let started = Instant::now();
-        let platform = dchu.map(Dchu::read_platform_state).unwrap_or_default();
-        log_action(&format!(
-            "worker: platform sampled in {} us",
-            started.elapsed().as_micros()
-        ));
-        let started = Instant::now();
-        let quick_toggles = dchu.map(Dchu::read_quick_toggles).unwrap_or_default();
-        log_action(&format!(
-            "worker: toggles sampled in {} us",
-            started.elapsed().as_micros()
-        ));
-        let started = Instant::now();
-        let fan_curve = dchu.and_then(|dchu| dchu.read_fan_curve().ok());
-        log_action(&format!(
-            "worker: fan curve sampled in {} us",
-            started.elapsed().as_micros()
-        ));
-        // Extended ACPI commands return a full response frame; the protocol layer
-        // always provides the full 256-byte vendor response buffer.
-        let started = Instant::now();
-        let rpm_fan_table = dchu.and_then(|dchu| dchu.read_rpm_fan_table().ok());
-        log_action(&format!(
-            "worker: RPM fan table sampled in {} us",
-            started.elapsed().as_micros()
-        ));
-        let started = Instant::now();
-        let gpu_switch = dchu.and_then(|dchu| dchu.read_gpu_switch().ok());
-        log_action(&format!(
-            "worker: gpu switch sampled in {} us",
-            started.elapsed().as_micros()
-        ));
-        let started = Instant::now();
-        let capabilities = dchu.and_then(|dchu| dchu.read_capabilities().ok());
-        log_action(&format!(
-            "worker: capabilities sampled in {} us",
-            started.elapsed().as_micros()
-        ));
-        let rgb_keyboard = dchu.and_then(|dchu| dchu.read_rgb_keyboard_state().ok());
-        let camera_enabled = dchu.and_then(Dchu::read_camera_enabled);
-        let touchpad_enabled = dchu.and_then(Dchu::read_touchpad_enabled);
-        let airplane_enabled = system_controls::airplane_mode_enabled().ok();
-        let brightness = system_controls::screen_brightness().ok();
-        let blue_light = dchu.and_then(|dchu| dchu.read_setting_byte(1, 34));
-        let audio = system_controls::audio_state().ok();
-        let anti_dust_schedule = dchu.and_then(|dchu| dchu.read_anti_dust_schedule().ok());
-        (
-            platform,
-            quick_toggles,
-            fan_curve,
-            rpm_fan_table,
-            gpu_switch,
-            capabilities,
-            rgb_keyboard,
-            camera_enabled,
-            touchpad_enabled,
-            airplane_enabled,
-            brightness,
-            blue_light,
-            audio,
-            anti_dust_schedule,
-        )
+    let platform = if read_scope.any(&[
+        Control::Power,
+        Control::Fan,
+        Control::FanOffset,
+        Control::AntiDust,
+        Control::LowRefresh,
+    ]) {
+        dchu.map(Dchu::read_platform_state).unwrap_or_default()
     } else {
-        (
-            PlatformState::default(),
-            QuickToggleState::default(),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
+        Default::default()
     };
+    let quick_toggles = if read_scope.contains(Control::QuickToggles) {
+        dchu.map(Dchu::read_quick_toggles).unwrap_or_default()
+    } else {
+        Default::default()
+    };
+    let fan_curve = sample("fan curve", read_scope.contains(Control::FanCurve), || {
+        dchu.and_then(|device| device.read_fan_curve().ok())
+    });
+    let rpm_fan_table = sample("RPM table", read_scope.contains(Control::FanRpm), || {
+        dchu.and_then(|device| device.read_rpm_fan_table().ok())
+    });
+    let gpu_switch = sample("GPU switch", read_scope.contains(Control::Gpu), || {
+        dchu.and_then(|device| device.read_gpu_switch().ok())
+    });
+    let capabilities = sample("capabilities", read_scope == Controls::ALL, || {
+        dchu.and_then(|device| device.read_capabilities().ok())
+    });
+    let rgb_keyboard = sample(
+        "lighting",
+        read_scope.any(&[
+            Control::Lighting,
+            Control::LightingBrightness,
+            Control::LightingEffect,
+            Control::LightingBoot,
+            Control::LightingSleep,
+        ]),
+        || dchu.and_then(|device| device.read_rgb_keyboard_state().ok()),
+    );
+    let camera_enabled = sample("camera", read_scope.contains(Control::Camera), || {
+        dchu.and_then(Dchu::read_camera_enabled)
+    });
+    let touchpad_enabled = sample("touchpad", read_scope.contains(Control::Touchpad), || {
+        dchu.and_then(Dchu::read_touchpad_enabled)
+    });
+    let airplane_enabled = sample("airplane", read_scope.contains(Control::Airplane), || {
+        system_controls::airplane_mode_enabled().ok()
+    });
+    let brightness = sample(
+        "brightness",
+        read_scope.contains(Control::Brightness),
+        || system_controls::screen_brightness().ok(),
+    );
+    let blue_light = sample(
+        "blue light",
+        read_scope.contains(Control::BlueLight),
+        || dchu.and_then(|device| device.read_setting_byte(1, 34)),
+    );
+    let audio = sample(
+        "audio",
+        read_scope.any(&[Control::Audio, Control::AudioMute]),
+        || system_controls::audio_state().ok(),
+    );
+    let anti_dust_schedule = sample("anti dust", read_scope.contains(Control::AntiDust), || {
+        dchu.and_then(|device| device.read_anti_dust_schedule().ok())
+    });
     let extended_api = dchu.is_some_and(Dchu::has_extended_api);
-    let display_care = (extended_reads || refresh_display_care)
-        .then(system_controls::display_care_state)
-        .and_then(Result::ok);
+    let display_care = sample(
+        "display care",
+        read_scope.any(&[
+            Control::DisplayCare,
+            Control::MonitorTimeout,
+            Control::ScreenSaver,
+        ]),
+        || system_controls::display_care_state().ok(),
+    );
     let flexi_ready = flexi_recovery_ready();
-    let flexi_charger = if flexi_ready {
-        dchu.and_then(|dchu| dchu.read_flexi_charger().ok())
-    } else {
-        None
-    };
+    let flexi_charger = sample(
+        "charging",
+        flexi_ready && read_scope.contains(Control::Charging),
+        || dchu.and_then(|device| device.read_flexi_charger().ok()),
+    );
     let transport_ready = dchu.is_some();
     let transport_label = if transport_ready {
         tr("DCHU connected").to_owned()
@@ -200,6 +176,19 @@ pub(super) fn push_snapshot(
             extended_reads,
         },
     );
+}
+
+fn sample<T>(name: &str, enabled: bool, read: impl FnOnce() -> Option<T>) -> Option<T> {
+    if !enabled {
+        return None;
+    }
+    let started = Instant::now();
+    let value = read();
+    log_action(&format!(
+        "worker: {name} sampled in {} us",
+        started.elapsed().as_micros()
+    ));
+    value
 }
 
 pub(super) fn push_update(weak: &Weak<MainWindow>, update: UiUpdate) {

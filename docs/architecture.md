@@ -138,10 +138,10 @@ modifiers released in reverse order.
 The same binary exposes a native Windows service mode:
 
 ```text
-"C:\ProgramData\NeoControl\ram-control-center.exe" --boot-service --wait-ms 120000
+"C:\ProgramData\RAM Control Center\ram-control-center.exe" --boot-service --wait-ms 120000
 ```
 
-The installed `NeoControlBoot` service is automatic, runs as `LocalSystem`,
+The installed `RAMControlCenterBoot` service is automatic, runs as `LocalSystem`,
 and declares a dependency on the signed `AcpiBridge` driver. The Service
 Control Manager starts it before the user shell. It creates no UI, opens
 AcpiBridge, retries at 10 ms, applies the complete vendor power transition
@@ -192,7 +192,10 @@ hardware worker ── AcpiBridge IOCTL ── readback
 slint::invoke_from_event_loop
 ```
 
-Thermal data is polled every two seconds; extended reads run every other cycle.
+The worker keeps a one-second sampling deadline across incoming commands;
+extended reads run every fifth tick. After a write, it immediately samples the
+affected control domains for confirmation. Unrelated control queries wait for
+the periodic full read, keeping command completion independent of their latency.
 The UI animation is independent of hardware sampling. Renderer diagnostics are
 installed on every GUI launch; optional frame logging observes the same notifier
 without controlling whether the settings page receives the graphics API report.

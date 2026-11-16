@@ -60,7 +60,7 @@ const ALL_CONTROLS: &[Control] = &[
 ];
 const COUNT: usize = ALL_CONTROLS.len();
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Controls(u32);
 impl Controls {
     pub(crate) const ALL: Self = Self((1 << COUNT) - 1);
@@ -73,6 +73,9 @@ impl Controls {
     }
     pub(crate) const fn contains(self, control: Control) -> bool {
         self.0 & Self::one(control).0 != 0
+    }
+    pub(crate) fn any(self, controls: &[Control]) -> bool {
+        controls.iter().any(|control| self.contains(*control))
     }
 }
 

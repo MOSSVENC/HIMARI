@@ -90,3 +90,9 @@ HKLM\Software\Microsoft\Windows\CurrentVersion\App Paths\ram-control-center.exe
 - `startup-task-audit.log`：按产品旧名、程序路径、FlexiKey/FlexK、CC40/FnKey/DCHU 相关命令检索计划任务，匹配 0 项。当前启动入口仍为产品服务和 HKCU Run。
 
 这些结果覆盖状态同步和短时采样，完整功能复刻、物理输入对照和冷启动验收仍按上面的清单推进。
+
+## 写入后的定向确认
+
+工作线程现在在命令完成后立即读取相关控制域，避免等待下一次完整轮询才更新“应用”状态。RGB、音量等操作只触发对应的设备设置读取；风扇曲线、能力检测等查询保留在各自操作或定期完整采样中。周期采样使用独立截止时间，持续点击也会执行到期的采样。
+
+`verify-targeted-readbacks.log` 和 `verify-bars.log` 均完成格式、57 项主机测试、unsafe 门禁、Windows Clippy 和 Release；`windows-targeted-tests.log` 中 Windows 原生 60 项测试通过。按控制域立即确认的实际交互耗时仍需单独测量，这些测试不作为点击延迟的测量结果。
