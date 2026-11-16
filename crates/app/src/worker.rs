@@ -101,12 +101,10 @@ impl WorkerRuntime {
         };
         let driver_health = driver_manager::detect(dchu.is_some());
         #[cfg(windows)]
-        // The vendor notification channel's multi-client behavior is not yet
-        // established. Tracing is explicit while the resident Fn handler owns it.
-        if std::env::args().any(|arg| arg == "--trace-fn-events")
-            && let Some(device_path) = dchu.as_ref().map(|device| device.path().to_owned())
-        {
-            crate::fn_diagnostics::spawn_trace(device_path);
+        // The diagnostic checks the vendor forwarding service and ownership
+        // flag before registering the direct notification channel.
+        if dchu.is_some() && std::env::args().any(|arg| arg == "--trace-fn-events") {
+            crate::fn_diagnostics::spawn_trace();
         }
         Self {
             weak,

@@ -349,7 +349,9 @@ its event ID / argument, and the verified dispatch subset. FnKey's Arg001 receiv
 uses the low byte as the event ID and a signed right shift for the argument.
 The static dispatch evidence and the touchpad toggle distinction are recorded in
 [Fn event protocol](fn-event-protocol.md). `--fn-events-smoke` exercises three bounded
-waits and subscription cleanup. Normal startup leaves channel ownership to the
-existing resident Fn handler. Physical Fn combinations, channel ownership,
+waits and subscription cleanup. The diagnostic checks service status and the
+AppSettings 1/12 forwarding flag before registration; its caller also coordinates
+FnKey. Normal startup retains the existing vendor service/FnKey notification route.
+Physical Fn combinations, channel ownership during actual delivery,
 action execution, and OSD UI still require Windows validation before parity can
 be considered complete.

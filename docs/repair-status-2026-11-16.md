@@ -135,4 +135,14 @@ HKLM\Software\Microsoft\Windows\CurrentVersion\App Paths\ram-control-center.exe
 - Release 的状态同步、GPU 后端初始化、100 次输入钩子生命周期检查通过，记录为 `target/validation/windows-fn-final-smoke.log`。
 - 默认 Release 已部署到统一目录并后台启动，11,270,144 字节；SHA-256 为 `601603d2b002f5a9ac0ab93c0f488ee1d39bb97edb5bc90b518f510e5c646f48`。部署核对目标哈希一致，启动服务退出码为 0，记录为 `target/validation/deploy-fn.log`。
 
-测试期间没有物理按键通知，因此通知投递、具体 Fn 组合、常驻通道所有权、动作闭环和 OSD 仍待验收。正常启动沿用现有 FnKey 通道归属。
+上述测试期间 CCDCHUService 仍在运行，只证明了调用与句柄生命周期；完整隔离结果见下节。正常启动沿用现有厂商服务与 FnKey 通知路径。
+
+## 通知服务归属检查与隔离复测
+
+进一步分析原厂服务和 FnKey 后确认 AppSettings 1/12 是服务转发归属标记。服务在事件循环启动时写 1，停止或清理时写 0；FnKey 读取为 1 时接受服务的 Arg001 转发，否则创建直接监听器。具体 RVA 和哈希见 [Fn 事件协议](fn-event-protocol.md)。
+
+诊断订阅现在先检查服务状态与该标记。运行 `scripts/test-fn-events.ps1`，服务运行时读取到 1 并在注册前返回所有权错误；暂停服务及 FnKey、确认服务进程退出后，读取到 0，连续两次订阅均成功。每次三次限时等待全部超时，实际 150–157 ms；最后恢复服务与原路径的 FnKey。记录为 `target/validation/windows-fn-owner.log`。
+
+完整 `scripts/verify.sh` 通过：格式、unsafe 门禁、72 项主机测试、Windows Clippy 和 Release。Windows 原生 75 项测试通过（应用 39、协议 33、卸载器 3）。新增测试覆盖活动转发标记、未知值和读取失败。物理按键投递、运行期间所有权变化、动作闭环与 OSD 仍待验收。
+
+该版本已部署至统一目录并静默后台启动，11,270,144 字节，SHA-256 为 `45afff4cdc032943bc731c42b3fef01a87d9b4701bb181239b6d3e871196be28`；部署哈希核对一致，启动服务退出码为 0。部署后的只读检查确认转发标记恢复为 1、CCDCHUService 为 Running，显式诊断在注册前拒绝占用通道。记录为 `target/validation/deploy-fn-owner.log` 和 `target/validation/fn-owned-after.log`。

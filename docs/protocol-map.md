@@ -321,11 +321,18 @@ The implemented IOCTLs and 16-byte collection frames are documented in
 
 ## ACPI notifications
 
-The vendor service uses `0x322404` to register an event handle and
-`0x322408` to read an eight-byte notification value. RAM CONTROL CENTER now has
-the matching wait/read loop and exposes the low 32 bits as the raw notification
-value for diagnostics. The transport layout is recovered; the mapping from
-values to Fn actions still requires hardware capture. The vendor service also
-writes `AppSettings(1, 12, 1)`; this implementation leaves that setting
-untouched until its role and restore behavior are verified on hardware. The
-listener currently logs raw values and does not render an OSD.
+The vendor service registers an event handle once through `0x322404` and reads
+an eight-byte notification through `0x322408`. RAM CONTROL CENTER preserves the
+full i64 payload and decodes FnKey's Arg001 low-byte event ID and signed argument.
+Static dispatch evidence and verified events are in [Fn event protocol](fn-event-protocol.md).
+
+`AppSettings(1, 12)` advertises service forwarding: DCHUService writes 1 when
+starting its event loop and 0 when stopping; FnKey creates its own direct
+listener when the byte is not 1. The application's diagnostic checks both the
+service state and this byte before registering. Its caller also coordinates
+FnKey. Normal startup retains the existing vendor notification route.
+
+The controlled Windows test confirmed rejection while CCDCHUService was running,
+then successful repeated registration after stopping the service and FnKey.
+Both were restored afterward. Physical Fn notification delivery, action
+execution and OSD remain separate acceptance work.
