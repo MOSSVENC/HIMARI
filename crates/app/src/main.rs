@@ -363,6 +363,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("--input-hooks-smoke") => std::process::exit(flexikey_engine::hook_lifecycle_smoke()),
         Some("--system-smoke") => std::process::exit(system_smoke()),
         Some("--io-smoke") => std::process::exit(io_smoke()),
+        Some("--touchpad-smoke") => std::process::exit(smoke::touchpad_smoke()),
         Some("--display-care-smoke") => std::process::exit(display_care_smoke()),
         Some("--settings-smoke") => std::process::exit(settings_backend_smoke()),
         _ => {}

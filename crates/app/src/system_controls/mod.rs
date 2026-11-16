@@ -4,6 +4,7 @@ mod display_care;
 #[cfg(windows)]
 mod power;
 mod radio;
+mod touchpad;
 
 #[cfg(windows)]
 pub(crate) mod registry;
@@ -15,3 +16,4 @@ pub use display_care::{
     set_taskbar_auto_hide, set_taskbar_transparency,
 };
 pub use radio::{airplane_mode_enabled, set_airplane_mode};
+pub use touchpad::{set_touchpad_enabled, touchpad_enabled};

@@ -112,6 +112,22 @@ either side fails. The page remains available on LCD systems because taskbar,
 dark-mode, timeout and screen-saver controls are Windows features; panel-only
 pixel shifting/refresh is not exposed.
 
+### Touchpad
+
+The FnKey implementation reads `HKCU\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad\Status\Enabled`
+before sending Ctrl+Win+F24. It updates AppSettings page 1 offset 10 as a
+settings mirror after the Windows transition. RAM CONTROL CENTER uses the
+Windows value for live readback, skips repeated targets, confirms the
+transition with bounded polling, and restores the previous Windows state if
+persisting the mirror fails. Injected events share the FlexiKey marker; keys
+already held by the user are excluded from the generated press/release batch.
+
+The dedicated `--touchpad-smoke` test repeats a target and restores the initial
+Windows state. On the reference machine it passed with FnKey running. The
+first off-to-on transition took 860 ms including the platform mirror write;
+the repeated on request took 0 ms. Operation with FnKey stopped and physical
+modifier-key overlap require separate verification.
+
 ### Fan policies
 
 ```text

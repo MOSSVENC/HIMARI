@@ -108,3 +108,15 @@ HKLM\Software\Microsoft\Windows\CurrentVersion\App Paths\ram-control-center.exe
 本机 `windows-bars.log` 全部检查通过，渲染报告为 `GraphicsAPI::NativeOpenGL`。检查了 0%、25%、50%、100% 的截图；0% 无监视条填充，其余比例的起点始终位于轨道左端，RGB 填充终点跟随滑块中心。截图保存在本地忽略目录 `target/validation/bars/`。`windows-bars-final.log` 记录默认 Release 的状态同步、GPU 后端初始化和输入钩子生命周期检查。
 
 本次默认 Release 的 SHA-256 为 `44cf5b937887faec22a39c9f8071b6bc6152abd85a681a8db9aa60b174c32c05`。Vulkan 后端尚未构建和测量，不据此作渲染性能对比结论。
+
+## CI、头像与触摸板后续验证（2026-11-17）
+
+`d9a3fde` 的 GitHub Actions 运行 `43889533402` 已完成：Linux 验证和 Windows 测试均成功。Rust 固定为 1.100.0；交叉链接器将 synchronization 导入名映射到 Zig 的 Windows API-set 库。同步 API 和图标资源编译在完整构建前独立检查。checkout 使用 v7.0.1，Zig 使用官方归档与固定 SHA-256。
+
+原创头像以 CC0-1.0 提供 SVG、PNG 和九种尺寸 ICO。Windows 已从 Release EXE 提取出实际头像图标，应用与托盘使用同源资源。该版本已部署到统一目录，输入钩子、设置和状态同步检查通过。
+
+触摸板控制改为读取 Windows PrecisionTouchPad 状态后执行目标状态：相同状态跳过快捷键；Windows 确认后才写厂商镜像。镜像写失败尝试恢复此前已确认的 Windows 状态。发送输入统一使用 SendInput，带 FlexiKey 标记，保留已按住的修饰键，并为部分插入准备释放序列。unsafe 总计保持 102，两个边界移入共用输入模块并相应收紧 FlexiKey 上限。
+
+`windows-touchpad.log`：Windows 初始 Enabled=0；原值请求 0 ms；开启后 Windows 和镜像均为 true，整条链路 860 ms；重复开启 0 ms；最后恢复 Enabled=0。测试时厂商 FnKey 运行中。厂商退出后的独立性、物理键重叠和完整功能覆盖尚未据此验收。
+
+触摸板改动的本机验证：格式、64 项主机测试、Windows Clippy 与 Release 构建通过；Windows 原生测试 67 项通过（应用 37、协议 27、卸载器 3）。回归覆盖相同目标去重、延迟回读、无状态/拒绝输入、超时、镜像失败恢复、已按住修饰键以及每个部分插入前缀的释放计划。实机切换记录与单元测试分别作为行为和故障路径证据。Release SHA-256：`ed4b6e47fd46e420d923d60b1a5eb4b200b35c9d4e716e92bebf9f70182332fe`。

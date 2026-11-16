@@ -144,7 +144,7 @@ mod platform {
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
         GetKeyNameTextW, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
         KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, KEYEVENTF_UNICODE, MAPVK_VK_TO_VSC,
-        MAPVK_VK_TO_VSC_EX, MAPVK_VSC_TO_VK_EX, MapVirtualKeyW, SendInput,
+        MAPVK_VK_TO_VSC_EX, MAPVK_VSC_TO_VK_EX, MapVirtualKeyW,
     };
     use windows_sys::Win32::UI::Shell::ShellExecuteW;
     use windows_sys::Win32::UI::WindowsAndMessaging::{
@@ -155,7 +155,7 @@ mod platform {
 
     use super::{CapturedTrigger, EngineReport, FlexiKeyEngine};
 
-    const INJECTION_MAGIC: usize = 0x4e45_4f46; // "NEOF"
+    use crate::input::{INJECTION_MAGIC, insert_inputs};
 
     struct EngineState {
         keyboard_actions: HashMap<u16, FlexiKeyAction>,
@@ -839,16 +839,8 @@ mod platform {
     }
 
     fn send_input(inputs: &[INPUT]) -> Result<(), String> {
-        // SAFETY: `inputs` is a live slice of initialized INPUT structures;
-        // its length and the exact INPUT stride are passed to SendInput.
-        let sent = unsafe {
-            SendInput(
-                inputs.len() as u32,
-                inputs.as_ptr(),
-                std::mem::size_of::<INPUT>() as i32,
-            )
-        };
-        if sent != inputs.len() as u32 {
+        let sent = insert_inputs(inputs);
+        if sent != inputs.len() {
             return Err(std::io::Error::last_os_error().to_string());
         }
         Ok(())

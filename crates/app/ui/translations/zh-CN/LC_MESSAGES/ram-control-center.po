@@ -654,8 +654,8 @@ msgstr "摄像头"
 msgid "Touchpad"
 msgstr "触摸板"
 
-msgid "Camera and touchpad state are read back from the vendor setting pages after each write."
-msgstr "每次写入后都会从厂商设置页读回摄像头与触摸板状态。"
+msgid "Camera state is read from the platform; touchpad state is confirmed by Windows."
+msgstr "摄像头状态由平台读回，触摸板状态由 Windows 确认。"
 
 msgid "Lock keys"
 msgstr "锁定键"

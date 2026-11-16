@@ -44,9 +44,8 @@ impl Dchu {
         self.read_byte(1, 10).map(|value| value != 0)
     }
 
-    /// Persist the touchpad state after the caller sends the vendor's
-    /// Ctrl+Win+F24 chord. This keeps the setting page as the authoritative
-    /// readback source used by CC40.
+    /// Persist the settings-page mirror after the application has confirmed
+    /// the Windows touchpad transition. This byte is not the device state.
     pub fn set_touchpad_enabled(&self, enabled: bool) -> Result<()> {
         let value = u8::from(enabled);
         let previous = self.read_touchpad_enabled();

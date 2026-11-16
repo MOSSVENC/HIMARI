@@ -1,7 +1,62 @@
 use ram_control_center_protocol::Dchu;
 
-use crate::input::send_touchpad_chord;
 use crate::system_controls;
+
+/// Exercise only the touchpad path and restore the initial Windows state.
+pub(crate) fn touchpad_smoke() -> i32 {
+    match Dchu::open() {
+        Ok(device) => i32::from(!touchpad_smoke_inner(&device)),
+        Err(error) => {
+            eprintln!("touchpad: {error}");
+            1
+        }
+    }
+}
+
+fn touchpad_smoke_inner(device: &Dchu) -> bool {
+    let previous = match system_controls::touchpad_enabled() {
+        Ok(previous) => previous,
+        Err(error) => {
+            eprintln!("touchpad read: {error}");
+            return false;
+        }
+    };
+    let result = (|| {
+        for enabled in [previous, !previous, !previous] {
+            let started = std::time::Instant::now();
+            system_controls::set_touchpad_enabled(device, enabled)?;
+            let actual = system_controls::touchpad_enabled()?;
+            if actual != enabled {
+                return Err(format!(
+                    "touchpad readback expected {enabled}, got {actual}"
+                ));
+            }
+            println!(
+                "touchpad: Windows={actual} mirror={:?} elapsed_ms={}",
+                device.read_touchpad_enabled(),
+                started.elapsed().as_millis()
+            );
+        }
+        Ok::<(), String>(())
+    })();
+    let restore = system_controls::set_touchpad_enabled(device, previous).and_then(|()| {
+        if system_controls::touchpad_enabled()? == previous {
+            Ok(())
+        } else {
+            Err("touchpad restoration readback mismatch".to_owned())
+        }
+    });
+    if let Err(error) = &result {
+        eprintln!("touchpad test: {error}");
+    }
+    if let Err(error) = &restore {
+        eprintln!("touchpad restore: {error}");
+    }
+    if restore.is_ok() {
+        println!("touchpad: restored Windows state to {previous}");
+    }
+    result.is_ok() && restore.is_ok()
+}
 
 /// Samples each sensor independently; this diagnostic performs no control writes.
 pub(crate) fn thermal_smoke() -> i32 {
@@ -146,34 +201,8 @@ pub(crate) fn io_smoke() -> i32 {
         }
     }
 
-    if let Some(previous) = dchu.read_touchpad_enabled() {
-        let target = !previous;
-        let result = send_touchpad_chord().and_then(|()| {
-            dchu.set_touchpad_enabled(target)
-                .map_err(|error| error.to_string())
-        });
-        match result {
-            Ok(()) if dchu.read_touchpad_enabled() == Some(target) => {
-                println!("touchpad: toggled to {target}");
-                let _ = send_touchpad_chord();
-                if let Err(error) = dchu.set_touchpad_enabled(previous) {
-                    eprintln!("touchpad restore: {error}");
-                    ok = false;
-                } else {
-                    println!("touchpad: restored to {previous}");
-                }
-            }
-            Ok(()) => {
-                eprintln!("touchpad: readback mismatch");
-                let _ = send_touchpad_chord();
-                let _ = dchu.set_touchpad_enabled(previous);
-                ok = false;
-            }
-            Err(error) => {
-                eprintln!("touchpad toggle: {error}");
-                ok = false;
-            }
-        }
+    if !touchpad_smoke_inner(&dchu) {
+        ok = false;
     }
 
     match system_controls::airplane_mode_enabled() {

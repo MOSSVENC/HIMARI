@@ -89,7 +89,7 @@ pub(super) fn push_snapshot(
         dchu.and_then(Dchu::read_camera_enabled)
     });
     let touchpad_enabled = sample("touchpad", read_scope.contains(Control::Touchpad), || {
-        dchu.and_then(Dchu::read_touchpad_enabled)
+        system_controls::touchpad_enabled().ok()
     });
     let airplane_enabled = sample("airplane", read_scope.contains(Control::Airplane), || {
         system_controls::airplane_mode_enabled().ok()
