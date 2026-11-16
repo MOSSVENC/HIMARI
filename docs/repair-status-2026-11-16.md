@@ -96,3 +96,15 @@ HKLM\Software\Microsoft\Windows\CurrentVersion\App Paths\ram-control-center.exe
 工作线程现在在命令完成后立即读取相关控制域，避免等待下一次完整轮询才更新“应用”状态。RGB、音量等操作只触发对应的设备设置读取；风扇曲线、能力检测等查询保留在各自操作或定期完整采样中。周期采样使用独立截止时间，持续点击也会执行到期的采样。
 
 `verify-targeted-readbacks.log` 和 `verify-bars.log` 均完成格式、57 项主机测试、unsafe 门禁、Windows Clippy 和 Release；`windows-targeted-tests.log` 中 Windows 原生 60 项测试通过。按控制域立即确认的实际交互耗时仍需单独测量，这些测试不作为点击延迟的测量结果。
+
+## 条形控件坐标与原生像素验证
+
+`MetricBar` 和 `ValueSlider` 的填充矩形显式固定在左上原点。RGB 滑块中心、填充末端、指针映射共用完整轨道宽度，命中区域包含两端滑块；显示比例限制在 0–100%。概览的 CPU/GPU 负载、显存、内存、磁盘，以及电池页使用同一个 `MetricBar`。
+
+`snapshot-tools` 构建提供 `--bars-smoke=<目录>`，直接使用生产控件建立独立测试窗口，执行 10 组数值像素检查，以及三个 RGB 通道共 30 次正向、反向、越界指针移动。拖动后立即检查数值、填充起点和滑块边缘。测试只向 Slint 窗口分发指针事件，不向系统注入键鼠，也不连接硬件写入。
+
+复现方法：在 WSL 构建 `cargo build --release --target x86_64-pc-windows-gnu -p ram-control-center --bin ram-control-center --features snapshot-tools`，然后在 Windows PowerShell 7 执行 `scripts/test-bars.ps1 -Executable <exe路径> -OutputDirectory <截图目录>`。正式交付使用默认 feature 的 Release。
+
+本机 `windows-bars.log` 全部检查通过，渲染报告为 `GraphicsAPI::NativeOpenGL`。检查了 0%、25%、50%、100% 的截图；0% 无监视条填充，其余比例的起点始终位于轨道左端，RGB 填充终点跟随滑块中心。截图保存在本地忽略目录 `target/validation/bars/`。`windows-bars-final.log` 记录默认 Release 的状态同步、GPU 后端初始化和输入钩子生命周期检查。
+
+本次默认 Release 的 SHA-256 为 `44cf5b937887faec22a39c9f8071b6bc6152abd85a681a8db9aa60b174c32c05`。Vulkan 后端尚未构建和测量，不据此作渲染性能对比结论。

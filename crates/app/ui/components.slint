@@ -173,6 +173,8 @@ export component MetricBar inherits Rectangle {
     clip: true;
 
     Rectangle {
+        x: 0;
+        y: 0;
         width: max(0px, min(parent.width, parent.width * root.fraction));
         height: parent.height;
         border-radius: 2px;
@@ -818,7 +820,7 @@ export component ValueSlider inherits Rectangle {
     opacity: root.enabled ? 1 : 0.45;
     out property <length> track-left: 32px;
     out property <length> track-width: max(1px, root.width - 84px);
-    out property <float> fraction: (root.value - root.lower) * 1.0 / max(1, root.upper - root.lower);
+    out property <float> fraction: max(0.0, min(1.0, (root.value - root.lower) * 1.0 / max(1, root.upper - root.lower)));
     animate opacity { duration: 140ms; easing: ease-out; }
 
     function set-from-x(x: length) {
@@ -852,6 +854,8 @@ export component ValueSlider inherits Rectangle {
         clip: true;
 
         Rectangle {
+            x: 0;
+            y: 0;
             width: root.fraction * parent.width;
             height: parent.height;
             border-radius: 3px;
@@ -860,7 +864,7 @@ export component ValueSlider inherits Rectangle {
     }
 
     Rectangle {
-        x: root.track-left + root.fraction * (root.track-width - 16px);
+        x: root.track-left + root.fraction * root.track-width - 8px;
         y: (parent.height - 16px) / 2;
         width: 16px;
         height: 16px;
@@ -883,20 +887,20 @@ export component ValueSlider inherits Rectangle {
     }
 
     slider-touch := TouchArea {
-        x: root.track-left;
+        x: root.track-left - 8px;
         y: 0;
-        width: root.track-width;
+        width: root.track-width + 16px;
         height: parent.height;
         enabled: root.enabled;
         mouse-cursor: root.enabled ? pointer : default;
         pointer-event(event) => {
             if (root.enabled && event.button == PointerEventButton.left && event.kind == PointerEventKind.down) {
-                root.set-from-x(self.mouse-x);
+                root.set-from-x(self.mouse-x - 8px);
             }
         }
         moved => {
             if (root.enabled && self.pressed) {
-                root.set-from-x(self.mouse-x);
+                root.set-from-x(self.mouse-x - 8px);
             }
         }
     }

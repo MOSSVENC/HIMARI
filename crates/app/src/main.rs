@@ -1,5 +1,7 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
+#[cfg(feature = "snapshot-tools")]
+mod bar_smoke;
 mod boot_agent;
 mod boot_service;
 mod control_sync;
@@ -102,12 +104,12 @@ fn write_snapshot_ppm(
 ) -> std::io::Result<()> {
     use std::io::Write as _;
 
-    let mut file = std::fs::File::create(path)?;
+    let mut file = std::io::BufWriter::new(std::fs::File::create(path)?);
     write!(file, "P6\n{} {}\n255\n", buffer.width(), buffer.height())?;
     for pixel in buffer.as_slice() {
         file.write_all(&[pixel.r, pixel.g, pixel.b])?;
     }
-    Ok(())
+    file.flush()
 }
 
 fn poll_settings_backend(
@@ -297,6 +299,14 @@ fn run_transition_snapshot(
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(feature = "snapshot-tools")]
+    if let Some(directory) = std::env::args().nth(1).and_then(|arg| {
+        arg.strip_prefix("--bars-smoke=")
+            .map(std::path::PathBuf::from)
+    }) {
+        return bar_smoke::run(directory);
+    }
+
     #[cfg(any(debug_assertions, feature = "snapshot-tools"))]
     if let Some(directory) = std::env::args().nth(1).and_then(|arg| {
         arg.strip_prefix("--transition-snapshot=")

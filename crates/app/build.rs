@@ -8,7 +8,12 @@ fn main() {
     let config = slint_build::CompilerConfiguration::new()
         .with_bundled_translations("ui/translations")
         .with_default_translation_context(slint_build::DefaultTranslationContext::None);
-    slint_build::compile_with_config("ui/main.slint", config).expect("failed to compile Slint UI");
+    let source = if std::env::var_os("CARGO_FEATURE_SNAPSHOT_TOOLS").is_some() {
+        "ui/tests/bars.slint"
+    } else {
+        "ui/main.slint"
+    };
+    slint_build::compile_with_config(source, config).expect("failed to compile Slint UI");
 }
 
 fn compile_runtime_catalog() {

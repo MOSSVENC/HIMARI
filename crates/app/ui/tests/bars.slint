@@ -1,0 +1,19 @@
+export { MainWindow } from "../main.slint";
+export { Palette } from "../theme.slint";
+import { MetricBar, ValueSlider } from "../components.slint";
+
+// Exercises the production components in a window without hardware controls.
+export component BarDiagnostics inherits Window {
+    width: 640px;
+    height: 280px;
+    background: #101010;
+    in-out property <int> level: 0;
+    callback edited(int);
+
+    ValueSlider { x: 20px; y: 20px; width: 600px; label: "R"; upper: 100; value <=> root.level; tone: #ff0000; changed(value) => { root.edited(value); } }
+    ValueSlider { x: 20px; y: 64px; width: 600px; label: "G"; upper: 100; value <=> root.level; tone: #00ff00; changed(value) => { root.edited(value); } }
+    ValueSlider { x: 20px; y: 108px; width: 600px; label: "B"; upper: 100; value <=> root.level; tone: #0000ff; changed(value) => { root.edited(value); } }
+    MetricBar { x: 52px; y: 180px; width: 516px; height: 8px; fraction: root.level / 100.0; tone: #ff0000; }
+    MetricBar { x: 52px; y: 208px; width: 516px; height: 8px; fraction: root.level / 100.0; tone: #00ff00; }
+    MetricBar { x: 52px; y: 236px; width: 516px; height: 8px; fraction: root.level / 100.0; tone: #0000ff; }
+}
