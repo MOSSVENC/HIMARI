@@ -37,6 +37,11 @@ for arg in "$@"; do
         -l:libpthread.a)
             args+=("$libdir/libpthread.a")
             ;;
+        -lsynchronization)
+            # Rust 1.100 links Windows address-wait APIs through synchronization.lib.
+            # Zig's MinGW names that import library after the Windows API set.
+            args+=("-lapi-ms-win-core-synch-l1-2-0")
+            ;;
         -lwindows.0.52.0)
             args+=("$(find "$HOME/.cargo/registry/src" -path '*/windows_x86_64_gnu-0.52.6/lib/libwindows.0.52.0.a' -print -quit)")
             ;;

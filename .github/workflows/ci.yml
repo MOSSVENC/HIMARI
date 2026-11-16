@@ -8,23 +8,30 @@ jobs:
   rust:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: "1.100.0"
           components: rustfmt, clippy
           targets: x86_64-pc-windows-gnu
-      - uses: mlugg/setup-zig@v2
-        with:
-          version: 0.14.1
+      - name: Install Zig
+        run: ./scripts/setup-zig.sh
       - name: Install Linux UI build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y             libfontconfig1-dev             libfreetype6-dev             libxkbcommon-dev             libxkbcommon-x11-dev             libwayland-dev             libx11-dev             libxcursor-dev             libxrandr-dev             libxi-dev             libgl1-mesa-dev
+          sudo apt-get install -y \
+            llvm libfontconfig1-dev libfreetype6-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev \
+            libxrandr-dev libxi-dev libgl1-mesa-dev
+      - name: Verify Windows synchronization imports
+        run: ./scripts/test-cross-linker.sh
       - run: ./scripts/verify.sh
 
   windows-tests:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v7.0.1
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.100.0"
       - run: cargo test --workspace
