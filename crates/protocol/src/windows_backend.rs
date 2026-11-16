@@ -1,9 +1,8 @@
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::win_device::WinDevice;
+use crate::win_device::{WinDevice, WinEvent};
 use crate::{DchuError, FanMode, PowerMode, QuickToggle, Result};
-
 mod charging;
 mod gpu;
 mod input;
@@ -15,6 +14,8 @@ mod telemetry;
 const DEVICE_PATH: &str = r"\\?\ACPI#CLV0001#1#{86994c74-ad43-4812-b7e7-0c420b5c5fd7}";
 const DEVICE_PATH_ENV: &str = "NEO_CONTROL_ACPI_DEVICE";
 const IOCTL_ACPI_DCHU: u32 = 0x0032_2400;
+const IOCTL_ACPI_WAIT_EVENT: u32 = 0x0032_2404;
+const IOCTL_ACPI_GET_NOTIFY_VALUE: u32 = 0x0032_2408;
 const IOCTL_ACPI_SETTINGS: u32 = 0x0032_240C;
 const ACPI_REQUEST_LEN: usize = 0x420;
 const ACPI_RESPONSE_LEN: usize = 0x40c;
@@ -23,6 +24,54 @@ const SETTINGS_REQUEST_LEN: usize = 0x1008;
 const ACPI_READ_GUID: [u8; 16] = [
     0xE4, 0x24, 0xF2, 0x93, 0xDC, 0xFB, 0xBF, 0x4B, 0xAD, 0xD6, 0xDB, 0x71, 0xBD, 0xC0, 0xAF, 0xAD,
 ];
+
+pub struct AcpiNotificationListener {
+    device: WinDevice,
+    event: WinEvent,
+}
+
+impl std::fmt::Debug for AcpiNotificationListener {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AcpiNotificationListener")
+            .finish_non_exhaustive()
+    }
+}
+
+impl AcpiNotificationListener {
+    pub fn open(device_path: &str) -> Result<Self> {
+        let device = WinDevice::open(device_path, 0, "CreateFileW(AcpiBridge notifications)")?;
+        let event = WinEvent::auto_reset()?;
+        Ok(Self { device, event })
+    }
+
+    pub fn wait_next(&mut self) -> Result<u32> {
+        let request = self.event.request_bytes();
+        self.device.ioctl(
+            IOCTL_ACPI_WAIT_EVENT,
+            &request,
+            &mut [],
+            "DeviceIoControl(0x322404 wait event)",
+        )?;
+        self.event.wait()?;
+        let mut value = [0_u8; 8];
+        let returned = self.device.ioctl(
+            IOCTL_ACPI_GET_NOTIFY_VALUE,
+            &[],
+            &mut value,
+            "DeviceIoControl(0x322408 notification value)",
+        )?;
+        if returned as usize != value.len() {
+            return Err(DchuError::ControlFailed {
+                operation: "read AcpiBridge notification value",
+                detail: format!("expected 8 bytes, received {returned}"),
+            });
+        }
+
+        // The OEM service reads an eight-byte native value and exposes its
+        // low 32 bits as NotifyValue.
+        Ok(u64::from_ne_bytes(value) as u32)
+    }
+}
 
 pub struct Dchu {
     device: WinDevice,

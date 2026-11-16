@@ -33,11 +33,11 @@ cd RAM-CONTROL-CENTER
 ## Architecture
 
 ```text
-neo-control
-  -> neo-control-protocol
+ram-control-center
+  -> ram-control-center-protocol
   -> Slint / Win32
 
-neo-control-protocol
+ram-control-center-protocol
   -> signed AcpiBridge device interface (required)
   -> signed HKKbdFltr device interface (optional protocol path)
 ```
@@ -89,8 +89,23 @@ no driver is installed at startup.
 The Release executable is written to:
 
 ```text
-target/x86_64-pc-windows-gnu/release/neo-control.exe
+target/x86_64-pc-windows-gnu/release/ram-control-center.exe
 ```
+
+## Windows deployment
+
+Run the deployment script with PowerShell 7 as administrator, supplying the
+Windows-accessible Release directory:
+
+```powershell
+pwsh -File scripts/deploy.ps1 -ReleaseDirectory '<release directory>' -StartBackground
+```
+
+It verifies the executable hashes and boot policy replay, registers startup and
+uninstall, and migrates the previous installation. The uninstaller prints a
+cleanup plan by default; `--remove` executes it. Recovery backups and unrecognized
+files are retained and reported. The current verification scope and outstanding
+Fn/OSD work are listed in the [repair record](docs/repair-status-2026-11-16.md).
 
 ## Documentation
 

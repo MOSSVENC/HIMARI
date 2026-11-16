@@ -1,5 +1,5 @@
 param(
-    [string]$Executable = 'C:\ProgramData\NeoControl\neo-control.exe'
+    [string]$Executable = 'C:\ProgramData\RAM Control Center\ram-control-center.exe'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -7,7 +7,7 @@ if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) {
     throw "RAM CONTROL CENTER executable not found: $Executable"
 }
 
-$modes = @('--settings-smoke', '--system-smoke', '--io-smoke', '--display-care-smoke')
+$modes = @('--input-hooks-smoke', '--settings-smoke', '--system-smoke', '--io-smoke', '--display-care-smoke')
 foreach ($mode in $modes) {
     Write-Host "==> $mode"
     $process = Start-Process -FilePath $Executable -ArgumentList $mode -NoNewWindow -Wait -PassThru

@@ -2,7 +2,7 @@ use std::process::ExitCode;
 use std::thread;
 use std::time::Duration;
 
-use neo_control_protocol::{
+use ram_control_center_protocol::{
     CustomFanCurve, Dchu, FanCurveNodes, FanMode, FlexiChargerMode, PowerMode, QuickToggle,
 };
 
@@ -425,7 +425,7 @@ fn main() -> ExitCode {
             eprintln!("rgb-set-color: expected exactly three channels");
             return ExitCode::FAILURE;
         }
-        let color = neo_control_protocol::RgbColor {
+        let color = ram_control_center_protocol::RgbColor {
             red: channels[0],
             green: channels[1],
             blue: channels[2],
@@ -572,7 +572,7 @@ fn rgb_sleep_stability_smoke(dchu: &Dchu) -> ExitCode {
     }
 }
 
-fn write_smoke(dchu: &Dchu, state: neo_control_protocol::PlatformState) -> ExitCode {
+fn write_smoke(dchu: &Dchu, state: ram_control_center_protocol::PlatformState) -> ExitCode {
     let Some(power) = state.power_mode.and_then(PowerMode::from_u8) else {
         eprintln!("write-smoke: current power mode is not recognized; no write attempted");
         return ExitCode::FAILURE;

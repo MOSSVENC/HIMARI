@@ -9,23 +9,27 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 declare -A ceilings=(
     ["crates/app/src/telemetry.rs"]=26
     ["crates/app/src/driver_manager.rs"]=7
-    ["crates/app/src/tray.rs"]=21
-    ["crates/app/src/flexikey_engine.rs"]=10
+    ["crates/app/src/tray.rs"]=20
+    ["crates/app/src/flexikey_engine.rs"]=9
     ["crates/app/src/system_controls/registry.rs"]=1
     ["crates/app/src/system_controls/display_care.rs"]=5
     ["crates/app/src/system_controls/power.rs"]=6
-    ["crates/protocol/src/win_device.rs"]=3
+    ["crates/protocol/src/win_device.rs"]=6
     ["crates/protocol/src/bin/neo-acpi-probe.rs"]=3
     ["crates/app/src/system_controls/display.rs"]=3
     ["crates/app/src/system_controls/audio.rs"]=2
     ["crates/app/src/input.rs"]=1
     ["crates/app/src/runtime_state.rs"]=1
     ["crates/app/src/flexikey_ui.rs"]=1
+    ["crates/app/src/input_hooks.rs"]=5
+    ["crates/app/src/bin/ram-control-center-uninstaller.rs"]=6
 )
 
 total=0
 failed=0
-max_total=90
+# Includes the five audited hook handle/event boundaries and six uninstaller
+# boundaries; the dispatcher and tray ceilings were lowered after refactoring.
+max_total=102
 
 while IFS= read -r file; do
     count=$(grep -o -E '\bunsafe\b' "$file" | wc -l)

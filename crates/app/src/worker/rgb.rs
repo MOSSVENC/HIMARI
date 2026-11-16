@@ -1,4 +1,4 @@
-use neo_control_protocol::{Dchu, RgbColor};
+use ram_control_center_protocol::{Dchu, RgbColor};
 
 use super::CommandOutcome;
 use crate::localization::tr;

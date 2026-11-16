@@ -2,7 +2,7 @@
 
 OEM driver binaries are intentionally not committed to this repository.
 
-The deployed application looks for this layout next to `neo-control.exe`:
+The deployed application looks for this layout next to `ram-control-center.exe`:
 
 ```text
 drivers/

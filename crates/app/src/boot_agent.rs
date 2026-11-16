@@ -4,7 +4,9 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use neo_control_protocol::{Dchu, FanMode, PowerMode};
+use ram_control_center_protocol::{Dchu, FanMode, PowerMode};
+
+use crate::product::{legacy_data_dir, product_data_dir};
 
 #[derive(Clone, Copy, Debug)]
 struct BootProfile {
@@ -21,7 +23,7 @@ impl Default for BootProfile {
     }
 }
 
-/// Headless boot path used by the single `neo-control.exe` binary.
+/// Headless boot path used by the single `ram-control-center.exe` binary.
 ///
 /// It never constructs the Slint window. The signed AcpiBridge device is
 /// retried until its settings channel is ready, the full persisted power
@@ -30,7 +32,9 @@ impl Default for BootProfile {
 pub fn run() -> i32 {
     let started = Instant::now();
     let config_path = config_path();
-    let mut profile = read_profile(&config_path).unwrap_or_default();
+    let mut profile = read_profile(&config_path)
+        .or_else(|| read_profile(&legacy_data_dir().join("boot-profile.ini")))
+        .unwrap_or_default();
     let mut wait_ms = 45_000_u64;
 
     let mut args = std::env::args().skip(2);
@@ -262,11 +266,7 @@ fn ensure_acpi_bridge_service() -> Result<(), String> {
 }
 
 fn config_path() -> PathBuf {
-    std::env::var_os("ProgramData")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir)
-        .join("NeoControl")
-        .join("boot-profile.ini")
+    product_data_dir().join("boot-profile.ini")
 }
 
 fn read_profile(path: &Path) -> Option<BootProfile> {
@@ -291,10 +291,7 @@ fn read_profile(path: &Path) -> Option<BootProfile> {
 }
 
 fn log_line(message: &str) {
-    let root = std::env::var_os("ProgramData")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir)
-        .join("NeoControl");
+    let root = product_data_dir();
     if std::fs::create_dir_all(&root).is_err() {
         return;
     }

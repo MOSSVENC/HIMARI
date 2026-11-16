@@ -8,7 +8,7 @@ use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use neo_control_protocol::{
+use ram_control_center_protocol::{
     AntiDustSchedule, CustomFanCurve, Dchu, FanMode, GpuSwitchMode, PowerMode, QuickToggle,
     RgbColor, ThermalSample,
 };
@@ -147,6 +147,14 @@ impl WorkerRuntime {
             }
         };
         let driver_health = driver_manager::detect(dchu.is_some());
+        #[cfg(windows)]
+        // The vendor notification channel's multi-client behavior is not yet
+        // established. Tracing is explicit while the resident Fn handler owns it.
+        if std::env::args().any(|arg| arg == "--trace-fn-events")
+            && let Some(device_path) = dchu.as_ref().map(|device| device.path().to_owned())
+        {
+            spawn_acpi_notification_listener(device_path);
+        }
         Self {
             weak,
             sampler,
@@ -424,4 +432,34 @@ impl WorkerRuntime {
 
 pub(crate) fn spawn_worker(receiver: mpsc::Receiver<WorkerCommand>, weak: Weak<MainWindow>) {
     thread::spawn(move || WorkerRuntime::new(weak).run(receiver));
+}
+
+#[cfg(windows)]
+fn spawn_acpi_notification_listener(device_path: String) {
+    thread::spawn(move || {
+        use ram_control_center_protocol::AcpiNotificationListener;
+
+        let mut listener = match AcpiNotificationListener::open(&device_path) {
+            Ok(listener) => {
+                log_action("ACPI Fn notification listener ready");
+                listener
+            }
+            Err(error) => {
+                log_action(&format!(
+                    "ACPI Fn notification listener unavailable: {error}"
+                ));
+                return;
+            }
+        };
+
+        loop {
+            match listener.wait_next() {
+                Ok(value) => log_action(&format!("ACPI Fn notification: {value:#010x}")),
+                Err(error) => {
+                    log_action(&format!("ACPI Fn notification listener stopped: {error}"));
+                    return;
+                }
+            }
+        }
+    });
 }

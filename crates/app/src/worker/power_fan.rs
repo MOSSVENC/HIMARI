@@ -1,4 +1,4 @@
-use neo_control_protocol::{
+use ram_control_center_protocol::{
     AntiDustSchedule, CustomFanCurve, Dchu, FanMode, FlexiChargerMode, GpuSwitchMode, PowerMode,
 };
 

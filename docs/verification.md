@@ -1,5 +1,8 @@
 # Verification log
 
+This document records historical runs. Current deployment and repair validation
+are recorded in [the November 16 repair record](repair-status-2026-11-16.md).
+
 Date: 2026-11-07
 Target: Firebat/Clevo ZY-T6K, Windows host, signed AcpiBridge device
 

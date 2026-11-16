@@ -1,4 +1,4 @@
-use neo_control_protocol::{
+use ram_control_center_protocol::{
     AntiDustSchedule, FanCurveState, FanMode, FlexiChargerState, GpuSwitchMode, GpuSwitchState,
     PlatformCapabilities, PlatformState, PowerMode, QuickToggleState, RgbKeyboardState,
     RpmFanTable, ThermalSample,

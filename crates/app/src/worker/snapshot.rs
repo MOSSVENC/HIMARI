@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use neo_control_protocol::{Dchu, PlatformState, QuickToggleState, ThermalSample};
+use ram_control_center_protocol::{Dchu, PlatformState, QuickToggleState, ThermalSample};
 use slint::Weak;
 
 use crate::MainWindow;

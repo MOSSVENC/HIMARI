@@ -1,4 +1,4 @@
-use neo_control_protocol::Dchu;
+use ram_control_center_protocol::Dchu;
 
 use super::CommandOutcome;
 use crate::display_care::{display_care_offset, restore_display_toggle};

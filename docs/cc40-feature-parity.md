@@ -314,7 +314,7 @@ the binding.
   emitted the Unicode string, the keypress action emitted scan-code `B`, and a
   keyboard `A` disable binding was swallowed without appearing in the target.
 
-## Remaining implementation
+## Platform capabilities unavailable on this machine
 
 - Battery charge notification is capability-gated and unavailable on this
   machine.
@@ -323,3 +323,14 @@ the binding.
 - PD charging remains hidden because the platform reports no supported path.
 - CPU/GPU overclocking remains locked because this machine reports no supported
   OC path.
+
+## Remaining Fn parity
+
+The platform exposes the vendor ACPI notification channel used by FnKey for
+hardware Fn events and OSD updates. The opt-in `--trace-fn-events` diagnostic registers and waits
+on the event channel and reads the raw 8-byte notification payload. Normal
+startup leaves channel ownership to the existing resident Fn handler. The mapping
+from notification values to individual Fn actions still needs to be confirmed
+on this machine. OSD UI is not included; this restores the event transport
+path, not the vendor visual overlay. Verify each hardware Fn action on Windows
+before treating parity as complete.

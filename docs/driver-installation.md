@@ -21,8 +21,8 @@ device.
 
 ## Local payload layout
 
-The deployed app looks beside `neo-control.exe` first, then in
-`%ProgramData%\NeoControl\drivers`:
+The deployed app looks beside `ram-control-center.exe` first, then in
+`%ProgramData%\RAM Control Center\drivers`:
 
 ```text
 drivers/
@@ -57,7 +57,7 @@ No driver is launched or installed merely by opening the application.
 
 ## One-click installation
 
-The install button starts the same `neo-control.exe` with:
+The install button starts the same `ram-control-center.exe` with:
 
 ```text
 --install-drivers
@@ -98,7 +98,7 @@ The exact exit codes are:
 The Windows Release build was checked with:
 
 ```text
-neo-control.exe --driver-smoke
+ram-control-center.exe --driver-smoke
 ```
 
 Current host result:
@@ -116,7 +116,7 @@ payload_path=C:\ProgramData\NeoControl\drivers
 The idempotent helper path was also checked without changing the system:
 
 ```text
-neo-control.exe --install-drivers
+ram-control-center.exe --install-drivers
 exit=0
 installer: start
 installer: AcpiBridge already responding; nothing to install

@@ -1,12 +1,13 @@
 use std::os::windows::ffi::OsStrExt;
 
 use windows_sys::Win32::Foundation::{
-    CloseHandle, GENERIC_READ, GENERIC_WRITE, HANDLE, INVALID_HANDLE_VALUE,
+    CloseHandle, GENERIC_READ, GENERIC_WRITE, HANDLE, INVALID_HANDLE_VALUE, WAIT_OBJECT_0,
 };
 use windows_sys::Win32::Storage::FileSystem::{
     CreateFileW, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
 };
 use windows_sys::Win32::System::IO::DeviceIoControl;
+use windows_sys::Win32::System::Threading::{CreateEventW, INFINITE, WaitForSingleObject};
 
 use crate::{DchuError, Result};
 
@@ -90,8 +91,50 @@ impl WinDevice {
 
 impl Drop for WinDevice {
     fn drop(&mut self) {
-        // SAFETY: this wrapper uniquely owns the non-null handle returned by
+        // SAFETY: this wrapper uniquely owns the valid handle returned by
         // CreateFileW, and Drop runs exactly once for the value.
+        unsafe { CloseHandle(self.handle) };
+    }
+}
+
+pub(crate) struct WinEvent {
+    handle: HANDLE,
+}
+
+impl WinEvent {
+    pub(crate) fn auto_reset() -> Result<Self> {
+        // SAFETY: no security attributes or name are supplied; the returned
+        // handle is checked and uniquely owned by this value.
+        let handle = unsafe { CreateEventW(std::ptr::null(), 0, 0, std::ptr::null()) };
+        if handle.is_null() {
+            return Err(DchuError::Status {
+                operation: "CreateEventW(AcpiBridge notifications)",
+                code: std::io::Error::last_os_error().raw_os_error().unwrap_or(-1),
+            });
+        }
+        Ok(Self { handle })
+    }
+
+    pub(crate) fn request_bytes(&self) -> [u8; std::mem::size_of::<usize>()] {
+        (self.handle as usize).to_ne_bytes()
+    }
+
+    pub(crate) fn wait(&self) -> Result<()> {
+        // SAFETY: `self.handle` remains valid until this owner's Drop runs.
+        let result = unsafe { WaitForSingleObject(self.handle, INFINITE) };
+        if result != WAIT_OBJECT_0 {
+            return Err(DchuError::Status {
+                operation: "WaitForSingleObject(AcpiBridge notification)",
+                code: std::io::Error::last_os_error().raw_os_error().unwrap_or(-1),
+            });
+        }
+        Ok(())
+    }
+}
+
+impl Drop for WinEvent {
+    fn drop(&mut self) {
+        // SAFETY: this wrapper uniquely owns the event returned by CreateEventW.
         unsafe { CloseHandle(self.handle) };
     }
 }

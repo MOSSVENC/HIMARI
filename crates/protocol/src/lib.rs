@@ -25,6 +25,8 @@ pub use keyboard_filter::{
     IOCTL_REMOVE_FILTER_MACRO as KEYBOARD_FILTER_REMOVE_MACRO_IOCTL, KeyboardFilter,
     encode_filter_macro, encode_filter_macro_removal,
 };
+#[cfg(windows)]
+pub use windows_backend::AcpiNotificationListener;
 
 pub const TELEMETRY_COMMAND: i32 = 12;
 pub const POWER_COMMAND: i32 = 121;
@@ -1371,6 +1373,21 @@ impl Dchu {
     }
 
     pub fn set_quick_toggle(&self, _toggle: QuickToggle, _enabled: bool) -> Result<()> {
+        Err(DchuError::UnsupportedPlatform)
+    }
+}
+
+#[cfg(not(windows))]
+#[derive(Debug)]
+pub struct AcpiNotificationListener;
+
+#[cfg(not(windows))]
+impl AcpiNotificationListener {
+    pub fn open(_device_path: &str) -> Result<Self> {
+        Err(DchuError::UnsupportedPlatform)
+    }
+
+    pub fn wait_next(&mut self) -> Result<u32> {
         Err(DchuError::UnsupportedPlatform)
     }
 }

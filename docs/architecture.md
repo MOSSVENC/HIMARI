@@ -7,7 +7,7 @@ Slint UI (Rust, GPU-rendered)
         │
         │ typed commands on one worker thread
         ▼
-neo-control-protocol
+ram-control-center-protocol
         │ CreateFileW + DeviceIoControl
         ▼
 signed AcpiBridge device          signed HKKbdFltr device
@@ -17,7 +17,7 @@ signed AcpiBridge device          signed HKKbdFltr device
                                    (protocol path only)
 ```
 
-The accepted runtime is a two-crate Rust workspace with a native Slint UI.
+The current runtime is a two-crate Rust workspace with a native Slint UI.
 Hardware access is implemented through the signed `AcpiBridge` device
 interface. The current FlexiKey engine uses a low-level user-mode hook; the
 `HKKbdFltr` transport remains available as an optional protocol path. Firmware
@@ -59,7 +59,7 @@ the `build.rs` rebuild watch.
 
 ## Deployment naming
 
-The installed executable has one canonical name: `neo-control.exe`. Source
+The installed executable has one canonical name: `ram-control-center.exe`. Source
 versions are represented by Git commits; build output is never deployed as
 `-final`, `-preview` or numbered side-by-side executables. Replacing the running
 app is a stop, atomic file replacement and restart operation against the single
@@ -138,7 +138,7 @@ modifiers released in reverse order.
 The same binary exposes a native Windows service mode:
 
 ```text
-"C:\ProgramData\NeoControl\neo-control.exe" --boot-service --wait-ms 120000
+"C:\ProgramData\NeoControl\ram-control-center.exe" --boot-service --wait-ms 120000
 ```
 
 The installed `NeoControlBoot` service is automatic, runs as `LocalSystem`,
@@ -154,8 +154,8 @@ after 1, 2 and 5 seconds and are enabled for non-crash service failures.
 The service command is installed and removed by the same executable:
 
 ```text
-neo-control.exe --install-boot-service
-neo-control.exe --uninstall-boot-service
+ram-control-center.exe --install-boot-service
+ram-control-center.exe --uninstall-boot-service
 ```
 
 `--boot-agent` remains available as a direct diagnostic invocation of the
@@ -259,3 +259,17 @@ page even when the panel reports LCD; OLED-only pixel shifting remains hidden.
 - Panel-specific OLED pixel shifting and periodic refresh on OLED hardware.
 - PD charging.
 - CPU/GPU overclocking and voltage controls.
+
+## Installation lifecycle
+
+`product.rs` owns the executable, service, data-directory and startup identifiers.
+`scripts/deploy.ps1` deploys the Windows Release, checks hashes, migrates owned
+legacy data and verifies the boot service and logon entry before removing old
+copies. Input recovery backups are retained in the current data directory.
+`service_lifecycle.rs` is shared by migration and uninstall.
+
+The uninstaller plans cleanup by default and executes with `--remove`. Its file
+list lives in `uninstall_files.rs`; unknown files and recovery backups remain
+visible in the result. Paths containing symlinks or reparse points are rejected.
+See [the repair record](repair-status-2026-11-16.md) for verification and remaining
+functional work.

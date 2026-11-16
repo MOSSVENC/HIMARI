@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::Sender;
 use std::time::{Duration, Instant};
 
-use neo_control_protocol::{
+use ram_control_center_protocol::{
     AntiDustSchedule, CustomFanCurve, FanMode, GpuSwitchMode, PowerMode, QuickToggle, RgbColor,
 };
 use slint::ComponentHandle;

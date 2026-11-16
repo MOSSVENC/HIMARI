@@ -39,15 +39,14 @@ mod platform {
 
     use crate::MainWindow;
     use crate::localization::tr;
+    use crate::product::{MUTEX_NAME, PRODUCT_NAME, RUN_KEY_PATH, RUN_VALUE_NAME, WINDOW_CLASS};
 
     const TRAY_ID: u32 = 1;
     const TRAY_MESSAGE: u32 = WM_APP + 1;
     const SHOW_MESSAGE: u32 = WM_APP + 2;
     const MENU_OPEN: usize = 1;
     const MENU_EXIT: usize = 2;
-    const WINDOW_CLASS: &str = "NeoControlTrayWindow";
-    const WINDOW_TITLE: &str = "RAM CONTROL CENTER";
-    const MUTEX_NAME: &str = "Local\\NeoControlUiInstance";
+    const WINDOW_TITLE: &str = PRODUCT_NAME;
     const ICON_BYTES: &[u8] = include_bytes!("../../../assets/ram_control_center_logo.ico");
 
     struct TrayContext {
@@ -139,14 +138,11 @@ mod platform {
         {
             return Some(window.hwnd.get() as usize);
         }
-        let title = wide("RAM CONTROL CENTER");
+        let title = wide(PRODUCT_NAME);
         // SAFETY: `title` is NUL-terminated and remains alive for the call.
         let window = unsafe { FindWindowW(ptr::null(), title.as_ptr()) };
         (!window.is_null()).then_some(window as usize)
     }
-
-    const RUN_KEY_PATH: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
-    const RUN_VALUE_NAME: &str = "NeoControl";
 
     pub fn install_startup(executable: &std::path::Path) -> Result<(), String> {
         let executable = executable
@@ -159,18 +155,30 @@ mod platform {
             RUN_KEY_PATH,
             RUN_VALUE_NAME,
             &format!("\"{executable}\" --background"),
+        )?;
+        crate::system_controls::registry::delete_registry_value(
+            RUN_KEY_PATH,
+            crate::product::LEGACY_RUN_VALUE_NAME,
         )
     }
 
     pub fn uninstall_startup() -> Result<(), String> {
-        crate::system_controls::registry::delete_registry_value(RUN_KEY_PATH, RUN_VALUE_NAME)
+        crate::system_controls::registry::delete_registry_value(RUN_KEY_PATH, RUN_VALUE_NAME)?;
+        crate::system_controls::registry::delete_registry_value(
+            RUN_KEY_PATH,
+            crate::product::LEGACY_RUN_VALUE_NAME,
+        )
     }
 
     pub fn startup_enabled() -> bool {
-        crate::system_controls::registry::read_registry_string(RUN_KEY_PATH, RUN_VALUE_NAME)
-            .ok()
-            .flatten()
-            .is_some_and(|value| !value.is_empty())
+        [RUN_VALUE_NAME, crate::product::LEGACY_RUN_VALUE_NAME]
+            .into_iter()
+            .any(|name| {
+                crate::system_controls::registry::read_registry_string(RUN_KEY_PATH, name)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|value| !value.is_empty())
+            })
     }
 
     pub struct SingleInstance {
@@ -417,7 +425,7 @@ mod platform {
             return false;
         };
         let (icon, tip) = match context.lock() {
-            Ok(context) => (context.icon as HICON, wide("RAM CONTROL CENTER")),
+            Ok(context) => (context.icon as HICON, wide(PRODUCT_NAME)),
             Err(_) => return false,
         };
         let mut data = notify_data(hwnd, icon);

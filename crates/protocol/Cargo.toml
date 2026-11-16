@@ -1,5 +1,5 @@
 [package]
-name = "neo-control-protocol"
+name = "ram-control-center-protocol"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

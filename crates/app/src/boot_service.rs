@@ -19,14 +19,11 @@ mod platform {
     use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
     use windows_service::service_dispatcher;
     use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
-    use windows_sys::Win32::Foundation::{
-        ERROR_SERVICE_ALREADY_RUNNING, ERROR_SERVICE_DOES_NOT_EXIST, ERROR_SERVICE_EXISTS,
-    };
+    use windows_sys::Win32::Foundation::{ERROR_SERVICE_ALREADY_RUNNING, ERROR_SERVICE_EXISTS};
 
     use crate::boot_agent;
+    use crate::product::{LEGACY_SERVICE_NAME, SERVICE_DISPLAY_NAME, SERVICE_NAME};
 
-    const SERVICE_NAME: &str = "NeoControlBoot";
-    const SERVICE_DISPLAY_NAME: &str = "RAM CONTROL CENTER Boot Agent";
     const SERVICE_DESCRIPTION: &str =
         "Applies the persisted RAM CONTROL CENTER power policy before the user shell starts.";
     const SERVICE_DEPENDENCY: &str = "AcpiBridge";
@@ -163,7 +160,7 @@ mod platform {
             Err(error) if error_code(&error) == Some(ERROR_SERVICE_EXISTS as i32) => {
                 let service = manager
                     .open_service(SERVICE_NAME, service_access)
-                    .map_err(|error| describe("OpenServiceW(NeoControlBoot)", error))?;
+                    .map_err(|error| describe("OpenServiceW(RAMControlCenterBoot)", error))?;
                 service
                     .change_config(&service_info)
                     .map_err(|error| describe("ChangeServiceConfigW", error))?;
@@ -177,6 +174,7 @@ mod platform {
             .map_err(|error| describe("ChangeServiceConfig2W(description)", error))?;
         configure_failure_actions(&service)?;
 
+        crate::service_lifecycle::remove(LEGACY_SERVICE_NAME, Duration::from_secs(10))?;
         match service.start::<&OsStr>(&[]) {
             Ok(()) => {}
             Err(error) if error_code(&error) == Some(ERROR_SERVICE_ALREADY_RUNNING as i32) => {}
@@ -232,31 +230,10 @@ mod platform {
     }
 
     fn uninstall_inner() -> Result<(), String> {
-        let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
-            .map_err(|error| describe("OpenSCManagerW", error))?;
-        let service = match manager.open_service(
-            SERVICE_NAME,
-            ServiceAccess::DELETE | ServiceAccess::STOP | ServiceAccess::QUERY_STATUS,
-        ) {
-            Ok(service) => service,
-            Err(error) if error_code(&error) == Some(ERROR_SERVICE_DOES_NOT_EXIST as i32) => {
-                return Ok(());
-            }
-            Err(error) => return Err(describe("OpenServiceW(NeoControlBoot)", error)),
-        };
-
-        if service
-            .query_status()
-            .map(|status| status.current_state != ServiceState::Stopped)
-            .unwrap_or(true)
-        {
-            let _ = service.stop();
-            std::thread::sleep(Duration::from_millis(100));
+        for name in [SERVICE_NAME, LEGACY_SERVICE_NAME] {
+            crate::service_lifecycle::remove(name, Duration::from_secs(10))?;
         }
-
-        service
-            .delete()
-            .map_err(|error| describe("DeleteService", error))
+        Ok(())
     }
 
     fn error_code(error: &windows_service::Error) -> Option<i32> {

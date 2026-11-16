@@ -12,7 +12,7 @@ fn main() {
 }
 
 fn compile_runtime_catalog() {
-    let path = "ui/translations/zh-CN/LC_MESSAGES/neo-control.po";
+    let path = "ui/translations/zh-CN/LC_MESSAGES/ram-control-center.po";
     let source = std::fs::read_to_string(path).expect("failed to read Chinese translation catalog");
     let mut entries = Vec::new();
     let mut msgid = None;

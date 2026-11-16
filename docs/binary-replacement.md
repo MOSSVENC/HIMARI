@@ -9,10 +9,10 @@ discover or version during startup.
 
 | Vendor component | Replacement | State |
 |---|---|---|
-| `CC40.exe` | Slint UI in `neo-control.exe` | Implemented |
-| `InsydeDCHU.dll` | `neo-control-protocol` direct AcpiBridge transport | All five exports have a direct equivalent |
-| `HKFltrLib.dll` | `neo-control-protocol` direct `HKKbdFltr.sys` transport | Protocol is implemented; the current FlexiKey engine uses a user-mode hook and does not require this driver |
-| vendor boot-policy delivery | `NeoControlBoot` service mode plus interactive `neo-control.exe` | Power replay starts before the user shell; the vendor hotkey application remains independently installed |
+| `CC40.exe` | Slint UI in `ram-control-center.exe` | Core controls implemented; Fn/OSD parity remains open |
+| `InsydeDCHU.dll` | `ram-control-center-protocol` direct AcpiBridge transport | All five exports have a direct equivalent |
+| `HKFltrLib.dll` | `ram-control-center-protocol` direct `HKKbdFltr.sys` transport | Protocol is implemented; the current FlexiKey engine uses a user-mode hook and does not require this driver |
+| vendor boot-policy delivery | `RAMControlCenterBoot` service mode plus interactive `ram-control-center.exe` | Power replay starts before the user shell; the vendor hotkey application remains independently installed |
 
 The signed `AcpiBridge.sys` and `HKKbdFltr.sys` drivers are not replaced,
 patched, re-signed or wrapped by a custom kernel component. `AcpiBridge.sys` is
@@ -57,8 +57,8 @@ validated clear-and-reapply transaction instead.
 
 ## Boot service
 
-`neo-control.exe --boot-service` is a one-shot Windows service entry point.
-The installed service is named `NeoControlBoot`, starts automatically as
+`ram-control-center.exe --boot-service` is a one-shot Windows service entry point.
+The installed service is named `RAMControlCenterBoot`, starts automatically as
 `LocalSystem`, and depends on the signed `AcpiBridge` driver. It runs the same
 headless worker as `--boot-agent`, applies the persisted power transition,
 verifies the readback and exits without creating a window.
@@ -66,7 +66,7 @@ verifies the readback and exits without creating a window.
 ## Driver-only installation
 
 The signed OEM driver is a deployment dependency, not a component linked into
-`neo-control.exe`. The application looks for a local payload beside the
+`ram-control-center.exe`. The application looks for a local payload beside the
 executable:
 
 ```text

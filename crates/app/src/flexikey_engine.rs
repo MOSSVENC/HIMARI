@@ -18,12 +18,7 @@ pub struct CapturedTrigger {
 }
 
 #[derive(Clone, Debug)]
-pub struct FlexiKeyEngine {
-    #[cfg(windows)]
-    available: bool,
-    #[cfg(windows)]
-    error: Option<String>,
-}
+pub struct FlexiKeyEngine {}
 
 #[cfg(any(windows, test))]
 pub(crate) fn cc40_key_code_from_parts(virtual_key: u16, scan_code: u16, extended: bool) -> u16 {
@@ -76,15 +71,21 @@ mod tests {
         assert!(
             steps[..3]
                 .iter()
-                .all(|step| step.kind == neo_control_protocol::MacroStepKind::Make)
+                .all(|step| step.kind == ram_control_center_protocol::MacroStepKind::Make)
         );
         assert!(
             steps[3..6]
                 .iter()
-                .all(|step| step.kind == neo_control_protocol::MacroStepKind::Break)
+                .all(|step| step.kind == ram_control_center_protocol::MacroStepKind::Break)
         );
-        assert_eq!(steps[6].kind, neo_control_protocol::MacroStepKind::Make);
-        assert_eq!(steps[7].kind, neo_control_protocol::MacroStepKind::Break);
+        assert_eq!(
+            steps[6].kind,
+            ram_control_center_protocol::MacroStepKind::Make
+        );
+        assert_eq!(
+            steps[7].kind,
+            ram_control_center_protocol::MacroStepKind::Break
+        );
     }
 
     #[cfg(windows)]
@@ -110,12 +111,16 @@ pub(crate) fn cc40_mouse_code(message: u32, mouse_data: u32) -> Option<u16> {
 }
 
 #[cfg(windows)]
-pub(crate) fn hotkey_steps(text: &str) -> Result<Vec<neo_control_protocol::MacroStep>, String> {
+pub(crate) fn hotkey_steps(
+    text: &str,
+) -> Result<Vec<ram_control_center_protocol::MacroStep>, String> {
     platform::hotkey_steps(text)
 }
 
 #[cfg(not(windows))]
-pub(crate) fn hotkey_steps(_text: &str) -> Result<Vec<neo_control_protocol::MacroStep>, String> {
+pub(crate) fn hotkey_steps(
+    _text: &str,
+) -> Result<Vec<ram_control_center_protocol::MacroStep>, String> {
     Err("hotkey recording is only available on Windows".to_owned())
 }
 
@@ -130,12 +135,12 @@ mod platform {
     use std::thread;
     use std::time::Duration;
 
+    use crate::input_bindings::{InputDecision, dispatch};
     use crate::localization::tr;
-    use neo_control_protocol::{
+    use ram_control_center_protocol::{
         FlexiKeyAction, FlexiKeyDevice, FlexiKeyProfile, MacroStep, MacroStepKind,
     };
     use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
-    use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
         GetKeyNameTextW, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_EXTENDEDKEY,
         KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE, KEYEVENTF_UNICODE, MAPVK_VK_TO_VSC,
@@ -143,17 +148,14 @@ mod platform {
     };
     use windows_sys::Win32::UI::Shell::ShellExecuteW;
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        CallNextHookEx, DispatchMessageW, GetMessageW, KBDLLHOOKSTRUCT, LLKHF_EXTENDED,
-        LLKHF_INJECTED, MSG, MSLLHOOKSTRUCT, SetWindowsHookExW, TranslateMessage,
-        UnhookWindowsHookEx, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN,
-        WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN,
-        WM_SYSKEYUP, WM_XBUTTONDOWN, WM_XBUTTONUP,
+        CallNextHookEx, KBDLLHOOKSTRUCT, LLKHF_EXTENDED, LLKHF_INJECTED, MSLLHOOKSTRUCT,
+        WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP,
+        WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDOWN, WM_XBUTTONUP,
     };
 
     use super::{CapturedTrigger, EngineReport, FlexiKeyEngine};
 
     const INJECTION_MAGIC: usize = 0x4e45_4f46; // "NEOF"
-    const HOOK_START_TIMEOUT: Duration = Duration::from_secs(3);
 
     struct EngineState {
         keyboard_actions: HashMap<u16, FlexiKeyAction>,
@@ -172,75 +174,62 @@ mod platform {
 
     static ENGINE: OnceLock<Mutex<EngineState>> = OnceLock::new();
     static CAPTURE: OnceLock<Mutex<CaptureState>> = OnceLock::new();
+    static HOOK_RUNTIME: OnceLock<Mutex<crate::input_hooks::HookRuntime>> = OnceLock::new();
+
+    fn configure_hooks(keyboard: bool, mouse: bool) -> Result<(), String> {
+        HOOK_RUNTIME
+            .get_or_init(|| Mutex::new(crate::input_hooks::HookRuntime::default()))
+            .lock()
+            .map_err(|_| "input hook runtime lock was poisoned".to_owned())?
+            .configure(keyboard, mouse, Some(keyboard_hook), Some(mouse_hook))
+            .map(|_| ())
+    }
+
+    fn restore_profile_hooks() -> Result<(), String> {
+        let (keyboard, mouse) = ENGINE
+            .get()
+            .and_then(|engine| engine.lock().ok())
+            .map(|engine| {
+                (
+                    !engine.keyboard_actions.is_empty(),
+                    !engine.mouse_actions.is_empty(),
+                )
+            })
+            .ok_or_else(|| "FlexiKey engine is unavailable".to_owned())?;
+        let capturing = CAPTURE
+            .get()
+            .map(|capture| {
+                capture
+                    .lock()
+                    .map(|capture| !matches!(*capture, CaptureState::Idle))
+                    .map_err(|_| "trigger capture lock was poisoned".to_owned())
+            })
+            .transpose()?
+            .unwrap_or(false);
+        configure_hooks(keyboard || capturing, mouse || capturing)
+    }
 
     impl FlexiKeyEngine {
         pub fn start() -> Self {
-            if ENGINE.get().is_none() {
+            ENGINE.get_or_init(|| {
                 let (sender, receiver) = mpsc::channel();
                 thread::spawn(move || action_worker(receiver));
-                let _ = ENGINE.set(Mutex::new(EngineState {
+                Mutex::new(EngineState {
                     keyboard_actions: HashMap::new(),
                     mouse_actions: HashMap::new(),
                     keyboard_down: HashSet::new(),
                     mouse_down: HashSet::new(),
                     sender,
-                }));
-            }
-
-            let (hook_tx, hook_rx) = mpsc::channel();
-            // SAFETY: Win32 low-level hooks require a thread-owned message loop.
-            // All handles are checked, kept local to this thread, and unhooked
-            // before it exits; the callback functions have system ABI signatures.
-            thread::spawn(move || unsafe {
-                let module = GetModuleHandleW(ptr::null());
-                let keyboard = SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_hook), module, 0);
-                let mouse = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook), module, 0);
-                if keyboard.is_null() || mouse.is_null() {
-                    if !keyboard.is_null() {
-                        UnhookWindowsHookEx(keyboard);
-                    }
-                    if !mouse.is_null() {
-                        UnhookWindowsHookEx(mouse);
-                    }
-                    let _ = hook_tx.send(Err(std::io::Error::last_os_error().to_string()));
-                    return;
-                }
-                let _ = hook_tx.send(Ok(()));
-                let mut message = MSG::default();
-                while GetMessageW(&mut message, ptr::null_mut(), 0, 0) > 0 {
-                    TranslateMessage(&message);
-                    DispatchMessageW(&message);
-                }
-                UnhookWindowsHookEx(keyboard);
-                UnhookWindowsHookEx(mouse);
+                })
             });
 
-            let (available, error) = match hook_rx.recv_timeout(HOOK_START_TIMEOUT) {
-                Ok(Ok(())) => (true, None),
-                Ok(Err(error)) => (false, Some(format!("keyboard hook failed: {error}"))),
-                Err(error) => (
-                    false,
-                    Some(format!("keyboard hook start timed out: {error}")),
-                ),
-            };
-            if available {
-                log_line("keyboard hook active");
-            } else if let Some(error) = &error {
-                log_line(error);
-            }
-            Self { available, error }
+            Self {}
         }
 
         pub fn update_profile(
             &self,
             profile: Option<&FlexiKeyProfile>,
         ) -> Result<EngineReport, String> {
-            if !self.available {
-                return Err(self
-                    .error
-                    .clone()
-                    .unwrap_or_else(|| "keyboard hook unavailable".to_owned()));
-            }
             let mut report = EngineReport::default();
             let mut keyboard_actions = HashMap::new();
             let mut mouse_actions = HashMap::new();
@@ -291,6 +280,24 @@ mod platform {
             engine.mouse_actions = mouse_actions;
             engine.keyboard_down.clear();
             engine.mouse_down.clear();
+            drop(engine);
+            if let Err(error) = restore_profile_hooks() {
+                let mut engine = ENGINE
+                    .get()
+                    .and_then(|engine| engine.lock().ok())
+                    .ok_or_else(|| "FlexiKey engine lock was poisoned".to_owned())?;
+                engine.keyboard_actions.clear();
+                engine.mouse_actions.clear();
+                engine.keyboard_down.clear();
+                engine.mouse_down.clear();
+                drop(engine);
+                if let Err(cleanup_error) = configure_hooks(false, false) {
+                    log_line(&format!(
+                        "hook cleanup after profile failure failed: {cleanup_error}"
+                    ));
+                }
+                return Err(error);
+            }
             log_line(&format!(
                 "profile loaded: {} keyboard action(s), {} mouse action(s)",
                 report.keyboard_actions, report.mouse_actions
@@ -299,17 +306,16 @@ mod platform {
         }
 
         pub fn arm_capture(&self) -> Result<(), String> {
-            if !self.available {
-                return Err(self
-                    .error
-                    .clone()
-                    .unwrap_or_else(|| "input hook unavailable".to_owned()));
-            }
             let capture = CAPTURE.get_or_init(|| Mutex::new(CaptureState::Idle));
             let mut capture = capture
                 .lock()
                 .map_err(|_| "trigger capture lock was poisoned".to_owned())?;
             *capture = CaptureState::Armed;
+            drop(capture);
+            if let Err(error) = restore_profile_hooks() {
+                self.cancel_capture();
+                return Err(error);
+            }
             log_line("trigger capture armed");
             Ok(())
         }
@@ -319,6 +325,9 @@ mod platform {
                 && let Ok(mut capture) = capture.lock()
             {
                 *capture = CaptureState::Idle;
+            }
+            if let Err(error) = restore_profile_hooks() {
+                log_line(&format!("restore profile hooks after capture: {error}"));
             }
         }
 
@@ -330,12 +339,58 @@ mod platform {
             };
             let trigger = trigger.clone();
             *capture = CaptureState::Idle;
+            drop(capture);
+            if let Err(error) = restore_profile_hooks() {
+                log_line(&format!("restore profile hooks after trigger: {error}"));
+            }
             log_line(&format!(
                 "trigger captured: device={} code={:#06x} name={}",
                 trigger.device, trigger.key_code, trigger.name
             ));
             Some(trigger)
         }
+    }
+
+    pub(super) fn hook_lifecycle_smoke() -> Result<(), String> {
+        use crate::input_hooks::{HookRuntime, HookStatus};
+        let engine = FlexiKeyEngine::start();
+        engine.update_profile(None)?;
+        if HOOK_RUNTIME.get().is_some_and(|runtime| {
+            runtime
+                .lock()
+                .map(|runtime| runtime.is_started())
+                .unwrap_or(true)
+        }) {
+            return Err("empty profile started an input hook thread".to_owned());
+        }
+        let mut runtime = HookRuntime::default();
+        for _ in 0..20 {
+            for (keyboard, mouse) in [
+                (false, false),
+                (true, false),
+                (true, true),
+                (false, true),
+                (false, false),
+            ] {
+                let status =
+                    runtime.configure(keyboard, mouse, Some(keyboard_hook), Some(mouse_hook))?;
+                if status != (HookStatus { keyboard, mouse }) {
+                    return Err(format!("unexpected installed hook handles: {status:?}"));
+                }
+            }
+        }
+        // A failed installation must release a hook already installed in this request.
+        if runtime
+            .configure(true, true, Some(keyboard_hook), None)
+            .is_ok()
+        {
+            return Err("missing callback unexpectedly installed a mouse hook".to_owned());
+        }
+        drop(runtime);
+        println!(
+            "input hooks: 100 acknowledged transitions; empty, keyboard, mouse, both, removal and installation failure passed"
+        );
+        Ok(())
     }
 
     fn call_next_hook(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -370,10 +425,8 @@ mod platform {
         }
         let key = cc40_key_code(keyboard);
         if down
-            && capture_down(CapturedTrigger {
-                device: FlexiKeyDevice::Keyboard.as_u8(),
-                key_code: key,
-                name: keyboard_name(keyboard),
+            && capture_down(FlexiKeyDevice::Keyboard.as_u8(), key, || {
+                keyboard_name(keyboard)
             })
         {
             return 1;
@@ -387,19 +440,22 @@ mod platform {
         let Ok(mut engine) = engine.lock() else {
             return call_next_hook(code, wparam, lparam);
         };
-        let Some(action) = engine.keyboard_actions.get(&key).cloned() else {
-            drop(engine);
-            return call_next_hook(code, wparam, lparam);
-        };
-        if down {
-            if engine.keyboard_down.insert(key) {
-                let _ = engine.sender.send(action);
-            }
-        } else {
-            engine.keyboard_down.remove(&key);
+        let EngineState {
+            keyboard_actions,
+            keyboard_down,
+            ..
+        } = &mut *engine;
+        let decision = dispatch(keyboard_actions, keyboard_down, key, down);
+        let pass = matches!(&decision, InputDecision::Pass);
+        if let InputDecision::Dispatch(action) = decision {
+            let _ = engine.sender.send(action);
         }
         drop(engine);
-        1
+        if pass {
+            call_next_hook(code, wparam, lparam)
+        } else {
+            1
+        }
     }
 
     fn cc40_key_code(keyboard: &KBDLLHOOKSTRUCT) -> u16 {
@@ -430,20 +486,12 @@ mod platform {
         // pointer in lparam for the duration of this callback; the reference is
         // immutable and does not escape the callback.
         let mouse = unsafe { &*(lparam as *const MSLLHOOKSTRUCT) };
-        if matches!(message, WM_XBUTTONDOWN | WM_XBUTTONUP) {
-            log_line(&format!(
-                "mouse xbutton event: message={message:#06x} data={:#010x}",
-                mouse.mouseData
-            ));
-        }
         let Some(button) = super::cc40_mouse_code(message, mouse.mouseData) else {
             return call_next_hook(code, wparam, lparam);
         };
         if down
-            && capture_down(CapturedTrigger {
-                device: FlexiKeyDevice::Mouse.as_u8(),
-                key_code: button,
-                name: mouse_button_name(button).to_owned(),
+            && capture_down(FlexiKeyDevice::Mouse.as_u8(), button, || {
+                mouse_button_name(button).to_owned()
             })
         {
             return 1;
@@ -457,28 +505,37 @@ mod platform {
         let Ok(mut engine) = engine.lock() else {
             return call_next_hook(code, wparam, lparam);
         };
-        let Some(action) = engine.mouse_actions.get(&button).cloned() else {
-            drop(engine);
-            return call_next_hook(code, wparam, lparam);
-        };
-        if down {
-            if engine.mouse_down.insert(button) {
-                let _ = engine.sender.send(action);
-            }
-        } else {
-            engine.mouse_down.remove(&button);
+        let EngineState {
+            mouse_actions,
+            mouse_down,
+            ..
+        } = &mut *engine;
+        let decision = dispatch(mouse_actions, mouse_down, button, down);
+        let pass = matches!(&decision, InputDecision::Pass);
+        if let InputDecision::Dispatch(action) = decision {
+            let _ = engine.sender.send(action);
         }
         drop(engine);
-        1
+        if pass {
+            call_next_hook(code, wparam, lparam)
+        } else {
+            1
+        }
     }
 
-    fn capture_down(trigger: CapturedTrigger) -> bool {
+    fn capture_down(device: u8, key_code: u16, name: impl FnOnce() -> String) -> bool {
         let capture = CAPTURE.get_or_init(|| Mutex::new(CaptureState::Idle));
         let Ok(mut capture) = capture.lock() else {
             return false;
         };
         if matches!(*capture, CaptureState::Armed) {
-            *capture = CaptureState::Down { trigger };
+            *capture = CaptureState::Down {
+                trigger: CapturedTrigger {
+                    device,
+                    key_code,
+                    name: name(),
+                },
+            };
             true
         } else {
             false
@@ -849,7 +906,7 @@ mod platform {
 
 #[cfg(not(windows))]
 mod platform {
-    use neo_control_protocol::FlexiKeyProfile;
+    use ram_control_center_protocol::FlexiKeyProfile;
 
     use super::{EngineReport, FlexiKeyEngine};
 
@@ -873,6 +930,21 @@ mod platform {
 
         pub fn take_captured_trigger(&self) -> Option<super::CapturedTrigger> {
             None
+        }
+    }
+}
+
+/// Runs handle lifecycle checks without loading bindings or injecting input.
+pub(crate) fn hook_lifecycle_smoke() -> i32 {
+    #[cfg(windows)]
+    let result = platform::hook_lifecycle_smoke();
+    #[cfg(not(windows))]
+    let result: Result<(), String> = Err("input hook checks require Windows".to_owned());
+    match result {
+        Ok(()) => 0,
+        Err(error) => {
+            eprintln!("input hooks: {error}");
+            1
         }
     }
 }

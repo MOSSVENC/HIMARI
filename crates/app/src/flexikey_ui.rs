@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::Duration;
 
-use neo_control_protocol::{
+use ram_control_center_protocol::{
     FlexiKeyAction, FlexiKeyBinding, FlexiKeyDevice, FlexiKeyProfile, FlexiKeyStore,
 };
 use slint::{ComponentHandle, VecModel, Weak};
@@ -819,7 +819,11 @@ fn flexikey_engine_status(state: &FlexiKeyViewState) -> String {
     };
     format!(
         "{} · {} {} · {} {}",
-        tr("Input hooks active"),
+        if report.keyboard_actions == 0 && report.mouse_actions == 0 {
+            tr("Input hooks idle")
+        } else {
+            tr("Input hooks active")
+        },
         report.keyboard_actions,
         tr("keyboard action(s)"),
         report.mouse_actions,
@@ -1075,9 +1079,9 @@ mod flexikey_tests {
 
     #[test]
     fn editing_text_preserves_start_and_send_keys() {
-        let step = |key_code| neo_control_protocol::MacroStep {
+        let step = |key_code| ram_control_center_protocol::MacroStep {
             key_code,
-            kind: neo_control_protocol::MacroStepKind::Make,
+            kind: ram_control_center_protocol::MacroStepKind::Make,
             delay_ms: 5,
             group: 0,
             display: String::new(),

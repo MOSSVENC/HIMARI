@@ -1,6 +1,6 @@
 use crate::MainWindow;
 use crate::localization::tr;
-use neo_control_protocol::{
+use ram_control_center_protocol::{
     FanCurveNodes, FanCurveState, QuickToggle, QuickToggleState, RpmFanLevel,
 };
 
@@ -45,7 +45,7 @@ pub(crate) fn set_fan_curve_properties(ui: &MainWindow, curve: Option<&FanCurveS
 fn apply_curve_channel(
     ui: &MainWindow,
     index: usize,
-    channel: &neo_control_protocol::FanCurveChannel,
+    channel: &ram_control_center_protocol::FanCurveChannel,
     sync_requested: bool,
 ) {
     if channel.is_unused() {
@@ -80,7 +80,7 @@ fn apply_curve_channel(
     }
 }
 
-fn curve_profile_text(channel: &neo_control_protocol::FanCurveChannel) -> String {
+fn curve_profile_text(channel: &ram_control_center_protocol::FanCurveChannel) -> String {
     if channel.is_unused() {
         return tr("unused").to_owned();
     }

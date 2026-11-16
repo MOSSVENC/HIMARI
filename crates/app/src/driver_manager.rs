@@ -6,7 +6,9 @@
 
 use std::path::{Path, PathBuf};
 
-use neo_control_protocol::{Dchu, KeyboardFilter};
+use ram_control_center_protocol::{Dchu, KeyboardFilter};
+
+use crate::product::product_data_dir;
 
 const ACPI_SERVICE: &str = "AcpiBridge";
 const KEYBOARD_SERVICE: &str = "HKKbdFltr";
@@ -107,11 +109,7 @@ fn payload_root() -> PathBuf {
     {
         candidates.push(parent.join("drivers"));
     }
-    let program_data = std::env::var_os("ProgramData")
-        .map(PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir)
-        .join("NeoControl")
-        .join("drivers");
+    let program_data = product_data_dir().join("drivers");
     if !candidates
         .iter()
         .any(|candidate| candidate == &program_data)
@@ -186,7 +184,7 @@ mod platform {
     use std::thread;
     use std::time::Duration;
 
-    use neo_control_protocol::Dchu;
+    use ram_control_center_protocol::Dchu;
     use windows_service::service::ServiceAccess;
     use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
     use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0};
@@ -203,6 +201,7 @@ mod platform {
     use super::{
         ACPI_SERVICE, ElevatedInstaller, InstallLaunchError, acpi_payload_at, payload_root,
     };
+    use crate::product::product_data_dir;
 
     const ERROR_CANCELLED: i32 = 1223;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -409,11 +408,7 @@ mod platform {
     }
 
     fn log_path() -> std::path::PathBuf {
-        std::env::var_os("ProgramData")
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(std::env::temp_dir)
-            .join("NeoControl")
-            .join("driver-install.log")
+        product_data_dir().join("driver-install.log")
     }
 
     fn append_log(path: &Path, message: &str) {
@@ -444,8 +439,10 @@ mod tests {
 
     #[test]
     fn required_payload_requires_all_three_files() {
-        let root =
-            std::env::temp_dir().join(format!("neo-control-driver-test-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!(
+            "ram-control-center-driver-test-{}",
+            std::process::id()
+        ));
         let directory = root.join("acpibridge");
         std::fs::create_dir_all(&directory).expect("create test directory");
         std::fs::write(directory.join("AcpiBridge.inf"), b"inf").expect("write inf");

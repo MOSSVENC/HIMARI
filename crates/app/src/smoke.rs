@@ -1,4 +1,4 @@
-use neo_control_protocol::Dchu;
+use ram_control_center_protocol::Dchu;
 
 use crate::input::send_touchpad_chord;
 use crate::system_controls;
@@ -54,7 +54,7 @@ pub(crate) fn system_smoke() -> i32 {
             .copied()
             .unwrap_or(0);
         system_controls::set_blue_light_filter(level).map_err(|error| {
-            neo_control_protocol::DchuError::ControlFailed {
+            ram_control_center_protocol::DchuError::ControlFailed {
                 operation: "system smoke blue light",
                 detail: error,
             }

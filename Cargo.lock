@@ -2554,28 +2554,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "neo-control"
-version = "0.1.0"
-dependencies = [
- "neo-control-protocol",
- "raw-window-handle",
- "slint",
- "slint-build",
- "windows",
- "windows-registry",
- "windows-service",
- "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "neo-control-protocol"
-version = "0.1.0"
-dependencies = [
- "roxmltree",
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "nix"
 version = "0.31.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3322,6 +3300,29 @@ name = "r-efi"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
+
+[[package]]
+name = "ram-control-center"
+version = "0.1.0"
+dependencies = [
+ "ram-control-center-protocol",
+ "raw-window-handle",
+ "slint",
+ "slint-build",
+ "windows",
+ "windows-registry",
+ "windows-result",
+ "windows-service",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "ram-control-center-protocol"
+version = "0.1.0"
+dependencies = [
+ "roxmltree",
+ "windows-sys 0.61.2",
+]
 
 [[package]]
 name = "range-alloc"

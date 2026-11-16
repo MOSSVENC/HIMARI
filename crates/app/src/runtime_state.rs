@@ -1,22 +1,20 @@
 #[cfg(windows)]
 use std::time::{Duration, SystemTime};
 
-use neo_control_protocol::PowerMode;
+use ram_control_center_protocol::PowerMode;
+
+use crate::product::{legacy_data_dir, product_data_dir};
 
 pub(crate) fn persist_power_mode(mode: PowerMode) {
-    let root = std::env::var_os("ProgramData")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir)
-        .join("NeoControl");
+    let root = product_data_dir();
     if std::fs::create_dir_all(&root).is_err() {
         return;
     }
     let path = root.join("boot-profile.ini");
-    let mut lines = std::fs::read_to_string(&path)
-        .unwrap_or_default()
-        .lines()
-        .map(str::to_owned)
-        .collect::<Vec<_>>();
+    let initial = std::fs::read_to_string(&path)
+        .or_else(|_| std::fs::read_to_string(legacy_data_dir().join("boot-profile.ini")))
+        .unwrap_or_default();
+    let mut lines = initial.lines().map(str::to_owned).collect::<Vec<_>>();
     let mut found_power = false;
     let mut found_fan = false;
     for line in &mut lines {
@@ -41,10 +39,7 @@ pub(crate) fn persist_power_mode(mode: PowerMode) {
 #[cfg(windows)]
 pub(crate) fn flexi_recovery_ready() -> bool {
     use windows_sys::Win32::System::SystemInformation::GetTickCount64;
-    let root = std::env::var_os("ProgramData")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir)
-        .join("NeoControl");
+    let root = product_data_dir();
     let marker = root.join("flexi-recovery.marker");
     let now = SystemTime::now();
     let marker_time = match std::fs::metadata(&marker).and_then(|meta| meta.modified()) {

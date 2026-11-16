@@ -1,4 +1,4 @@
-use neo_control_protocol::{Dchu, QuickToggle};
+use ram_control_center_protocol::{Dchu, QuickToggle};
 
 use super::CommandOutcome;
 use crate::input::{send_touchpad_chord, send_virtual_key};

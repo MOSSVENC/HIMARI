@@ -1,5 +1,9 @@
 # RAM CONTROL CENTER quality assessment
 
+This is a historical assessment. The input and installation defects found on
+November 14–16 invalidate its broad readiness claims. Use the
+[repair record](repair-status-2026-11-16.md) for current evidence and open items.
+
 Date: 2026-11-06. Measurements are from the current project and the installed
 vendor package; no BIOS, EC, driver or vendor binary was modified for them.
 
@@ -117,16 +121,16 @@ directory, so imported Slint files trigger rebuilds.
 The crate graph remains deliberately small and acyclic:
 
 ```text
-neo-control
-  -> neo-control-protocol
+ram-control-center
+  -> ram-control-center-protocol
   -> slint / raw-window-handle / windows-sys / windows
   -> windows-registry / windows-service
 
-neo-control-protocol
+ram-control-center-protocol
   -> roxmltree / windows-sys
 ```
 
-`neo-control-protocol` is independent of the app and UI. Hardware access is
+`ram-control-center-protocol` is independent of the app and UI. Hardware access is
 confined to direct `CreateFileW` / `DeviceIoControl` code and typed domain
 modules behind the signed device interfaces.
 

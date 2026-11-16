@@ -10,8 +10,16 @@ mod flexikey_engine;
 mod flexikey_ui;
 mod formatting;
 mod input;
+#[cfg(any(windows, test))]
+mod input_bindings;
+#[cfg(windows)]
+mod input_hooks;
 mod localization;
+#[allow(dead_code)]
+mod product;
 mod runtime_state;
+#[cfg(windows)]
+mod service_lifecycle;
 mod smoke;
 mod system_controls;
 mod telemetry;
@@ -173,7 +181,7 @@ fn run_snapshot(page: usize, path: std::path::PathBuf) -> Result<(), Box<dyn std
         log_action(&format!("snapshot translation unavailable: {error}"));
     }
     ui.set_language_zh(true);
-    let dchu = neo_control_protocol::Dchu::open();
+    let dchu = ram_control_center_protocol::Dchu::open();
     ui.set_transport_ready(dchu.is_ok());
     ui.set_transport_detail(
         dchu.as_ref()
@@ -338,6 +346,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::process::exit(1);
             }
         },
+        Some("--input-hooks-smoke") => std::process::exit(flexikey_engine::hook_lifecycle_smoke()),
         Some("--system-smoke") => std::process::exit(system_smoke()),
         Some("--io-smoke") => std::process::exit(io_smoke()),
         Some("--display-care-smoke") => std::process::exit(display_care_smoke()),

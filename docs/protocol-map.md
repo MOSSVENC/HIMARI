@@ -318,3 +318,14 @@ The signed keyboard filter is a separate device:
 
 The implemented IOCTLs and 16-byte collection frames are documented in
 [`docs/verification.md`](verification.md).
+
+## ACPI notifications
+
+The vendor service uses `0x322404` to register an event handle and
+`0x322408` to read an eight-byte notification value. RAM CONTROL CENTER now has
+the matching wait/read loop and exposes the low 32 bits as the raw notification
+value for diagnostics. The transport layout is recovered; the mapping from
+values to Fn actions still requires hardware capture. The vendor service also
+writes `AppSettings(1, 12, 1)`; this implementation leaves that setting
+untouched until its role and restore behavior are verified on hardware. The
+listener currently logs raw values and does not render an OSD.
