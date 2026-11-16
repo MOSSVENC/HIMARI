@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::mpsc::Sender;
 use std::time::{Duration, Instant};
 
 use ram_control_center_protocol::{
@@ -15,7 +14,7 @@ use crate::fan_curve_ui::{curve_nodes, quick_toggle_from_index};
 use crate::flexikey_ui::{FlexiKeyViewState, render_flexikey};
 use crate::localization::{is_zh, localized_fan_label, localized_power_label, set_zh, tr};
 use crate::tray;
-use crate::worker::WorkerCommand;
+use crate::worker::{CommandSender, WorkerCommand};
 use crate::{MainWindow, Palette};
 
 static PAGE_EPOCH: AtomicU64 = AtomicU64::new(0);
@@ -101,7 +100,7 @@ fn begin_page_switch(ui: &MainWindow, page: i32, epoch: u64) {
 
 pub(crate) fn wire_ui(
     ui: &MainWindow,
-    sender: Sender<WorkerCommand>,
+    sender: CommandSender,
     flexikey_state: Rc<RefCell<FlexiKeyViewState>>,
 ) {
     let weak = ui.as_weak();

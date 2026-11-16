@@ -188,7 +188,7 @@ pub(super) fn apply_flexi_charger(
         return CommandOutcome::missing_transport();
     };
     let Some(mode) = FlexiChargerMode::from_u8(mode) else {
-        return CommandOutcome::failure(tr("Unsupported charge mode.")).without_selection_sync();
+        return CommandOutcome::failure(tr("Unsupported charge mode."));
     };
     CommandOutcome::from_result(
         active.set_flexi_charger(mode, start, stop),

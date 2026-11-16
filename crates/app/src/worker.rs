@@ -1,81 +1,40 @@
+mod commands;
 mod input;
 mod io_controls;
 mod power_fan;
 mod rgb;
 mod snapshot;
 
-use std::sync::mpsc::{self, RecvTimeoutError};
+use std::sync::mpsc::RecvTimeoutError;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use ram_control_center_protocol::{
-    AntiDustSchedule, CustomFanCurve, Dchu, FanMode, GpuSwitchMode, PowerMode, QuickToggle,
-    RgbColor, ThermalSample,
-};
+use ram_control_center_protocol::Dchu;
 use slint::Weak;
 
 use crate::MainWindow;
+use crate::control_sync::{ControlSync, Controls};
 use crate::diagnostics::log_action;
 use crate::driver_manager::{self, DriverHealth};
 use crate::localization::tr;
 use crate::telemetry::SystemSampler;
+use crate::thermal_cache::ThermalCache;
 use crate::ui_update::UiUpdate;
-
-pub(crate) enum WorkerCommand {
-    ApplyPower(PowerMode),
-    ApplyFan(FanMode),
-    ApplySlowFan(bool),
-    ApplyTurboFan(bool),
-    ApplyFanOffset(u8),
-    RunAntiDust,
-    ApplyAntiDustSchedule(AntiDustSchedule),
-    ApplyDisplayToggle(u8, bool),
-    ApplyMonitorTimeouts(u32, u32),
-    ApplyScreenSaver(bool, u8, u32),
-    ApplyRpmEdit {
-        cpu: [(u8, u16); 10],
-        gpu: [(u8, u16); 10],
-    },
-    ApplyQuickToggle(QuickToggle, bool),
-    ApplyLowRefresh(bool),
-    ApplyFanCurve(CustomFanCurve),
-    ApplyQuiet(bool),
-    ApplyGpuSwitch(GpuSwitchMode),
-    ApplyFlexiCharger(u8, u8, u8),
-    ApplyRgbBrightness(u8),
-    ApplyRgbColor(RgbColor),
-    ApplyRgbEffect(u8),
-    ApplyRgbSleepTimer(bool, u32),
-    ApplyRgbBootEffect(bool),
-    ApplyCamera(bool),
-    ApplyTouchpad(bool),
-    ApplyAirplane(bool),
-    ApplyLockKey(u8),
-    ApplyBrightness(u8),
-    ApplyBlueLight(u8),
-    ApplyVolume(u8),
-    ApplyMute(bool),
-    Refresh,
-}
+pub(crate) use commands::{CommandReceiver, CommandSender, WorkerCommand, channel};
 
 pub(super) struct CommandOutcome {
     status: Option<(String, i32)>,
-    sync_selection: bool,
 }
 
 impl CommandOutcome {
     pub(super) fn success(message: impl Into<String>) -> Self {
         Self {
             status: Some((message.into(), 1)),
-            sync_selection: true,
         }
     }
 
     pub(super) fn silent_success() -> Self {
-        Self {
-            status: None,
-            sync_selection: true,
-        }
+        Self { status: None }
     }
 
     pub(super) fn failure(message: impl ToString) -> Self {
@@ -85,7 +44,6 @@ impl CommandOutcome {
     pub(super) fn with_tone(message: String, tone: i32) -> Self {
         Self {
             status: Some((message, tone)),
-            sync_selection: true,
         }
     }
 
@@ -100,12 +58,7 @@ impl CommandOutcome {
     }
 
     pub(super) fn missing_transport() -> Self {
-        Self::failure(tr("Hardware transport is unavailable.")).without_selection_sync()
-    }
-
-    pub(super) fn without_selection_sync(mut self) -> Self {
-        self.sync_selection = false;
-        self
+        Self::failure(tr("Hardware transport is unavailable."))
     }
 }
 
@@ -115,15 +68,15 @@ struct WorkerRuntime {
     dchu: Option<Dchu>,
     status: Option<(String, i32)>,
     next_retry: Instant,
-    sync_selection_once: bool,
+    control_sync: ControlSync,
     tick: u64,
-    last_thermal: Option<ThermalSample>,
+    thermal: ThermalCache,
     thermal_failures: u8,
     driver_health: DriverHealth,
 }
 
 impl WorkerRuntime {
-    fn new(weak: Weak<MainWindow>) -> Self {
+    fn new(weak: Weak<MainWindow>, control_sync: ControlSync) -> Self {
         log_action("worker: start");
         let sampler = SystemSampler::new();
         log_action("worker: sampler ready");
@@ -161,182 +114,159 @@ impl WorkerRuntime {
             dchu,
             status: None,
             next_retry: Instant::now() + Duration::from_secs(5),
-            sync_selection_once: true,
+            control_sync,
             tick: 0,
-            last_thermal: None,
+            thermal: ThermalCache::default(),
             thermal_failures: 0,
             driver_health,
         }
     }
 
-    fn run(mut self, receiver: mpsc::Receiver<WorkerCommand>) {
+    fn run(mut self, receiver: CommandReceiver) {
         loop {
-            match receiver.recv_timeout(Duration::from_secs(1)) {
-                Ok(WorkerCommand::ApplyPower(mode)) => {
-                    self.finish(power_fan::apply_power(self.dchu.as_ref(), mode));
+            match receiver.receiver.recv_timeout(Duration::from_secs(1)) {
+                Ok(request) => {
+                    let commands::QueuedCommand { command, ticket } = request;
+                    let refresh = matches!(&command, WorkerCommand::Refresh);
+                    let display = matches!(&command, WorkerCommand::ApplyDisplayToggle(_, _));
+                    if refresh {
+                        drop(ticket);
+                        self.refresh();
+                        continue;
+                    }
+                    let outcome = self.execute(command);
+                    drop(ticket);
+                    if display {
+                        self.finish_display_toggle(outcome);
+                    } else {
+                        self.finish(outcome);
+                    }
                 }
-                Ok(WorkerCommand::ApplyFan(mode)) => {
-                    self.finish(power_fan::apply_fan(self.dchu.as_ref(), mode));
-                }
-                Ok(WorkerCommand::ApplySlowFan(enabled)) => {
-                    self.finish(power_fan::apply_slow_fan(self.dchu.as_ref(), enabled));
-                }
-                Ok(WorkerCommand::ApplyTurboFan(enabled)) => {
-                    self.finish(power_fan::apply_turbo_fan(self.dchu.as_ref(), enabled));
-                }
-                Ok(WorkerCommand::ApplyFanOffset(percent)) => {
-                    self.finish(power_fan::apply_fan_offset(self.dchu.as_ref(), percent));
-                }
-                Ok(WorkerCommand::RunAntiDust) => {
-                    self.finish(power_fan::run_anti_dust(self.dchu.as_ref()));
-                }
-                Ok(WorkerCommand::ApplyAntiDustSchedule(schedule)) => {
-                    self.finish(power_fan::apply_anti_dust_schedule(
-                        self.dchu.as_ref(),
-                        schedule,
-                    ));
-                }
-                Ok(WorkerCommand::ApplyRpmEdit { cpu, gpu }) => {
-                    self.finish(power_fan::apply_rpm_edit(self.dchu.as_ref(), cpu, gpu));
-                }
-                Ok(WorkerCommand::ApplyFanCurve(curve)) => {
-                    self.finish(power_fan::apply_fan_curve(self.dchu.as_ref(), curve));
-                }
-                Ok(WorkerCommand::ApplyQuiet(disable_dgpu)) => {
-                    self.finish(power_fan::apply_quiet(self.dchu.as_ref(), disable_dgpu));
-                }
-                Ok(WorkerCommand::ApplyGpuSwitch(mode)) => {
-                    self.finish(power_fan::apply_gpu_switch(self.dchu.as_ref(), mode));
-                }
-                Ok(WorkerCommand::ApplyFlexiCharger(mode, start, stop)) => {
-                    self.finish(power_fan::apply_flexi_charger(
-                        self.dchu.as_ref(),
-                        mode,
-                        start,
-                        stop,
-                    ));
-                }
-                Ok(WorkerCommand::ApplyLowRefresh(enabled)) => {
-                    self.finish(power_fan::apply_low_refresh(self.dchu.as_ref(), enabled));
-                }
-                Ok(WorkerCommand::ApplyDisplayToggle(toggle, enabled)) => {
-                    self.finish_display_toggle(io_controls::apply_display_toggle(
-                        self.dchu.as_ref(),
-                        toggle,
-                        enabled,
-                    ));
-                }
-                Ok(WorkerCommand::ApplyMonitorTimeouts(ac, dc)) => {
-                    self.finish(io_controls::apply_monitor_timeouts(ac, dc));
-                }
-                Ok(WorkerCommand::ApplyScreenSaver(enabled, kind, minutes)) => {
-                    self.finish(io_controls::apply_screen_saver(
-                        self.dchu.as_ref(),
-                        enabled,
-                        kind,
-                        minutes,
-                    ));
-                }
-                Ok(WorkerCommand::ApplyBrightness(percent)) => {
-                    self.finish(io_controls::apply_brightness(percent));
-                }
-                Ok(WorkerCommand::ApplyBlueLight(level)) => {
-                    self.finish(io_controls::apply_blue_light(level));
-                }
-                Ok(WorkerCommand::ApplyVolume(percent)) => {
-                    self.finish(io_controls::apply_volume(percent));
-                }
-                Ok(WorkerCommand::ApplyMute(muted)) => {
-                    self.finish(io_controls::apply_mute(muted));
-                }
-                Ok(WorkerCommand::ApplyRgbBrightness(level)) => {
-                    self.finish(rgb::apply_brightness(self.dchu.as_ref(), level));
-                }
-                Ok(WorkerCommand::ApplyRgbColor(color)) => {
-                    self.finish(rgb::apply_color(self.dchu.as_ref(), color));
-                }
-                Ok(WorkerCommand::ApplyRgbEffect(effect)) => {
-                    self.finish(rgb::apply_effect(self.dchu.as_ref(), effect));
-                }
-                Ok(WorkerCommand::ApplyRgbSleepTimer(enabled, seconds)) => {
-                    self.finish(rgb::apply_sleep_timer(self.dchu.as_ref(), enabled, seconds));
-                }
-                Ok(WorkerCommand::ApplyRgbBootEffect(enabled)) => {
-                    self.finish(rgb::apply_boot_effect(self.dchu.as_ref(), enabled));
-                }
-                Ok(WorkerCommand::ApplyCamera(enabled)) => {
-                    self.finish(input::apply_camera(self.dchu.as_ref(), enabled));
-                }
-                Ok(WorkerCommand::ApplyTouchpad(enabled)) => {
-                    self.finish(input::apply_touchpad(self.dchu.as_ref(), enabled));
-                }
-                Ok(WorkerCommand::ApplyAirplane(enabled)) => {
-                    self.finish(input::apply_airplane(self.dchu.as_ref(), enabled));
-                }
-                Ok(WorkerCommand::ApplyQuickToggle(toggle, enabled)) => {
-                    self.finish(input::apply_quick_toggle(
-                        self.dchu.as_ref(),
-                        toggle,
-                        enabled,
-                    ));
-                }
-                Ok(WorkerCommand::ApplyLockKey(vk)) => {
-                    self.finish(input::apply_lock_key(vk));
-                }
-                Ok(WorkerCommand::Refresh) => self.refresh(),
                 Err(RecvTimeoutError::Timeout) => self.on_timeout(),
                 Err(RecvTimeoutError::Disconnected) => break,
             }
         }
     }
 
+    fn execute(&mut self, command: WorkerCommand) -> CommandOutcome {
+        match command {
+            WorkerCommand::ApplyPower(mode) => power_fan::apply_power(self.dchu.as_ref(), mode),
+            WorkerCommand::ApplyFan(mode) => power_fan::apply_fan(self.dchu.as_ref(), mode),
+            WorkerCommand::ApplySlowFan(enabled) => {
+                power_fan::apply_slow_fan(self.dchu.as_ref(), enabled)
+            }
+            WorkerCommand::ApplyTurboFan(enabled) => {
+                power_fan::apply_turbo_fan(self.dchu.as_ref(), enabled)
+            }
+            WorkerCommand::ApplyFanOffset(percent) => {
+                power_fan::apply_fan_offset(self.dchu.as_ref(), percent)
+            }
+            WorkerCommand::RunAntiDust => power_fan::run_anti_dust(self.dchu.as_ref()),
+            WorkerCommand::ApplyAntiDustSchedule(schedule) => {
+                power_fan::apply_anti_dust_schedule(self.dchu.as_ref(), schedule)
+            }
+            WorkerCommand::ApplyRpmEdit { cpu, gpu } => {
+                power_fan::apply_rpm_edit(self.dchu.as_ref(), cpu, gpu)
+            }
+            WorkerCommand::ApplyFanCurve(curve) => {
+                power_fan::apply_fan_curve(self.dchu.as_ref(), curve)
+            }
+            WorkerCommand::ApplyQuiet(disable_dgpu) => {
+                power_fan::apply_quiet(self.dchu.as_ref(), disable_dgpu)
+            }
+            WorkerCommand::ApplyGpuSwitch(mode) => {
+                power_fan::apply_gpu_switch(self.dchu.as_ref(), mode)
+            }
+            WorkerCommand::ApplyFlexiCharger(mode, start, stop) => {
+                power_fan::apply_flexi_charger(self.dchu.as_ref(), mode, start, stop)
+            }
+            WorkerCommand::ApplyLowRefresh(enabled) => {
+                power_fan::apply_low_refresh(self.dchu.as_ref(), enabled)
+            }
+            WorkerCommand::ApplyDisplayToggle(toggle, enabled) => {
+                io_controls::apply_display_toggle(self.dchu.as_ref(), toggle, enabled)
+            }
+            WorkerCommand::ApplyMonitorTimeouts(ac, dc) => {
+                io_controls::apply_monitor_timeouts(ac, dc)
+            }
+            WorkerCommand::ApplyScreenSaver(enabled, kind, minutes) => {
+                io_controls::apply_screen_saver(self.dchu.as_ref(), enabled, kind, minutes)
+            }
+            WorkerCommand::ApplyBrightness(percent) => io_controls::apply_brightness(percent),
+            WorkerCommand::ApplyBlueLight(level) => io_controls::apply_blue_light(level),
+            WorkerCommand::ApplyVolume(percent) => io_controls::apply_volume(percent),
+            WorkerCommand::ApplyMute(muted) => io_controls::apply_mute(muted),
+            WorkerCommand::ApplyRgbBrightness(level) => {
+                rgb::apply_brightness(self.dchu.as_ref(), level)
+            }
+            WorkerCommand::ApplyRgbColor(color) => rgb::apply_color(self.dchu.as_ref(), color),
+            WorkerCommand::ApplyRgbEffect(effect) => rgb::apply_effect(self.dchu.as_ref(), effect),
+            WorkerCommand::ApplyRgbSleepTimer(enabled, seconds) => {
+                rgb::apply_sleep_timer(self.dchu.as_ref(), enabled, seconds)
+            }
+            WorkerCommand::ApplyRgbBootEffect(enabled) => {
+                rgb::apply_boot_effect(self.dchu.as_ref(), enabled)
+            }
+            WorkerCommand::ApplyCamera(enabled) => input::apply_camera(self.dchu.as_ref(), enabled),
+            WorkerCommand::ApplyTouchpad(enabled) => {
+                input::apply_touchpad(self.dchu.as_ref(), enabled)
+            }
+            WorkerCommand::ApplyAirplane(enabled) => {
+                input::apply_airplane(self.dchu.as_ref(), enabled)
+            }
+            WorkerCommand::ApplyQuickToggle(toggle, enabled) => {
+                input::apply_quick_toggle(self.dchu.as_ref(), toggle, enabled)
+            }
+            WorkerCommand::ApplyLockKey(vk) => input::apply_lock_key(vk),
+            WorkerCommand::Refresh => unreachable!("refresh is handled by the receive loop"),
+        }
+    }
+
     fn finish(&mut self, outcome: CommandOutcome) {
         self.status = outcome.status;
-        self.sync_selection_once |= outcome.sync_selection;
-        self.push_quick(false);
+        self.push_quick();
     }
 
     fn finish_display_toggle(&mut self, outcome: CommandOutcome) {
         self.status = outcome.status;
-        self.sync_selection_once |= outcome.sync_selection;
-        self.push_quick_with_display_care(false);
+        self.push_quick_with_display_care();
     }
 
-    fn push(&mut self, sync_selection: bool, extended_reads: bool) {
+    fn push(&mut self, extended_reads: bool) {
         snapshot::push_snapshot(
             &self.weak,
             &mut self.sampler,
             self.dchu.as_ref(),
             snapshot::SnapshotInput {
                 status: self.status.clone(),
-                thermal: self.last_thermal,
+                thermal: self.thermal.current(Instant::now()),
                 driver_health: &self.driver_health,
+                control_sync: &self.control_sync,
             },
-            sync_selection,
             extended_reads,
             extended_reads,
         );
     }
 
-    fn push_quick(&mut self, sync_selection: bool) {
-        self.push_quick_inner(sync_selection, false);
+    fn push_quick(&mut self) {
+        self.push_quick_inner(false);
     }
 
-    fn push_quick_with_display_care(&mut self, sync_selection: bool) {
-        self.push_quick_inner(sync_selection, true);
+    fn push_quick_with_display_care(&mut self) {
+        self.push_quick_inner(true);
     }
 
-    fn push_quick_inner(&mut self, sync_selection: bool, refresh_display_care: bool) {
+    fn push_quick_inner(&mut self, refresh_display_care: bool) {
         snapshot::push_snapshot(
             &self.weak,
             &mut self.sampler,
             self.dchu.as_ref(),
             snapshot::SnapshotInput {
                 status: self.status.clone(),
-                thermal: self.last_thermal,
+                thermal: self.thermal.current(Instant::now()),
                 driver_health: &self.driver_health,
+                control_sync: &self.control_sync,
             },
-            sync_selection,
             false,
             refresh_display_care,
         );
@@ -355,7 +285,8 @@ impl WorkerRuntime {
         }
         self.refresh_thermal();
         self.driver_health = driver_manager::detect(self.dchu.is_some());
-        self.push(true, true);
+        drop(self.control_sync.issue(Controls::ALL));
+        self.push(true);
     }
 
     fn on_timeout(&mut self) {
@@ -372,20 +303,12 @@ impl WorkerRuntime {
             self.refresh_thermal();
             self.driver_health = driver_manager::detect(self.dchu.is_some());
         }
-        let sync_selection = if full_read {
-            std::mem::take(&mut self.sync_selection_once)
-        } else {
-            false
-        };
-        self.push(sync_selection, full_read);
+        self.push(full_read);
     }
 
     fn refresh_thermal(&mut self) {
         let Some(dchu) = self.dchu.as_ref() else {
             self.thermal_failures = self.thermal_failures.saturating_add(1);
-            if self.thermal_failures >= 3 {
-                self.last_thermal = None;
-            }
             return;
         };
         let started = Instant::now();
@@ -399,7 +322,7 @@ impl WorkerRuntime {
                     sample.fan4.temperature_c,
                     started.elapsed().as_micros()
                 ));
-                self.last_thermal = Some(sample);
+                self.thermal.observe(sample, Instant::now());
                 self.thermal_failures = 0;
             }
             Ok(sample) => {
@@ -412,9 +335,6 @@ impl WorkerRuntime {
                     sample.fan4.temperature_c,
                     self.thermal_failures
                 ));
-                if self.thermal_failures >= 3 {
-                    self.last_thermal = None;
-                }
             }
             Err(error) => {
                 self.thermal_failures = self.thermal_failures.saturating_add(1);
@@ -422,16 +342,13 @@ impl WorkerRuntime {
                     "worker: thermal read failed ({error}, failures={})",
                     self.thermal_failures
                 ));
-                if self.thermal_failures >= 3 {
-                    self.last_thermal = None;
-                }
             }
         }
     }
 }
 
-pub(crate) fn spawn_worker(receiver: mpsc::Receiver<WorkerCommand>, weak: Weak<MainWindow>) {
-    thread::spawn(move || WorkerRuntime::new(weak).run(receiver));
+pub(crate) fn spawn_worker(receiver: CommandReceiver, weak: Weak<MainWindow>) {
+    thread::spawn(move || WorkerRuntime::new(weak, receiver.sync.clone()).run(receiver));
 }
 
 #[cfg(windows)]

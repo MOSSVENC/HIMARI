@@ -94,16 +94,26 @@ fn curve_profile_text(channel: &ram_control_center_protocol::FanCurveChannel) ->
 }
 
 pub(crate) fn set_toggle_properties(ui: &MainWindow, state: &QuickToggleState) {
-    ui.set_toggle_fn_value(state.fn_lock.unwrap_or(false));
-    ui.set_toggle_fn_known(state.fn_lock.is_some());
-    ui.set_toggle_win_value(state.win_lock.unwrap_or(false));
-    ui.set_toggle_win_known(state.win_lock.is_some());
-    ui.set_toggle_swap_value(state.swap_win_fn.unwrap_or(false));
-    ui.set_toggle_swap_known(state.swap_win_fn.is_some());
-    ui.set_toggle_hotkeys_value(state.hotkeys_control_center.unwrap_or(false));
-    ui.set_toggle_hotkeys_known(state.hotkeys_control_center.is_some());
-    ui.set_toggle_copilot_value(state.copilot.unwrap_or(false));
-    ui.set_toggle_copilot_known(state.copilot.is_some());
+    if let Some(value) = state.fn_lock {
+        ui.set_toggle_fn_value(value);
+        ui.set_toggle_fn_known(true);
+    }
+    if let Some(value) = state.win_lock {
+        ui.set_toggle_win_value(value);
+        ui.set_toggle_win_known(true);
+    }
+    if let Some(value) = state.swap_win_fn {
+        ui.set_toggle_swap_value(value);
+        ui.set_toggle_swap_known(true);
+    }
+    if let Some(value) = state.hotkeys_control_center {
+        ui.set_toggle_hotkeys_value(value);
+        ui.set_toggle_hotkeys_known(true);
+    }
+    if let Some(value) = state.copilot {
+        ui.set_toggle_copilot_value(value);
+        ui.set_toggle_copilot_known(true);
+    }
 }
 
 pub(crate) fn quick_toggle_from_index(index: i32) -> Option<QuickToggle> {

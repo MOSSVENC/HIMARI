@@ -7,7 +7,7 @@ if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) {
     throw "RAM CONTROL CENTER executable not found: $Executable"
 }
 
-$modes = @('--input-hooks-smoke', '--settings-smoke', '--system-smoke', '--io-smoke', '--display-care-smoke')
+$modes = @('--control-sync-smoke', '--input-hooks-smoke', '--settings-smoke', '--system-smoke', '--io-smoke', '--display-care-smoke')
 foreach ($mode in $modes) {
     Write-Host "==> $mode"
     $process = Start-Process -FilePath $Executable -ArgumentList $mode -NoNewWindow -Wait -PassThru

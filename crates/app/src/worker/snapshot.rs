@@ -4,6 +4,7 @@ use ram_control_center_protocol::{Dchu, PlatformState, QuickToggleState, Thermal
 use slint::Weak;
 
 use crate::MainWindow;
+use crate::control_sync::ControlSync;
 use crate::diagnostics::log_action;
 use crate::driver_manager::DriverHealth;
 use crate::formatting::shorten_path;
@@ -17,6 +18,7 @@ pub(super) struct SnapshotInput<'a> {
     pub(super) status: Option<(String, i32)>,
     pub(super) thermal: Option<ThermalSample>,
     pub(super) driver_health: &'a DriverHealth,
+    pub(super) control_sync: &'a ControlSync,
 }
 
 pub(super) fn push_snapshot(
@@ -24,7 +26,6 @@ pub(super) fn push_snapshot(
     sampler: &mut SystemSampler,
     dchu: Option<&Dchu>,
     input: SnapshotInput<'_>,
-    sync_selection: bool,
     extended_reads: bool,
     refresh_display_care: bool,
 ) {
@@ -32,7 +33,9 @@ pub(super) fn push_snapshot(
         status,
         thermal,
         driver_health,
+        control_sync,
     } = input;
+    let read_stamp = control_sync.snapshot();
     log_action(if extended_reads {
         "worker: snapshot begin full"
     } else {
@@ -102,7 +105,7 @@ pub(super) fn push_snapshot(
         let touchpad_enabled = dchu.and_then(Dchu::read_touchpad_enabled);
         let airplane_enabled = system_controls::airplane_mode_enabled().ok();
         let brightness = system_controls::screen_brightness().ok();
-        let blue_light = dchu.and_then(|dchu| dchu.raw_read_settings(1, 34, 1).1.first().copied());
+        let blue_light = dchu.and_then(|dchu| dchu.read_setting_byte(1, 34));
         let audio = system_controls::audio_state().ok();
         let anti_dust_schedule = dchu.and_then(|dchu| dchu.read_anti_dust_schedule().ok());
         (
@@ -166,6 +169,7 @@ pub(super) fn push_snapshot(
     push_update(
         weak,
         UiUpdate {
+            read_stamp: Some(read_stamp),
             system,
             thermal,
             platform,
@@ -193,7 +197,6 @@ pub(super) fn push_snapshot(
             driver_health: driver_health.clone(),
             busy: false,
             status,
-            sync_selection,
             extended_reads,
         },
     );

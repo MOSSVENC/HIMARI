@@ -2,6 +2,8 @@
 
 mod boot_agent;
 mod boot_service;
+mod control_sync;
+mod control_sync_smoke;
 mod diagnostics;
 mod display_care;
 mod driver_manager;
@@ -23,6 +25,7 @@ mod service_lifecycle;
 mod smoke;
 mod system_controls;
 mod telemetry;
+mod thermal_cache;
 mod tray;
 mod ui_callbacks;
 mod ui_update;
@@ -30,7 +33,6 @@ mod worker;
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
-use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 use slint::{CloseRequestResponse, ComponentHandle};
@@ -40,7 +42,7 @@ use flexikey_engine::FlexiKeyEngine;
 use flexikey_ui::wire_flexikey;
 use smoke::{display_care_smoke, io_smoke, system_smoke};
 use ui_callbacks::wire_ui;
-use worker::{WorkerCommand, spawn_worker};
+use worker::spawn_worker;
 
 slint::include_modules!();
 
@@ -262,7 +264,7 @@ fn run_transition_snapshot(
     ui.set_language_zh(true);
     ui.set_selected_page(0);
     ui.show()?;
-    let (sender, receiver) = mpsc::channel::<WorkerCommand>();
+    let (sender, receiver) = worker::channel();
     let engine = FlexiKeyEngine::start();
     let flexikey_state = wire_flexikey(&ui, engine);
     wire_ui(&ui, sender, flexikey_state);
@@ -346,6 +348,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::process::exit(1);
             }
         },
+        Some("--control-sync-smoke") => std::process::exit(control_sync_smoke::run()),
+        Some("--thermal-smoke") => std::process::exit(smoke::thermal_smoke()),
         Some("--input-hooks-smoke") => std::process::exit(flexikey_engine::hook_lifecycle_smoke()),
         Some("--system-smoke") => std::process::exit(system_smoke()),
         Some("--io-smoke") => std::process::exit(io_smoke()),
@@ -371,7 +375,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     ui.set_language_zh(true);
     ui.set_startup_enabled(tray::startup_enabled());
-    let (sender, receiver) = mpsc::channel::<WorkerCommand>();
+    let (sender, receiver) = worker::channel();
     let weak = ui.as_weak();
 
     let flexikey_engine = FlexiKeyEngine::start();

@@ -273,3 +273,21 @@ list lives in `uninstall_files.rs`; unknown files and recovery backups remain
 visible in the result. Paths containing symlinks or reparse points are rejected.
 See [the repair record](repair-status-2026-11-16.md) for verification and remaining
 functional work.
+
+## Control readback ordering
+
+`worker/commands.rs` assigns each request to the controls it can change and issues
+a revision before enqueueing the request. A scoped ticket completes when the
+worker finishes, including failed requests. `control_sync.rs` tracks outstanding
+writes and captures revisions before each sample. The UI accepts a domain only
+when its captured revision is still current and no write is outstanding.
+
+Each domain synchronizes its editable selection after its first valid sample and
+after each completed write. Missing samples leave synchronization pending. Other
+domains continue updating without resetting unsaved drafts. Domain-specific
+presentation lives under `ui_update/`; `ui_update.rs` coordinates delivery.
+
+`thermal_cache.rs` retains CPU/GPU/fan samples independently for up to 15 seconds.
+An invalid channel cannot replace another channel's valid reading or refresh its
+age. Expired channels display unavailable values; GPU temperature can fall back
+to the independently sampled NVML sensor.

@@ -3,6 +3,50 @@ use ram_control_center_protocol::Dchu;
 use crate::input::send_touchpad_chord;
 use crate::system_controls;
 
+/// Samples each sensor independently; this diagnostic performs no control writes.
+pub(crate) fn thermal_smoke() -> i32 {
+    use crate::thermal_cache::ThermalCache;
+    use std::time::{Duration, Instant};
+
+    let device = match Dchu::open() {
+        Ok(device) => device,
+        Err(error) => {
+            eprintln!("thermal: {error}");
+            return 1;
+        }
+    };
+    let mut cache = ThermalCache::default();
+    let started = Instant::now();
+    let mut valid = 0;
+    for index in 0..20 {
+        match device.read_thermal() {
+            Ok(sample) => {
+                if sample.has_plausible_temperature() {
+                    valid += 1;
+                }
+                cache.observe(sample, Instant::now());
+                let current = cache.current(Instant::now()).unwrap_or_default();
+                println!(
+                    "thermal sample={index} ms={} raw_cpu={} raw_gpu={} displayed_cpu={} displayed_gpu={} cpu_rpm={} gpu_rpm={}",
+                    started.elapsed().as_millis(),
+                    sample.cpu.temperature_c,
+                    sample.gpu.temperature_c,
+                    current.cpu.temperature_c,
+                    current.gpu.temperature_c,
+                    current.cpu.rpm,
+                    current.gpu.rpm
+                );
+            }
+            Err(error) => eprintln!("thermal sample={index}: {error}"),
+        }
+        if index != 19 {
+            std::thread::sleep(Duration::from_secs(1));
+        }
+    }
+    println!("thermal: {valid}/20 samples contained a valid CPU or GPU sensor");
+    i32::from(valid == 0)
+}
+
 pub(crate) fn system_smoke() -> i32 {
     let mut ok = true;
     match system_controls::screen_brightness() {

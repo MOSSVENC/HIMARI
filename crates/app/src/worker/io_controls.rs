@@ -13,7 +13,7 @@ pub(super) fn apply_display_toggle(
     let previous = match system_controls::display_care_state() {
         Ok(state) => state,
         Err(error) => {
-            return CommandOutcome::failure(error).without_selection_sync();
+            return CommandOutcome::failure(error);
         }
     };
     let result = match toggle {
