@@ -1,31 +1,49 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="108" fill="#090E15"/>
-  <rect x="20" y="20" width="472" height="472" rx="92" fill="none" stroke="#223244" stroke-width="4"/>
-  <g shape-rendering="crispEdges">
-    <!-- RAM pixel monogram: three 3×5 glyphs on a shared 8 px grid. -->
-    <g fill="#EAF5FF">
-      <!-- R -->
-      <rect x="72" y="152" width="32" height="32" fill="#6EA8FF"/><rect x="112" y="152" width="32" height="32" fill="#6EA8FF"/><rect x="152" y="152" width="32" height="32" fill="#6EA8FF"/>
-      <rect x="72" y="192" width="32" height="32" fill="#EAF5FF"/><rect x="152" y="192" width="32" height="32" fill="#EAF5FF"/>
-      <rect x="72" y="232" width="32" height="32" fill="#6EA8FF"/><rect x="112" y="232" width="32" height="32" fill="#6EA8FF"/><rect x="152" y="232" width="32" height="32" fill="#6EA8FF"/>
-      <rect x="72" y="272" width="32" height="32" fill="#EAF5FF"/><rect x="112" y="272" width="32" height="32" fill="#EAF5FF"/>
-      <rect x="72" y="312" width="32" height="32" fill="#EAF5FF"/><rect x="152" y="312" width="32" height="32" fill="#65E0C4"/>
-      <!-- A -->
-      <rect x="232" y="152" width="32" height="32" fill="#65E0C4"/>
-      <rect x="192" y="192" width="32" height="32"/><rect x="272" y="192" width="32" height="32"/>
-      <rect x="192" y="232" width="32" height="32"/><rect x="232" y="232" width="32" height="32"/><rect x="272" y="232" width="32" height="32"/>
-      <rect x="192" y="272" width="32" height="32"/><rect x="272" y="272" width="32" height="32"/>
-      <rect x="192" y="312" width="32" height="32"/><rect x="272" y="312" width="32" height="32"/>
-      <!-- M -->
-      <rect x="312" y="152" width="32" height="32"/><rect x="392" y="152" width="32" height="32"/>
-      <rect x="312" y="192" width="32" height="32"/><rect x="352" y="192" width="32" height="32"/><rect x="392" y="192" width="32" height="32"/>
-      <rect x="312" y="232" width="32" height="32"/><rect x="352" y="232" width="32" height="32"/><rect x="392" y="232" width="32" height="32"/>
-      <rect x="312" y="272" width="32" height="32"/><rect x="392" y="272" width="32" height="32"/>
-      <rect x="312" y="312" width="32" height="32"/><rect x="392" y="312" width="32" height="32"/>
+  <title>RAM — original character portrait</title>
+  <desc>Original pink-haired girl with ruby eyes, a pearl hair ornament and a ribbon collar. CC0-1.0.</desc>
+  <defs>
+    <clipPath id="tile"><rect width="512" height="512" rx="112"/></clipPath>
+    <linearGradient id="back" x2="0.8" y2="1"><stop stop-color="#fff4ed"/><stop offset="1" stop-color="#f5c6ce"/></linearGradient>
+    <linearGradient id="hair" x1="0.2" x2="0.8" y2="1"><stop stop-color="#ffb1b9"/><stop offset="0.55" stop-color="#ed839c"/><stop offset="1" stop-color="#c85179"/></linearGradient>
+    <linearGradient id="eye" x2="0" y2="1"><stop stop-color="#743048"/><stop offset="0.65" stop-color="#cc4c72"/><stop offset="1" stop-color="#f2999d"/></linearGradient>
+  </defs>
+  <g clip-path="url(#tile)">
+    <path fill="url(#back)" d="M0 0h512v512H0z"/>
+    <circle cx="256" cy="236" r="197" fill="#fffaf5" opacity="0.75"/>
+    <g stroke="#613447" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+      <!-- Broad shapes keep the silhouette readable at Windows tray sizes. -->
+      <path fill="#b54b70" d="M99 297C76 230 76 142 128 88 182 30 301 34 362 82 431 134 437 243 411 315l-9 94c-41 31-73 22-101-3H186c-34 22-67 20-101-1z"/>
+      <path fill="#e78099" d="M127 192c-35 42-38 116-23 162l-22 30 44-7-5 29c36-8 54-33 62-71l-7-148zm248-1c33 32 50 114 30 165l23 28-39-5 3 29c-39-9-57-35-63-77l9-143z"/>
+      <path fill="#fff7ef" d="M104 513v-28c2-47 37-72 96-80h112c60 8 95 33 97 80v28z"/>
+      <path fill="#ffdccc" d="M217 356h79v58l-39 28-41-28z"/>
+      <path fill="#f1b1ad" stroke="none" d="M219 358h75v35c-26 19-52 14-75-1z"/>
+      <path fill="#ffe9db" d="M135 201c6-72 55-112 121-111 75 1 120 49 123 119l-8 73c-4 65-64 111-114 111-52 0-111-48-116-109z"/>
+      <path fill="#ffd0c5" stroke="none" d="M143 251c4 74 59 125 113 130 55-3 105-53 115-120-3 77-59 132-114 132-55 0-112-53-116-109z"/>
+      <path fill="#ffe1d3" d="M144 253c-31-21-39 21-18 40l19 6m223-46c31-21 39 21 18 40l-19 6"/>
+      <path fill="url(#hair)" d="M108 230c-16-67-5-120 45-152 38-24 89-28 127-22 74-5 130 61 127 143l-16 63c-24-16-43-50-51-86-11 32-30 49-53 63 3-29-5-59-22-87-16 56-56 93-111 106l12-40c-18 19-37 28-58 31z"/>
+      <path fill="#ffc4c7" stroke="none" d="M126 155c18-63 84-92 139-86-57 15-99 42-122 99zm148-83c66 1 110 47 117 103-25-57-61-77-117-88z"/>
+      <path fill="none" stroke="#d56b8a" stroke-width="6" d="M222 96c-9 43-30 79-58 104m132-98c19 29 27 66 20 94m50-58c10 27 14 48 13 67"/>
+      <path fill="#fffaf6" stroke-width="5" d="M158 274c17-25 49-24 65 1-14 28-49 27-65-1zm130 1c17-25 49-26 65-1-16 28-50 29-65 1z"/>
+      <ellipse cx="193" cy="277" rx="19" ry="27" fill="url(#eye)" stroke="none"/>
+      <ellipse cx="319" cy="277" rx="19" ry="27" fill="url(#eye)" stroke="none"/>
+      <ellipse cx="193" cy="272" rx="8" ry="17" fill="#633045" stroke="none"/>
+      <ellipse cx="319" cy="272" rx="8" ry="17" fill="#633045" stroke="none"/>
+      <path fill="none" stroke="#4b2c3e" stroke-width="9" d="M155 270c18-21 46-22 68 4m65 0c22-26 50-25 68-4"/>
+      <path fill="none" stroke="#4b2c3e" stroke-width="6" d="m157 269-9-9m207 9 9-9"/>
+      <g fill="#fffdf7" stroke="none"><ellipse cx="186" cy="267" rx="7" ry="8"/><ellipse cx="312" cy="267" rx="7" ry="8"/><circle cx="200" cy="286" r="3.5"/><circle cx="326" cy="286" r="3.5"/></g>
+      <path fill="none" stroke="#b66b7c" stroke-width="5" d="m168 239 33-4m111 0 31 4"/>
+      <g fill="#ef9da6" stroke="none" opacity="0.65"><ellipse cx="167" cy="315" rx="23" ry="10"/><ellipse cx="345" cy="315" rx="23" ry="10"/></g>
+      <path fill="none" stroke="#d99794" stroke-width="4" d="m256 300-3 12 6 2"/>
+      <path fill="#d67a8d" stroke="none" d="M238 340c10 5 26 5 36 0-8 19-28 19-36 0z"/>
+      <path fill="none" stroke="#a45c70" stroke-width="4" d="M239 340c10 5 24 5 34 0"/>
+      <path fill="#693f57" stroke-width="5" d="m348 170 28-20 10 34-28 20z"/>
+      <path fill="#fbe4d6" stroke-width="4" d="m354 168 17-12 6 22-17 12z"/>
+      <circle cx="368" cy="173" r="7" fill="#fffaf1" stroke="none"/>
+      <path fill="none" stroke="#ffd7d5" stroke-width="5" d="m111 294 10 48m277-48-8 48"/>
+      <path fill="#fffdf5" stroke-width="5" d="m211 403 45 37-37 25-32-54zm89 0-44 37 37 25 32-54z"/>
+      <path fill="#704258" stroke-width="5" d="m252 440-45 5 8 34 41-26 39 26 9-34-44-5z"/>
+      <path fill="#e89aaa" stroke-width="4" d="m249 437 15 0 3 21h-20z"/>
+      <path fill="none" stroke="#e3b8b8" stroke-width="4" d="m149 465-6 47m219-47 7 47"/>
     </g>
-  </g>
-  <g fill="#6EA8FF" opacity="0.72" shape-rendering="crispEdges">
-    <rect x="80" y="400" width="16" height="16"/>
-    <rect x="416" y="400" width="16" height="16" fill="#65E0C4"/>
   </g>
 </svg>

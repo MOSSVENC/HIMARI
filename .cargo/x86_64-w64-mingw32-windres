@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+exec llvm-windres --preprocessor=cc --preprocessor-arg=-E --preprocessor-arg=-x --preprocessor-arg=c "$@"

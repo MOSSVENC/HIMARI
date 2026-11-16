@@ -1,6 +1,10 @@
 # RAM CONTROL CENTER
 
-<img src="assets/ram_control_center_logo.png" width="72" alt="RAM CONTROL CENTER pixel logo">
+<img src="assets/ram_control_center_logo.png" width="96" alt="RAM character portrait">
+
+RAM is the girl's name behind the project. The original character portrait is
+available under [CC0-1.0](assets/LICENSE.md); its editable SVG and Windows icon
+exports are in `assets/`.
 
 RAM CONTROL CENTER is a native Windows control center for compatible CC4.0/DCHU
 platforms. It is built with Rust and Slint and communicates with the platform

@@ -1,9 +1,16 @@
 fn main() {
     println!("cargo:rerun-if-changed=ui");
     println!("cargo:rerun-if-changed=../../assets/ram_control_center_logo.svg");
+    println!("cargo:rerun-if-changed=../../assets/ram_control_center_logo.ico");
+    println!("cargo:rerun-if-changed=app.rc");
     println!("cargo:rerun-if-changed=ui/translations");
 
     compile_runtime_catalog();
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        embed_resource::compile("app.rc", embed_resource::NONE)
+            .manifest_required()
+            .expect("failed to embed Windows application icon");
+    }
 
     let config = slint_build::CompilerConfiguration::new()
         .with_bundled_translations("ui/translations")
