@@ -106,7 +106,7 @@ impl WorkerRuntime {
         if std::env::args().any(|arg| arg == "--trace-fn-events")
             && let Some(device_path) = dchu.as_ref().map(|device| device.path().to_owned())
         {
-            spawn_acpi_notification_listener(device_path);
+            crate::fn_diagnostics::spawn_trace(device_path);
         }
         Self {
             weak,
@@ -328,34 +328,4 @@ impl WorkerRuntime {
 
 pub(crate) fn spawn_worker(receiver: CommandReceiver, weak: Weak<MainWindow>) {
     thread::spawn(move || WorkerRuntime::new(weak, receiver.sync.clone()).run(receiver));
-}
-
-#[cfg(windows)]
-fn spawn_acpi_notification_listener(device_path: String) {
-    thread::spawn(move || {
-        use ram_control_center_protocol::AcpiNotificationListener;
-
-        let mut listener = match AcpiNotificationListener::open(&device_path) {
-            Ok(listener) => {
-                log_action("ACPI Fn notification listener ready");
-                listener
-            }
-            Err(error) => {
-                log_action(&format!(
-                    "ACPI Fn notification listener unavailable: {error}"
-                ));
-                return;
-            }
-        };
-
-        loop {
-            match listener.wait_next() {
-                Ok(value) => log_action(&format!("ACPI Fn notification: {value:#010x}")),
-                Err(error) => {
-                    log_action(&format!("ACPI Fn notification listener stopped: {error}"));
-                    return;
-                }
-            }
-        }
-    });
 }

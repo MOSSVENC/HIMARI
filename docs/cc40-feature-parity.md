@@ -343,10 +343,13 @@ the binding.
 ## Remaining Fn parity
 
 The platform exposes the vendor ACPI notification channel used by FnKey for
-hardware Fn events and OSD updates. The opt-in `--trace-fn-events` diagnostic registers and waits
-on the event channel and reads the raw 8-byte notification payload. Normal
-startup leaves channel ownership to the existing resident Fn handler. The mapping
-from notification values to individual Fn actions still needs to be confirmed
-on this machine. OSD UI is not included; this restores the event transport
-path, not the vendor visual overlay. Verify each hardware Fn action on Windows
-before treating parity as complete.
+hardware Fn events and OSD updates. The opt-in `--trace-fn-events` diagnostic registers
+once, waits on the event channel, and records the complete 8-byte notification,
+its event ID / argument, and the verified dispatch subset. FnKey's Arg001 receiver
+uses the low byte as the event ID and a signed right shift for the argument.
+The static dispatch evidence and the touchpad toggle distinction are recorded in
+[Fn event protocol](fn-event-protocol.md). `--fn-events-smoke` exercises three bounded
+waits and subscription cleanup. Normal startup leaves channel ownership to the
+existing resident Fn handler. Physical Fn combinations, channel ownership,
+action execution, and OSD UI still require Windows validation before parity can
+be considered complete.

@@ -9,6 +9,7 @@
 use std::fmt;
 
 mod flexikey;
+mod fn_events;
 mod keyboard_filter;
 #[cfg(windows)]
 mod win_device;
@@ -16,6 +17,7 @@ pub use flexikey::{
     FlexiKeyAction, FlexiKeyBinding, FlexiKeyDevice, FlexiKeyError, FlexiKeyProfile, FlexiKeyStore,
     MacroStep, MacroStepKind,
 };
+pub use fn_events::{Adjustment, FanNotice, FnEvent, FnNotification};
 pub use keyboard_filter::{
     DEVICE_PATH as KEYBOARD_FILTER_DEVICE_PATH, FilterMacro, FilterRecord,
     IOCTL_ADD_FILTER_MACRO as KEYBOARD_FILTER_ADD_MACRO_IOCTL,
@@ -1387,7 +1389,14 @@ impl AcpiNotificationListener {
         Err(DchuError::UnsupportedPlatform)
     }
 
-    pub fn wait_next(&mut self) -> Result<u32> {
+    pub fn wait_next(&mut self) -> Result<FnNotification> {
+        Err(DchuError::UnsupportedPlatform)
+    }
+
+    pub fn wait_next_timeout(
+        &mut self,
+        _timeout: std::time::Duration,
+    ) -> Result<Option<FnNotification>> {
         Err(DchuError::UnsupportedPlatform)
     }
 }

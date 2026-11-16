@@ -147,7 +147,7 @@ RAM CONTROL CENTER 自己唯一主动启动的服务是 `AcpiBridge`。`NeoContr
 
 需要明确的功能缺口：
 
-- RAM CONTROL CENTER 已实现独立的 `0x322404` 事件注册/等待与 `0x322408` 8 字节通知读取循环，目前记录原始 `NotifyValue`。原厂还会写 `AppSettings(1, 12, 1)`；本实现暂不改动该设置，其是否为事件投递前置条件尚未实机确认。通知值到具体 Fn 动作的映射同样待硬件捕获；常规启动不注册此通道，诊断时通过 `--trace-fn-events` 显式启用。完整目标仍包含 Fn 动作与 OSD，需验证事件独占和分发行为后补齐。
+- RAM CONTROL CENTER 已实现独立的 `0x322404` 单次事件注册、限时等待与 `0x322408` 8 字节通知读取。已从 FnKey 的 Arg001 接收和分发回调确认低字节事件编号、有符号高位参数，以及部分事件的静态含义，见 [Fn 事件协议](fn-event-protocol.md)。原厂还会写 `AppSettings(1, 12, 1)`；本实现暂不改动该设置，其是否为事件投递前置条件尚未实机确认。常规启动由原厂 FnKey 持有通道；`--trace-fn-events` 显式记录原值和解析结果，`--fn-events-smoke` 检查限时等待与释放。各个物理 Fn 组合、通道所有权、动作闭环和 OSD 仍需实机验收。
 - `HKClipSvc` 是厂商键盘过滤器的剪贴板共享服务。Neo 当前不打开 `HKClipPipe`，也不使用它的共享内存，因此自己的用户态宏路径不依赖它。
 
 ## DCHUService 的安全与侵入性问题

@@ -2,12 +2,13 @@ use std::os::windows::ffi::OsStrExt;
 
 use windows_sys::Win32::Foundation::{
     CloseHandle, GENERIC_READ, GENERIC_WRITE, HANDLE, INVALID_HANDLE_VALUE, WAIT_OBJECT_0,
+    WAIT_TIMEOUT,
 };
 use windows_sys::Win32::Storage::FileSystem::{
     CreateFileW, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
 };
 use windows_sys::Win32::System::IO::DeviceIoControl;
-use windows_sys::Win32::System::Threading::{CreateEventW, INFINITE, WaitForSingleObject};
+use windows_sys::Win32::System::Threading::{CreateEventW, WaitForSingleObject};
 
 use crate::{DchuError, Result};
 
@@ -119,16 +120,19 @@ impl WinEvent {
         (self.handle as usize).to_ne_bytes()
     }
 
-    pub(crate) fn wait(&self) -> Result<()> {
+    pub(crate) fn wait(&self, timeout_ms: u32) -> Result<bool> {
         // SAFETY: `self.handle` remains valid until this owner's Drop runs.
-        let result = unsafe { WaitForSingleObject(self.handle, INFINITE) };
+        let result = unsafe { WaitForSingleObject(self.handle, timeout_ms) };
+        if result == WAIT_TIMEOUT {
+            return Ok(false);
+        }
         if result != WAIT_OBJECT_0 {
             return Err(DchuError::Status {
                 operation: "WaitForSingleObject(AcpiBridge notification)",
                 code: std::io::Error::last_os_error().raw_os_error().unwrap_or(-1),
             });
         }
-        Ok(())
+        Ok(true)
     }
 }
 

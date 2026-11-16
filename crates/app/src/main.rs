@@ -12,6 +12,7 @@ mod driver_manager;
 mod fan_curve_ui;
 mod flexikey_engine;
 mod flexikey_ui;
+mod fn_diagnostics;
 mod formatting;
 mod input;
 #[cfg(any(windows, test))]
@@ -364,6 +365,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("--system-smoke") => std::process::exit(system_smoke()),
         Some("--io-smoke") => std::process::exit(io_smoke()),
         Some("--touchpad-smoke") => std::process::exit(smoke::touchpad_smoke()),
+        Some("--fn-events-smoke") => std::process::exit(fn_diagnostics::smoke()),
         Some("--display-care-smoke") => std::process::exit(display_care_smoke()),
         Some("--settings-smoke") => std::process::exit(settings_backend_smoke()),
         _ => {}
