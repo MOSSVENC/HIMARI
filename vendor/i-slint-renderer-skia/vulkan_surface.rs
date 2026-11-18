@@ -4,7 +4,7 @@
 // cSpell: ignore madsmtm
 use std::cell::{Cell, RefCell};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use i_slint_core::api::{PhysicalSize as PhysicalWindowSize, Window};
 use i_slint_core::graphics::RequestedGraphicsAPI;
@@ -214,13 +214,21 @@ impl VulkanSurface {
             .build()
         };
 
-        let gr_context = skia_safe::gpu::direct_contexts::make_vulkan(&backend_context, None)
-            .ok_or_else(|| {
-                format!(
-                    "Error creating Skia Vulkan context (max api version {}.{}.{})",
-                    api_version.major, api_version.minor, api_version.patch
-                )
-            })?;
+        // A settings UI visits many short-lived combinations of text, paths and
+        // gradients. Reusing fewer shader variants favors first-interaction
+        // latency over maximum throughput for repeated complex scenes.
+        let mut context_options = skia_safe::gpu::ContextOptions::default();
+        context_options.reduced_shader_variations = true;
+        let gr_context = skia_safe::gpu::direct_contexts::make_vulkan(
+            &backend_context,
+            Some(&context_options),
+        )
+        .ok_or_else(|| {
+            format!(
+                "Error creating Skia Vulkan context (max api version {}.{}.{})",
+                api_version.major, api_version.minor, api_version.patch
+            )
+        })?;
 
         let previous_frame_end = RefCell::new(Some(sync::now(device.clone()).boxed()));
 
@@ -334,6 +342,7 @@ impl super::Surface for VulkanSurface {
         if size.width == 0 || size.height == 0 {
             return Ok(DrawOutcome::Occluded);
         }
+        let frame_started = Instant::now();
         let gr_context = &mut self.gr_context.borrow_mut();
 
         let device = self.device.clone();
@@ -397,6 +406,7 @@ impl super::Surface for VulkanSurface {
         acquire_future
             .wait(None)
             .map_err(|err| format!("Vulkan: waiting for image acquisition: {err}"))?;
+        let acquired = Instant::now();
 
         let width = swapchain.image_extent()[0];
         let width: i32 = width
@@ -447,12 +457,14 @@ impl super::Surface for VulkanSurface {
             None,
         )
         .ok_or_else(|| "Error creating Skia Vulkan surface".to_string())?;
+        let prepared = Instant::now();
 
         super::vulkan_diagnostics::notify(
             super::vulkan_diagnostics::FrameEvent::BeforeRendering,
             &self.diagnostic_info,
         );
         callback(skia_surface.canvas(), Some(gr_context), 0);
+        let drawn = Instant::now();
 
         gr_context.flush_surface_with_access(
             &mut skia_surface,
@@ -463,6 +475,7 @@ impl super::Surface for VulkanSurface {
             return Err("Skia failed to submit the Vulkan frame".into());
         }
         drop(skia_surface);
+        let submitted = Instant::now();
 
         if let Some(pre_present_callback) = pre_present_callback.borrow_mut().as_mut() {
             pre_present_callback();
@@ -484,8 +497,22 @@ impl super::Surface for VulkanSurface {
         match future.map_err(Validated::unwrap) {
             Ok(future) => {
                 *self.previous_frame_end.borrow_mut() = Some(future.boxed());
+                let presented = Instant::now();
                 super::vulkan_diagnostics::notify(
                     super::vulkan_diagnostics::FrameEvent::Submitted,
+                    &self.diagnostic_info,
+                );
+                super::vulkan_diagnostics::notify(
+                    super::vulkan_diagnostics::FrameEvent::Timings(
+                        super::vulkan_diagnostics::FrameTimings {
+                            acquire: acquired.duration_since(frame_started),
+                            prepare: prepared.duration_since(acquired),
+                            draw: drawn.duration_since(prepared),
+                            submit: submitted.duration_since(drawn),
+                            present: presented.duration_since(submitted),
+                            total: presented.duration_since(frame_started),
+                        },
+                    ),
                     &self.diagnostic_info,
                 );
             }

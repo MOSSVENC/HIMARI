@@ -1,7 +1,7 @@
 //! Native Vulkan submission cadence during production page transitions.
 
 use crate::MainWindow;
-use crate::graphics::{self, FrameEvent};
+use crate::graphics::{self, FrameEvent, FrameTimings};
 use slint::ComponentHandle;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -22,12 +22,17 @@ struct Measurements {
     measuring: bool,
     previous_submission: Option<Instant>,
     intervals_ms: Vec<f64>,
+    frame_timings: Vec<(usize, FrameTimings)>,
 }
 
 pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     let started = Instant::now();
     let ui = MainWindow::new()?;
     slint::select_bundled_translation("zh-CN")?;
+    // Exercise the full lighting controls instead of the unavailable-capability
+    // placeholder. This isolated fixture wires navigation only and writes no hardware.
+    ui.set_rgb_available(true);
+    println!("ui_fixture=lighting-controls-enabled hardware_workers=disabled");
     crate::ui_callbacks::wire_navigation(&ui);
     let measurements = Rc::new(RefCell::new(Measurements::default()));
     let rendering = Rc::clone(&measurements);
@@ -53,6 +58,12 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
                         .push(now.duration_since(previous).as_secs_f64() * 1000.0);
                 }
             }
+        }
+        if let FrameEvent::Timings(timings) = event
+            && data.measuring
+        {
+            let step = data.completed;
+            data.frame_timings.push((step, timings));
         }
     });
     ui.show()?;
@@ -93,6 +104,33 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
         data.intervals_ms[count - 1],
         data.intervals_ms.iter().filter(|&&v| v > 33.34).count()
     );
+    for step in 0..PAGES.len() * 2 {
+        let frames: Vec<_> = data
+            .frame_timings
+            .iter()
+            .filter_map(|(index, timing)| (*index == step).then_some(timing))
+            .collect();
+        let Some(longest) = frames.iter().max_by_key(|frame| frame.total) else {
+            return Err(format!("page transition {step} produced no Vulkan stage timings").into());
+        };
+        let milliseconds = |duration: Duration| duration.as_secs_f64() * 1000.0;
+        println!(
+            "frame_stages round={} page={} samples={} max_total_ms={:.2} max_acquire_ms={:.2} max_prepare_ms={:.2} max_draw_ms={:.2} max_submit_ms={:.2} max_present_ms={:.2} longest_acquire_ms={:.2} longest_draw_ms={:.2} longest_submit_ms={:.2} longest_present_ms={:.2}",
+            step / PAGES.len() + 1,
+            PAGES[step % PAGES.len()],
+            frames.len(),
+            milliseconds(longest.total),
+            milliseconds(frames.iter().map(|frame| frame.acquire).max().unwrap()),
+            milliseconds(frames.iter().map(|frame| frame.prepare).max().unwrap()),
+            milliseconds(frames.iter().map(|frame| frame.draw).max().unwrap()),
+            milliseconds(frames.iter().map(|frame| frame.submit).max().unwrap()),
+            milliseconds(frames.iter().map(|frame| frame.present).max().unwrap()),
+            milliseconds(longest.acquire),
+            milliseconds(longest.draw),
+            milliseconds(longest.submit),
+            milliseconds(longest.present),
+        );
+    }
     Ok(())
 }
 

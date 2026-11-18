@@ -4,6 +4,20 @@
 //! Read-only lifecycle observations from the native Vulkan surface.
 
 use std::cell::RefCell;
+use std::time::Duration;
+
+/// CPU wall time spent in each stage of one successful Vulkan frame.
+/// Submission includes the current synchronous GPU-completion wait. These are
+/// not GPU timestamps and do not measure compositor or scanout latency.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FrameTimings {
+    pub acquire: Duration,
+    pub prepare: Duration,
+    pub draw: Duration,
+    pub submit: Duration,
+    pub present: Duration,
+    pub total: Duration,
+}
 
 /// The physical device that owns the surface's logical device and swapchain.
 #[derive(Clone, Debug)]
@@ -22,6 +36,7 @@ pub enum FrameEvent {
     Setup,
     BeforeRendering,
     Submitted,
+    Timings(FrameTimings),
 }
 
 type Observer = Box<dyn FnMut(FrameEvent, &DeviceInfo)>;

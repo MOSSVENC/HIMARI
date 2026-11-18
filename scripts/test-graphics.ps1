@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)] [string] $Executable,
-    [Parameter(Mandatory)] [string] $OutputDirectory
+    [Parameter(Mandatory)] [string] $OutputDirectory,
+    [ValidateRange(0, 1000)] [double] $MaximumFrameGapMs = 0,
+    [switch] $RequireSnapshot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -54,6 +56,20 @@ try {
     $errors = if (Test-Path -LiteralPath $stderr) { Get-Content -LiteralPath $stderr -Raw } else { '' }
     Write-Output $output
     if ($errors) { Write-Output $errors }
+    $cadence = [regex]::Match($output, 'submission_interval_p50_ms=([0-9.]+) submission_interval_p95_ms=([0-9.]+) submission_interval_max_ms=([0-9.]+) gaps_over_33ms=([0-9]+)')
+    $performance = $null
+    if ($cadence.Success) {
+        $culture = [Globalization.CultureInfo]::InvariantCulture
+        $maximumGap = [double]::Parse($cadence.Groups[3].Value, $culture)
+        $performance = [pscustomobject]@{
+            SubmissionIntervalP50Ms = [double]::Parse($cadence.Groups[1].Value, $culture)
+            SubmissionIntervalP95Ms = [double]::Parse($cadence.Groups[2].Value, $culture)
+            MaximumSubmissionIntervalMs = $maximumGap
+            GapsOver33Ms = [int]::Parse($cadence.Groups[4].Value, $culture)
+            MaximumAllowedGapMs = if ($MaximumFrameGapMs -gt 0) { $MaximumFrameGapMs } else { $null }
+            BudgetStatus = if ($MaximumFrameGapMs -le 0) { 'MeasuredOnly' } elseif ($maximumGap -le $MaximumFrameGapMs) { 'Passed' } else { 'Exceeded' }
+        }
+    }
     $result = [pscustomobject]@{
         Renderer = 'native-vulkan-skia'
         ExitCode = $process.ExitCode
@@ -63,6 +79,7 @@ try {
         PeakPrivateBytes = $peakPrivateBytes
         CpuTimeMs = $cpuTimeMs
         DurationMs = $clock.Elapsed.TotalMilliseconds
+        Performance = $performance
         Output = $output
         Errors = $errors
     }
@@ -81,8 +98,15 @@ try {
     if ($output -notmatch 'type=IntegratedGpu|type=DiscreteGpu') {
         throw 'Vulkan did not select a hardware GPU'
     }
-    if (-not (Test-Path -LiteralPath $snapshot) -or (Get-Item -LiteralPath $snapshot).Length -lt 1024) {
+    if ($null -eq $performance -or [regex]::Matches($output, '(?m)^frame_stages round=').Count -ne 22) {
+        throw 'Vulkan per-transition performance measurements are incomplete'
+    }
+    if (($RequireSnapshot -or $output -match 'snapshot=written') -and
+        (-not (Test-Path -LiteralPath $snapshot) -or (Get-Item -LiteralPath $snapshot).Length -lt 1024)) {
         throw 'The Vulkan window snapshot is missing or too small'
+    }
+    if ($performance.BudgetStatus -eq 'Exceeded') {
+        throw "Vulkan frame-gap budget exceeded: $($performance.MaximumSubmissionIntervalMs) ms > $MaximumFrameGapMs ms"
     }
 } finally {
     if (-not $process.HasExited) {

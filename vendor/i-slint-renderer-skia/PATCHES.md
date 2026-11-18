@@ -8,6 +8,11 @@ vulkan_diagnostics.rs module:
 
 - Expose read-only physical-device and successful-submission events on the UI
   thread. Observers do not receive device handles or submit rendering commands.
+- Report CPU wall times for image acquisition, target preparation, scene drawing,
+  flush/submission and presentation. GPU-completion waiting is included in the
+  submission stage; these observations are not GPU timestamps.
+- Enable Skia's reduced shader variations option to favor first-interaction
+  latency for the control center's text, paths and gradients.
 - Prefer a presentation-capable integrated GPU; allow discrete GPUs and reject
   software/virtual device types.
 - Pass the Vulkan queue family index, rather than its index within that family,

@@ -19,13 +19,31 @@ Then run the bounded test with Windows PowerShell 7:
 
     pwsh -File scripts/test-graphics.ps1 -Executable '<release directory>\ram-control-center.exe' -OutputDirectory '<measurement directory>'
 
-The isolated process starts no hardware worker, service, or input hook. It verifies the production navigation callbacks over all eleven pages twice, checks resize and minimize/restore, confirms zero queue submissions during a one-second idle interval, and writes an off-screen snapshot of the rendered Overview. It also verifies that vulkan-1.dll was loaded and that the selected Vulkan adapter is integrated or discrete hardware.
+Add -RequireSnapshot when checking a snapshot-tools build. A default-feature
+Release can run the same test without taking an off-screen snapshot.
+To enforce a submission-gap budget, add -MaximumFrameGapMs 33.34 (or the
+appropriate budget for the target display). The script writes results.json
+before reporting a budget failure. Without this argument, BudgetStatus is
+MeasuredOnly; passing the lifecycle checks is not a performance acceptance.
+
+The isolated process starts no hardware worker, service, or input hook. It verifies the production navigation callbacks over all eleven pages twice, checks resize and minimize/restore, confirms zero queue submissions during a one-second idle interval, and optionally writes an off-screen snapshot of the rendered Overview. It also verifies that vulkan-1.dll was loaded and that the selected Vulkan adapter is integrated or discrete hardware.
+The lighting capability is enabled in this isolated UI fixture so that its
+sliders and color preview are rendered. The fixture does not exercise hardware
+writes or establish correctness of device capabilities and telemetry.
 
 The first submission interval is measured from Slint component creation to the first successful Skia queue submission; it excludes process creation and executable loading. Per-transition intervals measure CPU-observed submission cadence, not GPU timestamps, compositor latency, or display scanout. Windows CPU and memory values apply to this diagnostic process.
 
 A separate snapshot-tools bar test exercises pointer movement and pixel endpoints for the RGB/monitor bars:
 
     pwsh -File scripts/test-bars.ps1 -Executable '<release executable>' -OutputDirectory '<measurement directory>'
+
+Each transition also reports frame_stages with the maxima for acquisition,
+target preparation, drawing, submission and presentation, plus the stages of
+its longest frame. Acquisition includes frame cleanup and swapchain recreation.
+Drawing includes layout/text/path work and any work Skia performs inside the
+scene callback. Submission includes flushing and synchronous GPU completion.
+These CPU wall times distinguish work inside a frame from gaps between render
+callbacks; they do not establish which individual drawing operation was slow.
 
 ## Validation record — November 19, 2026
 
@@ -71,3 +89,29 @@ Validation gates passed: 73 host unit tests, 76 Windows unit tests, Windows
 Clippy with warnings denied (all targets/features), formatting, and Release.
 The application/protocol unsafe ceiling remains 102; vendored renderer source
 retains its upstream FFI boundaries and is outside that application-only count.
+
+### Stage measurements and shader settings
+
+A stage-instrumented default Release measured a 40.44 ms maximum submission gap.
+Its longest Cooling frame spent 36.63 ms in drawing and 1.27 ms in submission,
+so removing GPU-completion waiting alone would not resolve that sample's stall.
+The renderer now enables Skia's reduced_shader_variations context option.
+Two successive Windows runs with that setting completed all 22 transitions,
+resize, minimize/restore and idle checks. Both had a 4.32 ms 95th-percentile
+submission interval; their maximum gaps were 36.08 ms and 31.91 ms. The first
+run therefore still exceeded a 33.34 ms budget. First Cooling draws remained
+33.37 ms and 28.64 ms. These sequential measurements have background-load and
+driver-cache variation and are not a controlled estimate of the setting's
+performance benefit. First-visit drawing latency remains open work.
+
+The original native Vulkan integration's GitHub Actions run 44390756793 passed
+both Linux verification and Windows tests, strict Clippy and Release build.
+
+After enabling the full lighting fixture, two final default-feature Release
+runs passed the explicit 33.34 ms submission-gap budget: maxima 33.11 ms and
+31.93 ms, with 95th percentiles 6.14 ms and 4.45 ms. Both passed the 22-transition,
+resize, minimize/restore and idle checks. These values still do not establish
+240 Hz pacing or visual animation acceptance. The RGB regression passed ten
+value cases and thirty pointer moves with the Vulkan renderer. Both the
+instrumented snapshot and the final rendering measurements were inspected;
+76 Windows unit tests, host verification and strict Windows Clippy passed.
