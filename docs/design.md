@@ -89,7 +89,7 @@ Reference files:
 
 ## Renderer
 
-Slint uses its winit + FemtoVG OpenGL renderer. This is a GPU path; the executable can be assigned a high-performance adapter in Windows graphics settings if the laptop exposes multiple GPUs.
+Windows uses Slint winit with its native Skia Vulkan surface; Vulkan initialization is required for UI windows.
 
 ## Temperature units
 

@@ -31,6 +31,8 @@ concerns are isolated behind named modules:
 
 ```text
 main.rs             process entry and top-level composition
+graphics.rs         Vulkan selection and actual rendering-device reporting
+graphics_smoke.rs   native API validation and production page-transition timings
 ui_callbacks.rs     Slint callback -> typed WorkerCommand wiring
 worker.rs           worker state machine, command dispatch, retry and UI handoff
 worker/             power/fan, RGB, input, I/O controls and snapshot sampling
@@ -40,6 +42,15 @@ system_controls/    audio, display, display-care, radio and registry helpers
 boot_service.rs     safe service lifecycle through the windows-service crate
 smoke.rs            reversible transport/control smoke commands
 ```
+
+The Windows UI selects the winit backend and Slint's Skia renderer on its
+native Vulkan surface. Vulkan is mandatory for GUI windows; renderer
+initialization errors are not redirected to another graphics API. Slint 1.17
+is pinned for this native surface implementation, with a small tracked vendor
+patch for device/submission diagnostics, swapchain synchronization, and Skia's
+Vulkan queue-family metadata. The UI reports the physical adapter only after a
+successful queue submission. Headless command dispatch and the normal
+single-instance guard run before GPU initialization.
 
 The Slint tree mirrors the same boundaries:
 

@@ -12,10 +12,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: "1.100.0"
-          components: rustfmt, clippy
-          targets: x86_64-pc-windows-gnu
-      - name: Install Zig
-        run: ./scripts/setup-zig.sh
+          components: rustfmt
       - name: Install Linux UI build dependencies
         run: |
           sudo apt-get update
@@ -23,8 +20,6 @@ jobs:
             llvm libfontconfig1-dev libfreetype6-dev libxkbcommon-dev \
             libxkbcommon-x11-dev libwayland-dev libx11-dev libxcursor-dev \
             libxrandr-dev libxi-dev libgl1-mesa-dev
-      - name: Verify Windows synchronization imports
-        run: ./scripts/test-cross-linker.sh
       - run: ./scripts/verify.sh
 
   windows-tests:
@@ -34,4 +29,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: "1.100.0"
-      - run: cargo test --workspace
+          components: clippy
+      - run: cargo test --locked --workspace
+      - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings -D clippy::undocumented_unsafe_blocks
+      - run: cargo build --locked --release --workspace

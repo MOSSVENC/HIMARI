@@ -16,15 +16,20 @@ type Outcome = Rc<RefCell<Result<(), String>>>;
 pub(crate) fn run(directory: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(&directory)?;
     let ui = BarDiagnostics::new()?;
-    ui.window().set_rendering_notifier(|state, api| {
-        if matches!(state, slint::RenderingState::RenderingSetup) {
-            println!("bars renderer: {api:?}");
+    let submitted = Rc::new(std::cell::Cell::new(false));
+    let observed = Rc::clone(&submitted);
+    crate::graphics::set_observer(move |event, info| {
+        if event == crate::graphics::FrameEvent::Submitted && !observed.replace(true) {
+            println!("bars renderer: {}", crate::graphics::report(info));
         }
-    })?;
+    });
     ui.show()?;
     let outcome = Rc::new(RefCell::new(Ok(())));
     schedule(ui.as_weak(), directory, 0, Rc::clone(&outcome));
     slint::run_event_loop()?;
+    if !submitted.get() {
+        return Err("bar window never submitted a Vulkan frame".into());
+    }
     outcome.borrow().clone().map_err(Into::into)
 }
 

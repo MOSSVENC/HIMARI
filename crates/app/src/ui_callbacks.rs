@@ -98,11 +98,7 @@ fn begin_page_switch(ui: &MainWindow, page: i32, epoch: u64) {
     });
 }
 
-pub(crate) fn wire_ui(
-    ui: &MainWindow,
-    sender: CommandSender,
-    flexikey_state: Rc<RefCell<FlexiKeyViewState>>,
-) {
+pub(crate) fn wire_navigation(ui: &MainWindow) {
     let weak = ui.as_weak();
     ui.on_select_page(move |page| {
         let page = page.clamp(0, 10);
@@ -122,6 +118,14 @@ pub(crate) fn wire_ui(
             started.elapsed().as_micros()
         ));
     });
+}
+
+pub(crate) fn wire_ui(
+    ui: &MainWindow,
+    sender: CommandSender,
+    flexikey_state: Rc<RefCell<FlexiKeyViewState>>,
+) {
+    wire_navigation(ui);
 
     let weak = ui.as_weak();
     let tx = sender.clone();

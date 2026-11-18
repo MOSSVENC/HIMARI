@@ -7,9 +7,7 @@ fn main() {
 
     compile_runtime_catalog();
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
-        embed_resource::compile("app.rc", embed_resource::NONE)
-            .manifest_required()
-            .expect("failed to embed Windows application icon");
+        compile_icon();
     }
 
     let config = slint_build::CompilerConfiguration::new()
@@ -21,6 +19,27 @@ fn main() {
         "ui/main.slint"
     };
     slint_build::compile_with_config(source, config).expect("failed to compile Slint UI");
+}
+
+fn compile_icon() {
+    if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") && !cfg!(windows) {
+        // app.rc contains only an ICON resource and needs no C preprocessor.
+        let output =
+            std::path::PathBuf::from(std::env::var_os("OUT_DIR").expect("OUT_DIR missing"))
+                .join("app.res");
+        let status = std::process::Command::new("llvm-rc")
+            .args(["/no-preprocess", "/fo"])
+            .arg(&output)
+            .arg("app.rc")
+            .status()
+            .expect("llvm-rc is required for Windows cross-compilation");
+        assert!(status.success(), "failed to embed Windows application icon");
+        println!("cargo:rustc-link-arg-bins={}", output.display());
+    } else {
+        embed_resource::compile("app.rc", embed_resource::NONE)
+            .manifest_required()
+            .expect("failed to embed Windows application icon");
+    }
 }
 
 fn compile_runtime_catalog() {

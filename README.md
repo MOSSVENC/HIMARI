@@ -24,7 +24,7 @@ cd RAM-CONTROL-CENTER
 
 ## Highlights
 
-- Native Rust + Slint UI with GPU compositing and a compact tray-resident shell
+- Native Rust + Slint UI with Vulkan rendering and a compact tray-resident shell
 - Power profiles, fan policies, custom curves and a ten-point RPM editor
 - Thermal, clock, memory, disk, battery and optional NVIDIA telemetry
 - Keyboard RGB with live draggable channel sliders, charging policy, GPU mode and panel refresh controls
@@ -70,16 +70,21 @@ mapping and settings behavior before enabling writes.
 
 ## Build and verify
 
-Development and cross-compilation run in WSL/Arch with the configured Zig
-linker:
+Host checks run in WSL/Arch. The Windows MSVC Release target uses the Windows
+SDK and Visual C++ libraries already present on the mounted host:
 
 ```bash
 ./scripts/verify.sh
 ```
 
-The gate runs formatting, host tests, Windows-target Clippy with warnings
-denied, and the Release build. On a Windows host with the signed drivers
-installed, run the reversible hardware smoke suite:
+The local gate runs formatting and host tests. Windows CI runs Windows-target
+Clippy, tests and a Release build. To build the Windows Release executable from
+WSL:
+
+    ./scripts/build-windows.sh
+
+On a Windows host with the signed drivers installed, run the reversible
+hardware smoke suite:
 
 ```powershell
 pwsh -File scripts/hardware-smoke.ps1
@@ -93,8 +98,10 @@ no driver is installed at startup.
 The Release executable is written to:
 
 ```text
-target/x86_64-pc-windows-gnu/release/ram-control-center.exe
+target/x86_64-pc-windows-msvc/release/ram-control-center.exe
 ```
+
+The Windows UI uses Slint's Skia renderer on its native Vulkan surface and reports the physical adapter after a successful queue submission. See the [rendering check](docs/rendering.md) for validation scope and measurements.
 
 ## Windows deployment
 
@@ -124,4 +131,8 @@ Fn/OSD work are listed in the [repair record](docs/repair-status-2026-11-16.md).
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Application source: MIT. See [LICENSE](LICENSE). Third-party components retain
+their own licenses; the renderer's notices are included under
+[vendor/i-slint-renderer-skia/LICENSES](vendor/i-slint-renderer-skia/LICENSES).
+
+<img src="assets/made-with-slint.png" width="160" alt="Made with Slint">

@@ -434,8 +434,8 @@ export component MainWindow inherits Window {
                         page-scroll := Flickable {
                             width: parent.width;
                             height: parent.height;
-                            content-width: self.width;
-                            content-height: max(self.height, page-layout.preferred-height);
+                            viewport-width: self.width;
+                            viewport-height: max(self.height, page-layout.preferred-height);
 
                             page-layout := VerticalLayout {
                                 width: parent.width;

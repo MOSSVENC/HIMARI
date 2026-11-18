@@ -14,6 +14,8 @@ mod flexikey_engine;
 mod flexikey_ui;
 mod fn_diagnostics;
 mod formatting;
+mod graphics;
+mod graphics_smoke;
 mod input;
 #[cfg(any(windows, test))]
 mod input_bindings;
@@ -127,7 +129,7 @@ fn poll_settings_backend(
         let _ = slint::quit_event_loop();
         return;
     };
-    if ui.get_renderer_ready() && ui.get_renderer_text().starts_with("GraphicsAPI::") {
+    if ui.get_renderer_ready() && !ui.get_renderer_text().is_empty() {
         passed.set(true);
         done.set(true);
         let _ = slint::quit_event_loop();
@@ -300,35 +302,6 @@ fn run_transition_snapshot(
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    #[cfg(feature = "snapshot-tools")]
-    if let Some(directory) = std::env::args().nth(1).and_then(|arg| {
-        arg.strip_prefix("--bars-smoke=")
-            .map(std::path::PathBuf::from)
-    }) {
-        return bar_smoke::run(directory);
-    }
-
-    #[cfg(any(debug_assertions, feature = "snapshot-tools"))]
-    if let Some(directory) = std::env::args().nth(1).and_then(|arg| {
-        arg.strip_prefix("--transition-snapshot=")
-            .map(str::to_owned)
-    }) {
-        return run_transition_snapshot(std::path::PathBuf::from(directory));
-    }
-
-    #[cfg(any(debug_assertions, feature = "snapshot-tools"))]
-    if let Some(page) = std::env::args()
-        .nth(1)
-        .and_then(|arg| arg.strip_prefix("--snapshot=").map(str::to_owned))
-    {
-        let path = std::env::args()
-            .nth(2)
-            .map(std::path::PathBuf::from)
-            .ok_or("snapshot mode needs an output path")?;
-        let page = page.parse::<usize>()?;
-        return run_snapshot(page, path);
-    }
-
     match std::env::args().nth(1).as_deref() {
         Some("--boot-agent") => std::process::exit(boot_agent::run()),
         Some("--install-drivers") => std::process::exit(driver_manager::run_installer()),
@@ -359,7 +332,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::process::exit(1);
             }
         },
-        Some("--control-sync-smoke") => std::process::exit(control_sync_smoke::run()),
         Some("--thermal-smoke") => std::process::exit(smoke::thermal_smoke()),
         Some("--input-hooks-smoke") => std::process::exit(flexikey_engine::hook_lifecycle_smoke()),
         Some("--system-smoke") => std::process::exit(system_smoke()),
@@ -367,20 +339,72 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("--touchpad-smoke") => std::process::exit(smoke::touchpad_smoke()),
         Some("--fn-events-smoke") => std::process::exit(fn_diagnostics::smoke()),
         Some("--display-care-smoke") => std::process::exit(display_care_smoke()),
-        Some("--settings-smoke") => std::process::exit(settings_backend_smoke()),
         _ => {}
     }
 
+    let mode = std::env::args().nth(1);
+    let diagnostic = mode.as_deref().is_some_and(|argument| {
+        matches!(
+            argument,
+            "--control-sync-smoke" | "--settings-smoke" | "--graphics-smoke"
+        ) || (cfg!(any(debug_assertions, feature = "snapshot-tools"))
+            && (argument.starts_with("--snapshot=")
+                || argument.starts_with("--transition-snapshot=")))
+            || (cfg!(feature = "snapshot-tools") && argument.starts_with("--bars-smoke="))
+    });
     let start_background = std::env::args().any(|argument| argument == "--background");
     log_action(&format!("start_background={start_background}"));
-    let _single_instance = match tray::SingleInstance::acquire() {
-        Ok(Some(instance)) => Some(instance),
-        Ok(None) => return Ok(()),
-        Err(error) => {
-            log_action(&format!("single-instance guard unavailable: {error}"));
-            None
+    let _single_instance = if diagnostic {
+        None
+    } else {
+        match tray::SingleInstance::acquire() {
+            Ok(Some(instance)) => Some(instance),
+            Ok(None) => return Ok(()),
+            Err(error) => {
+                log_action(&format!("single-instance guard unavailable: {error}"));
+                None
+            }
         }
     };
+
+    let renderer = graphics::Renderer::from_arguments(std::env::args().skip(1))?;
+    renderer.select()?;
+
+    #[cfg(feature = "snapshot-tools")]
+    if let Some(directory) = std::env::args().nth(1).and_then(|arg| {
+        arg.strip_prefix("--bars-smoke=")
+            .map(std::path::PathBuf::from)
+    }) {
+        return bar_smoke::run(directory);
+    }
+
+    #[cfg(any(debug_assertions, feature = "snapshot-tools"))]
+    if let Some(directory) = std::env::args().nth(1).and_then(|arg| {
+        arg.strip_prefix("--transition-snapshot=")
+            .map(str::to_owned)
+    }) {
+        return run_transition_snapshot(std::path::PathBuf::from(directory));
+    }
+
+    #[cfg(any(debug_assertions, feature = "snapshot-tools"))]
+    if let Some(page) = std::env::args()
+        .nth(1)
+        .and_then(|arg| arg.strip_prefix("--snapshot=").map(str::to_owned))
+    {
+        let path = std::env::args()
+            .nth(2)
+            .map(std::path::PathBuf::from)
+            .ok_or("snapshot mode needs an output path")?;
+        let page = page.parse::<usize>()?;
+        return run_snapshot(page, path);
+    }
+
+    match std::env::args().nth(1).as_deref() {
+        Some("--control-sync-smoke") => std::process::exit(control_sync_smoke::run()),
+        Some("--settings-smoke") => std::process::exit(settings_backend_smoke()),
+        Some("--graphics-smoke") => return graphics_smoke::run(),
+        _ => {}
+    }
 
     let ui = MainWindow::new()?;
     if let Err(error) = slint::select_bundled_translation("zh-CN") {
