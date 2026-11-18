@@ -84,7 +84,6 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
         .into());
     }
     println!("resize_and_restore=passed idle_interval_ms=1000 idle_submissions=0");
-    #[cfg(feature = "snapshot-tools")]
     if let Some(path) = std::env::var_os("RAM_GRAPHICS_SMOKE_SNAPSHOT") {
         let pixels = ui.window().take_snapshot()?;
         crate::write_snapshot_ppm(&std::path::PathBuf::from(path), &pixels)?;

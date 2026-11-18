@@ -30,8 +30,29 @@
 
 详细日志位于本机忽略目录 target/validation/input-routing/。
 
+## Vulkan 页面合成对照
+
+原生 Skia/Vulkan 路径已经在 AMD 610M 上执行。最初的 22 次页面转换、窗口恢复和空闲提交检查通过，但 **37.48 ms** 的最大提交间隔超过 **33.34 ms** 门槛；散热页首次绘制约 **32.08 ms**。这份失败测量保存在 graphics/results.json。
+
+渲染器的 itemrenderer.rs / visit_opacity 对整页透明度调用 save_layer_alpha。工作区淡入淡出改为覆盖背景色矩形，页面直接绘入原目标，过渡时长和曲线保持原值。
+
+修改后的同一测试测得最大提交间隔 **30.43 ms**、P95 **4.38 ms**，超过 33 ms 的间隔为 0；散热页首次绘制为 **26.67 ms**。该轮通过 33.34 ms 门槛，记录位于 overlay-graphics/results.json。单次对照有运行波动，后续继续保留首次进入的单独测量。
+
+默认 Release 的 --graphics-smoke 支持通过 RAM_GRAPHICS_SMOKE_SNAPSHOT 指定最终渲染快照路径；性能采样在快照生成之前结束。
+
+最终构建复测：最大提交间隔 **30.61 ms**，P95 **4.30 ms**，散热页首次绘制 **25.04 ms**，22 次转换和 33.34 ms 门槛通过。窗口缩放、最小化恢复及一秒空闲零提交检查通过。应用自身生成的最终快照已检查，记录在 final-graphics/；屏幕遮挡采集未用于此结论。
+
+## 本机部署
+
+正式副本为 C:\ProgramData\RAM Control Center\ram-control-center.exe，以 --background 启动。安装与构建哈希核对一致，实际提交帧报告 Vulkan / Skia / AMD Radeon 610M。
+
+- EXE：19,065,856 字节。
+- SHA-256：c25a3799bfd13b78d943f977c2ba121b9ec1a1938536f15652fad71003b0fa1f。
+- 替换前副本保留一份恢复文件；安装目录的 pending、previous 临时文件均已清除。
+- 本轮替换应用文件，未变更服务、登录项和驱动配置。部署记录为 deployment.json。
+
 ## 仍需验收的项目
 
-原生 Skia/Vulkan 路径已经在 AMD 610M 上执行。本次 22 次页面转换、窗口恢复和空闲提交检查通过，但 **37.48 ms** 的最大提交间隔超过 **33.34 ms** 门槛；散热页首次绘制约 **32.08 ms**。这份测量记录在 graphics/results.json，不作为流畅度通过的证据。
+散热页首次绘制仍超过 60 Hz 的单帧预算。提交间隔检查及静态快照不能替代动画观感与物理交互验收。
 
 冷启动后的实际 CPU 性能恢复、完整 Fn 动作与 OSD、全部本机硬件功能对照和动画观感，继续按完整目标验收。热启动服务成功、窗口属性检查或单元测试均不替代这些结果。

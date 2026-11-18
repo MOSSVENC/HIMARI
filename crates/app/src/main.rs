@@ -103,7 +103,6 @@ fn schedule_tray_start(
     });
 }
 
-#[cfg(any(debug_assertions, feature = "snapshot-tools"))]
 fn write_snapshot_ppm(
     path: &std::path::Path,
     buffer: &slint::SharedPixelBuffer<slint::Rgba8Pixel>,
