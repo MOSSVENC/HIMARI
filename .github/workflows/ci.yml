@@ -30,6 +30,9 @@ jobs:
         with:
           toolchain: "1.100.0"
           components: clippy
+      - name: Test Windows executable replacement
+        shell: pwsh
+        run: ./scripts/test-deployment.ps1 -DeploymentScript ./scripts/deploy.ps1
       - run: cargo test --locked --workspace
       - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings -D clippy::undocumented_unsafe_blocks
       - run: cargo build --locked --release --workspace

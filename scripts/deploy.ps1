@@ -34,6 +34,49 @@ function Invoke-ProductCommand([string]$Executable, [string]$Mode, [int]$Timeout
     } finally { $process.Dispose() }
 }
 
+function Install-ProductBinary([string]$Source, [string]$Destination) {
+    $staged = "$Destination.pending"
+    $previous = "$Destination.previous"
+    if ((Test-Path -LiteralPath $staged) -or (Test-Path -LiteralPath $previous)) {
+        throw "An interrupted replacement requires inspection: $Destination"
+    }
+    $expectedHash = (Get-FileHash -LiteralPath $Source).Hash
+    $movedPrevious = $false
+    $placedReplacement = $false
+    $verified = $false
+    try {
+        Copy-Item -LiteralPath $Source -Destination $staged
+        if ((Get-FileHash -LiteralPath $staged).Hash -ne $expectedHash) {
+            throw "Staged binary hash mismatch: $Destination"
+        }
+        if (Test-Path -LiteralPath $Destination) {
+            # Retire the old image before moving the verified replacement into
+            # place. Windows can reject an overwrite while retaining image sections.
+            [IO.File]::Move($Destination, $previous)
+            $movedPrevious = $true
+        }
+        [IO.File]::Move($staged, $Destination)
+        $placedReplacement = $true
+        if ((Get-FileHash -LiteralPath $Destination).Hash -ne $expectedHash) {
+            throw "Installed binary hash mismatch: $Destination"
+        }
+        $verified = $true
+    } catch {
+        if ($placedReplacement) { Remove-Item -LiteralPath $Destination -Force }
+        if ($movedPrevious) {
+            if (-not (Test-Path -LiteralPath $Destination)) {
+                [IO.File]::Move($previous, $Destination)
+            }
+        }
+        throw
+    } finally {
+        if (Test-Path -LiteralPath $staged) { Remove-Item -LiteralPath $staged -Force }
+        if ($verified -and (Test-Path -LiteralPath $previous)) {
+            Remove-Item -LiteralPath $previous -Force
+        }
+    }
+}
+
 # Validate the complete release before stopping any running application.
 foreach ($name in $taskBinaryNames) {
     if (-not (Test-Path -LiteralPath (Join-Path $ReleaseDirectory $name) -PathType Leaf)) {
@@ -54,16 +97,7 @@ New-Item -ItemType Directory -Path $taskInstallRoot -Force | Out-Null
 foreach ($name in $taskBinaryNames) {
     $source = Join-Path $ReleaseDirectory $name
     $destination = Join-Path $taskInstallRoot $name
-    $staged = "$destination.pending"
-    try {
-        Copy-Item -LiteralPath $source -Destination $staged -Force
-        if ((Get-FileHash -LiteralPath $source).Hash -ne (Get-FileHash -LiteralPath $staged).Hash) {
-            throw "Staged binary hash mismatch: $name"
-        }
-        [IO.File]::Move($staged, $destination, $true)
-    } finally {
-        if (Test-Path -LiteralPath $staged) { Remove-Item -LiteralPath $staged -Force }
-    }
+    Install-ProductBinary $source $destination
 }
 
 # Migrate application-owned data and optional local driver payload copies.
