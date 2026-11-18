@@ -11,6 +11,9 @@ mod display_care;
 mod driver_manager;
 mod fan_curve_ui;
 mod flexikey_engine;
+mod flexikey_jobs;
+mod flexikey_smoke;
+mod flexikey_store;
 mod flexikey_ui;
 mod fn_diagnostics;
 mod formatting;
@@ -346,7 +349,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let diagnostic = mode.as_deref().is_some_and(|argument| {
         matches!(
             argument,
-            "--control-sync-smoke" | "--settings-smoke" | "--graphics-smoke"
+            "--control-sync-smoke"
+                | "--settings-smoke"
+                | "--graphics-smoke"
+                | "--flexikey-ui-smoke"
         ) || (cfg!(any(debug_assertions, feature = "snapshot-tools"))
             && (argument.starts_with("--snapshot=")
                 || argument.starts_with("--transition-snapshot=")))
@@ -403,6 +409,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("--control-sync-smoke") => std::process::exit(control_sync_smoke::run()),
         Some("--settings-smoke") => std::process::exit(settings_backend_smoke()),
         Some("--graphics-smoke") => return graphics_smoke::run(),
+        Some("--flexikey-ui-smoke") => return flexikey_smoke::run(),
         _ => {}
     }
 

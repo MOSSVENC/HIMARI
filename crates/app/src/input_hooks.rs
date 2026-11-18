@@ -47,9 +47,17 @@ struct RunningThread {
 #[derive(Default)]
 pub(crate) struct HookRuntime {
     running: Option<RunningThread>,
+    on_activated: Option<fn(HookStatus)>,
 }
 
 impl HookRuntime {
+    pub(crate) fn with_activation_callback(callback: fn(HookStatus)) -> Self {
+        Self {
+            running: None,
+            on_activated: Some(callback),
+        }
+    }
+
     pub(crate) fn is_started(&self) -> bool {
         self.running.is_some()
     }
@@ -83,10 +91,11 @@ impl HookRuntime {
             let (sender, receiver) = mpsc::channel();
             let thread_wake = Arc::clone(&wake);
             let thread_stop = Arc::clone(&stop);
+            let on_activated = self.on_activated;
             let thread = thread::Builder::new()
                 .name("input-hooks".to_owned())
                 .spawn(move || {
-                    run_loop(receiver, thread_wake, thread_stop);
+                    run_loop(receiver, thread_wake, thread_stop, on_activated);
                 })
                 .map_err(|error| format!("start input hook thread: {error}"))?;
             self.running = Some(RunningThread {
@@ -115,13 +124,13 @@ impl HookRuntime {
             .and_then(|()| {
                 reply
                     .recv_timeout(COMMAND_TIMEOUT)
-                    .map_err(|error| format!("input hook command: {error}"))?
+                    .map_err(|error| format!("input hook command: {error}"))
             });
         if outcome.is_err() {
             running.stop.store(true, Ordering::Release);
             let _ = signal(&running.wake);
         }
-        outcome
+        outcome?
     }
 }
 
@@ -163,19 +172,32 @@ fn signal(event: &OwnedHandle) -> Result<(), String> {
     Ok(())
 }
 
-fn run_loop(commands: Receiver<Configure>, wake: Arc<OwnedHandle>, stop: Arc<AtomicBool>) {
+fn run_loop(
+    commands: Receiver<Configure>,
+    wake: Arc<OwnedHandle>,
+    stop: Arc<AtomicBool>,
+    on_activated: Option<fn(HookStatus)>,
+) {
     let mut hooks = Hooks {
         keyboard: None,
         mouse: None,
     };
     while !stop.load(Ordering::Acquire) {
         while let Ok(command) = commands.try_recv() {
+            let previous = hooks.status();
             let result = hooks.configure(
                 command.keyboard,
                 command.mouse,
                 command.keyboard_proc,
                 command.mouse_proc,
             );
+            let current = hooks.status();
+            if let Some(callback) = on_activated {
+                callback(HookStatus {
+                    keyboard: current.keyboard && !previous.keyboard,
+                    mouse: current.mouse && !previous.mouse,
+                });
+            }
             let _ = command.result.send(result);
         }
         if stop.load(Ordering::Acquire) || !pump_messages(&wake) {
@@ -213,6 +235,13 @@ struct Hooks {
 }
 
 impl Hooks {
+    fn status(&self) -> HookStatus {
+        HookStatus {
+            keyboard: self.keyboard.is_some(),
+            mouse: self.mouse.is_some(),
+        }
+    }
+
     fn configure(
         &mut self,
         keyboard: bool,
@@ -220,27 +249,31 @@ impl Hooks {
         keyboard_proc: HOOKPROC,
         mouse_proc: HOOKPROC,
     ) -> Result<HookStatus, String> {
-        let result = (|| {
-            if keyboard && self.keyboard.is_none() {
-                self.keyboard = Some(Hook::install(WH_KEYBOARD_LL, keyboard_proc)?);
-            } else if !keyboard {
-                Hook::remove(&mut self.keyboard)?;
-            }
-            if mouse && self.mouse.is_none() {
-                self.mouse = Some(Hook::install(WH_MOUSE_LL, mouse_proc)?);
-            } else if !mouse {
-                Hook::remove(&mut self.mouse)?;
-            }
-            Ok(HookStatus {
-                keyboard: self.keyboard.is_some(),
-                mouse: self.mouse.is_some(),
-            })
-        })();
-        if result.is_err() {
-            self.keyboard.take();
-            self.mouse.take();
+        // Stage all additions before changing active handles. An installation
+        // error drops only the staged hooks and leaves existing input paired.
+        let new_keyboard = if keyboard && self.keyboard.is_none() {
+            Some(Hook::install(WH_KEYBOARD_LL, keyboard_proc)?)
+        } else {
+            None
+        };
+        let new_mouse = if mouse && self.mouse.is_none() {
+            Some(Hook::install(WH_MOUSE_LL, mouse_proc)?)
+        } else {
+            None
+        };
+        if new_keyboard.is_some() {
+            self.keyboard = new_keyboard;
         }
-        result
+        if new_mouse.is_some() {
+            self.mouse = new_mouse;
+        }
+        if !keyboard {
+            Hook::remove(&mut self.keyboard)?;
+        }
+        if !mouse {
+            Hook::remove(&mut self.mouse)?;
+        }
+        Ok(self.status())
     }
 }
 

@@ -60,7 +60,7 @@ fn keyboard_input(event: &KeyEvent) -> windows_sys::Win32::UI::Input::KeyboardAn
 }
 
 #[cfg(windows)]
-fn held_keys(keys: &[u16]) -> Vec<(u16, bool)> {
+pub(crate) fn held_keys(keys: &[u16]) -> Vec<(u16, bool)> {
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
     keys.iter()
         .map(|&key| {

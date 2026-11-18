@@ -126,16 +126,16 @@ pub(crate) fn hotkey_steps(
 
 #[cfg(windows)]
 mod platform {
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashMap;
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
     use std::ptr;
     use std::sync::mpsc::{self, Sender};
-    use std::sync::{Mutex, OnceLock};
+    use std::sync::{Arc, Mutex, OnceLock};
     use std::thread;
     use std::time::Duration;
 
-    use crate::input_bindings::{InputDecision, dispatch};
+    use crate::input_bindings::{Device, InputDecision, InputRouter};
     use crate::localization::tr;
     use ram_control_center_protocol::{
         FlexiKeyAction, FlexiKeyDevice, FlexiKeyProfile, MacroStep, MacroStepKind,
@@ -148,9 +148,10 @@ mod platform {
     };
     use windows_sys::Win32::UI::Shell::ShellExecuteW;
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        CallNextHookEx, KBDLLHOOKSTRUCT, LLKHF_EXTENDED, LLKHF_INJECTED, MSLLHOOKSTRUCT,
-        WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP,
-        WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDOWN, WM_XBUTTONUP,
+        CallNextHookEx, KBDLLHOOKSTRUCT, LLKHF_EXTENDED, LLKHF_INJECTED, LLMHF_INJECTED,
+        MSLLHOOKSTRUCT, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN,
+        WM_MBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SYSKEYDOWN, WM_SYSKEYUP, WM_XBUTTONDOWN,
+        WM_XBUTTONUP,
     };
 
     use super::{CapturedTrigger, EngineReport, FlexiKeyEngine};
@@ -158,27 +159,21 @@ mod platform {
     use crate::input::{INJECTION_MAGIC, insert_inputs};
 
     struct EngineState {
-        keyboard_actions: HashMap<u16, FlexiKeyAction>,
-        mouse_actions: HashMap<u16, FlexiKeyAction>,
-        keyboard_down: HashSet<u16>,
-        mouse_down: HashSet<u16>,
+        router: InputRouter,
         sender: Sender<FlexiKeyAction>,
-    }
-
-    enum CaptureState {
-        Idle,
-        Armed,
-        Down { trigger: CapturedTrigger },
-        Ready(CapturedTrigger),
+        hook_wake: Option<Arc<dyn Fn() + Send + Sync>>,
     }
 
     static ENGINE: OnceLock<Mutex<EngineState>> = OnceLock::new();
-    static CAPTURE: OnceLock<Mutex<CaptureState>> = OnceLock::new();
     static HOOK_RUNTIME: OnceLock<Mutex<crate::input_hooks::HookRuntime>> = OnceLock::new();
 
     fn configure_hooks(keyboard: bool, mouse: bool) -> Result<(), String> {
         HOOK_RUNTIME
-            .get_or_init(|| Mutex::new(crate::input_hooks::HookRuntime::default()))
+            .get_or_init(|| {
+                Mutex::new(crate::input_hooks::HookRuntime::with_activation_callback(
+                    seed_held_inputs,
+                ))
+            })
             .lock()
             .map_err(|_| "input hook runtime lock was poisoned".to_owned())?
             .configure(keyboard, mouse, Some(keyboard_hook), Some(mouse_hook))
@@ -186,27 +181,72 @@ mod platform {
     }
 
     fn restore_profile_hooks() -> Result<(), String> {
-        let (keyboard, mouse) = ENGINE
-            .get()
-            .and_then(|engine| engine.lock().ok())
-            .map(|engine| {
-                (
-                    !engine.keyboard_actions.is_empty(),
-                    !engine.mouse_actions.is_empty(),
-                )
-            })
-            .ok_or_else(|| "FlexiKey engine is unavailable".to_owned())?;
-        let capturing = CAPTURE
-            .get()
-            .map(|capture| {
-                capture
-                    .lock()
-                    .map(|capture| !matches!(*capture, CaptureState::Idle))
-                    .map_err(|_| "trigger capture lock was poisoned".to_owned())
-            })
-            .transpose()?
-            .unwrap_or(false);
-        configure_hooks(keyboard || capturing, mouse || capturing)
+        loop {
+            let (keyboard, mouse) = ENGINE
+                .get()
+                .ok_or_else(|| "FlexiKey engine is unavailable".to_owned())?
+                .lock()
+                .map_err(|_| "FlexiKey engine lock was poisoned".to_owned())?
+                .router
+                .hook_requirements();
+            configure_hooks(keyboard, mouse)?;
+            let mut engine = ENGINE
+                .get()
+                .unwrap()
+                .lock()
+                .map_err(|_| "FlexiKey engine lock was poisoned".to_owned())?;
+            if !keyboard {
+                engine.router.finish_unhook(Device::Keyboard);
+            }
+            if !mouse {
+                engine.router.finish_unhook(Device::Mouse);
+            }
+            if engine.router.hook_requirements() == (keyboard, mouse) {
+                return Ok(());
+            }
+        }
+    }
+
+    fn seed_held_inputs(activated: crate::input_hooks::HookStatus) {
+        // This callback runs after hook installation and before its thread pumps
+        // input. Already-held Windows keys must keep their repeats and release.
+        let virtual_keys: Vec<u16> = (1..=254).collect();
+        let held = crate::input::held_keys(&virtual_keys);
+        let mut keyboard = Vec::new();
+        let mut mouse = Vec::new();
+        for (vk, down) in held {
+            if !down {
+                continue;
+            }
+            match vk {
+                1 => mouse.push(1),
+                2 => mouse.push(4),
+                4 => mouse.push(0x10),
+                5 => mouse.push(0x40),
+                6 => mouse.push(0x100),
+                3 | 0x10..=0x12 => {}
+                _ => {
+                    let scan = map_virtual_key(u32::from(vk), MAPVK_VK_TO_VSC_EX);
+                    if scan != 0 {
+                        keyboard.push(super::cc40_key_code_from_parts(
+                            vk,
+                            scan as u16 & 0xff,
+                            scan >> 8 == 0xe0 || is_extended_key(vk),
+                        ));
+                    }
+                }
+            }
+        }
+        if let Some(engine) = ENGINE.get()
+            && let Ok(mut engine) = engine.lock()
+        {
+            if activated.keyboard {
+                engine.router.seed_pressed(Device::Keyboard, keyboard);
+            }
+            if activated.mouse {
+                engine.router.seed_pressed(Device::Mouse, mouse);
+            }
+        }
     }
 
     impl FlexiKeyEngine {
@@ -215,11 +255,9 @@ mod platform {
                 let (sender, receiver) = mpsc::channel();
                 thread::spawn(move || action_worker(receiver));
                 Mutex::new(EngineState {
-                    keyboard_actions: HashMap::new(),
-                    mouse_actions: HashMap::new(),
-                    keyboard_down: HashSet::new(),
-                    mouse_down: HashSet::new(),
+                    router: InputRouter::default(),
                     sender,
+                    hook_wake: None,
                 })
             });
 
@@ -276,27 +314,24 @@ mod platform {
             let mut engine = engine
                 .lock()
                 .map_err(|_| "FlexiKey engine lock was poisoned".to_owned())?;
-            engine.keyboard_actions = keyboard_actions;
-            engine.mouse_actions = mouse_actions;
-            engine.keyboard_down.clear();
-            engine.mouse_down.clear();
+            let [previous_keyboard, previous_mouse] = engine
+                .router
+                .replace_bindings(keyboard_actions, mouse_actions);
             drop(engine);
             if let Err(error) = restore_profile_hooks() {
                 let mut engine = ENGINE
                     .get()
-                    .and_then(|engine| engine.lock().ok())
-                    .ok_or_else(|| "FlexiKey engine lock was poisoned".to_owned())?;
-                engine.keyboard_actions.clear();
-                engine.mouse_actions.clear();
-                engine.keyboard_down.clear();
-                engine.mouse_down.clear();
+                    .unwrap()
+                    .lock()
+                    .map_err(|_| "FlexiKey engine lock was poisoned".to_owned())?;
+                engine
+                    .router
+                    .replace_bindings(previous_keyboard, previous_mouse);
                 drop(engine);
-                if let Err(cleanup_error) = configure_hooks(false, false) {
-                    log_line(&format!(
-                        "hook cleanup after profile failure failed: {cleanup_error}"
-                    ));
-                }
-                return Err(error);
+                return match restore_profile_hooks() {
+                    Ok(()) => Err(error),
+                    Err(restore) => Err(format!("{error}; restore previous hooks: {restore}")),
+                };
             }
             log_line(&format!(
                 "profile loaded: {} keyboard action(s), {} mouse action(s)",
@@ -305,13 +340,26 @@ mod platform {
             Ok(report)
         }
 
+        pub fn set_hook_wake(&self, wake: impl Fn() + Send + Sync + 'static) {
+            if let Some(engine) = ENGINE.get()
+                && let Ok(mut engine) = engine.lock()
+            {
+                engine.hook_wake = Some(Arc::new(wake));
+            }
+        }
+
+        pub fn reconcile_hooks(&self) -> Result<(), String> {
+            restore_profile_hooks()
+        }
+
         pub fn arm_capture(&self) -> Result<(), String> {
-            let capture = CAPTURE.get_or_init(|| Mutex::new(CaptureState::Idle));
-            let mut capture = capture
+            let mut engine = ENGINE
+                .get()
+                .ok_or_else(|| "FlexiKey engine is unavailable".to_owned())?
                 .lock()
-                .map_err(|_| "trigger capture lock was poisoned".to_owned())?;
-            *capture = CaptureState::Armed;
-            drop(capture);
+                .map_err(|_| "FlexiKey engine lock was poisoned".to_owned())?;
+            engine.router.arm_capture();
+            drop(engine);
             if let Err(error) = restore_profile_hooks() {
                 self.cancel_capture();
                 return Err(error);
@@ -321,33 +369,31 @@ mod platform {
         }
 
         pub fn cancel_capture(&self) {
-            if let Some(capture) = CAPTURE.get()
-                && let Ok(mut capture) = capture.lock()
-            {
-                *capture = CaptureState::Idle;
-            }
-            if let Err(error) = restore_profile_hooks() {
-                log_line(&format!("restore profile hooks after capture: {error}"));
+            let wake = ENGINE
+                .get()
+                .and_then(|engine| engine.lock().ok())
+                .and_then(|mut engine| {
+                    engine.router.cancel_capture();
+                    engine.hook_wake.clone()
+                });
+            if let Some(wake) = wake {
+                wake();
             }
         }
 
         pub fn take_captured_trigger(&self) -> Option<CapturedTrigger> {
-            let capture = CAPTURE.get()?;
-            let mut capture = capture.lock().ok()?;
-            let CaptureState::Ready(trigger) = &*capture else {
-                return None;
-            };
-            let trigger = trigger.clone();
-            *capture = CaptureState::Idle;
-            drop(capture);
-            if let Err(error) = restore_profile_hooks() {
-                log_line(&format!("restore profile hooks after trigger: {error}"));
+            let mut engine = ENGINE.get()?.lock().ok()?;
+            let captured = engine.router.take_capture()?;
+            let wake = engine.hook_wake.clone();
+            drop(engine);
+            if let Some(wake) = wake {
+                wake();
             }
-            log_line(&format!(
-                "trigger captured: device={} code={:#06x} name={}",
-                trigger.device, trigger.key_code, trigger.name
-            ));
-            Some(trigger)
+            Some(CapturedTrigger {
+                device: captured.device.as_u8(),
+                key_code: captured.key_code,
+                name: captured.name,
+            })
         }
     }
 
@@ -379,13 +425,27 @@ mod platform {
                 }
             }
         }
-        // A failed installation must release a hook already installed in this request.
+        // Failure to add the mouse must preserve an existing keyboard hook and
+        // leave the command thread available for the next configuration.
+        runtime.configure(true, false, Some(keyboard_hook), Some(mouse_hook))?;
         if runtime
             .configure(true, true, Some(keyboard_hook), None)
             .is_ok()
         {
             return Err("missing callback unexpectedly installed a mouse hook".to_owned());
         }
+        let status = runtime.configure(true, false, Some(keyboard_hook), Some(mouse_hook))?;
+        if status
+            != (HookStatus {
+                keyboard: true,
+                mouse: false,
+            })
+        {
+            return Err(format!(
+                "installation failure lost the existing keyboard hook: {status:?}"
+            ));
+        }
+        runtime.configure(false, false, Some(keyboard_hook), Some(mouse_hook))?;
         drop(runtime);
         println!(
             "input hooks: 100 acknowledged transitions; empty, keyboard, mouse, both, removal and installation failure passed"
@@ -424,37 +484,10 @@ mod platform {
             return call_next_hook(code, wparam, lparam);
         }
         let key = cc40_key_code(keyboard);
-        if down
-            && capture_down(FlexiKeyDevice::Keyboard.as_u8(), key, || {
-                keyboard_name(keyboard)
-            })
-        {
-            return 1;
-        }
-        if up && capture_up(FlexiKeyDevice::Keyboard.as_u8(), key) {
-            return 1;
-        }
-        let Some(engine) = ENGINE.get() else {
-            return call_next_hook(code, wparam, lparam);
-        };
-        let Ok(mut engine) = engine.lock() else {
-            return call_next_hook(code, wparam, lparam);
-        };
-        let EngineState {
-            keyboard_actions,
-            keyboard_down,
-            ..
-        } = &mut *engine;
-        let decision = dispatch(keyboard_actions, keyboard_down, key, down);
-        let pass = matches!(&decision, InputDecision::Pass);
-        if let InputDecision::Dispatch(action) = decision {
-            let _ = engine.sender.send(action);
-        }
-        drop(engine);
-        if pass {
-            call_next_hook(code, wparam, lparam)
-        } else {
+        if route_input(Device::Keyboard, key, down, || keyboard_name(keyboard)) {
             1
+        } else {
+            call_next_hook(code, wparam, lparam)
         }
     }
 
@@ -486,83 +519,42 @@ mod platform {
         // pointer in lparam for the duration of this callback; the reference is
         // immutable and does not escape the callback.
         let mouse = unsafe { &*(lparam as *const MSLLHOOKSTRUCT) };
+        if mouse.flags & LLMHF_INJECTED != 0 && mouse.dwExtraInfo == INJECTION_MAGIC {
+            return call_next_hook(code, wparam, lparam);
+        }
         let Some(button) = super::cc40_mouse_code(message, mouse.mouseData) else {
             return call_next_hook(code, wparam, lparam);
         };
-        if down
-            && capture_down(FlexiKeyDevice::Mouse.as_u8(), button, || {
-                mouse_button_name(button).to_owned()
-            })
-        {
-            return 1;
+        if route_input(Device::Mouse, button, down, || {
+            mouse_button_name(button).to_owned()
+        }) {
+            1
+        } else {
+            call_next_hook(code, wparam, lparam)
         }
-        if up && capture_up(FlexiKeyDevice::Mouse.as_u8(), button) {
-            return 1;
-        }
+    }
+
+    fn route_input(device: Device, key: u16, down: bool, name: impl FnOnce() -> String) -> bool {
         let Some(engine) = ENGINE.get() else {
-            return call_next_hook(code, wparam, lparam);
+            return false;
         };
         let Ok(mut engine) = engine.lock() else {
-            return call_next_hook(code, wparam, lparam);
+            return false;
         };
-        let EngineState {
-            mouse_actions,
-            mouse_down,
-            ..
-        } = &mut *engine;
-        let decision = dispatch(mouse_actions, mouse_down, button, down);
-        let pass = matches!(&decision, InputDecision::Pass);
+        let before = engine.router.hook_requirements();
+        let decision = engine.router.route(device, key, down, name);
+        let suppressed = !matches!(&decision, InputDecision::Pass);
         if let InputDecision::Dispatch(action) = decision {
             let _ = engine.sender.send(action);
         }
+        let wake = (before != engine.router.hook_requirements())
+            .then(|| engine.hook_wake.clone())
+            .flatten();
         drop(engine);
-        if pass {
-            call_next_hook(code, wparam, lparam)
-        } else {
-            1
+        if let Some(wake) = wake {
+            wake();
         }
-    }
-
-    fn capture_down(device: u8, key_code: u16, name: impl FnOnce() -> String) -> bool {
-        let capture = CAPTURE.get_or_init(|| Mutex::new(CaptureState::Idle));
-        let Ok(mut capture) = capture.lock() else {
-            return false;
-        };
-        if matches!(*capture, CaptureState::Armed) {
-            *capture = CaptureState::Down {
-                trigger: CapturedTrigger {
-                    device,
-                    key_code,
-                    name: name(),
-                },
-            };
-            true
-        } else {
-            false
-        }
-    }
-
-    fn capture_up(device: u8, key_code: u16) -> bool {
-        let Some(capture) = CAPTURE.get() else {
-            return false;
-        };
-        let Ok(mut capture) = capture.lock() else {
-            return false;
-        };
-        let ready = match &*capture {
-            CaptureState::Down { trigger }
-                if trigger.device == device && trigger.key_code == key_code =>
-            {
-                Some(trigger.clone())
-            }
-            _ => None,
-        };
-        if let Some(trigger) = ready {
-            *capture = CaptureState::Ready(trigger);
-            true
-        } else {
-            false
-        }
+        suppressed
     }
 
     fn keyboard_name(keyboard: &KBDLLHOOKSTRUCT) -> String {
@@ -905,6 +897,12 @@ mod platform {
     impl FlexiKeyEngine {
         pub fn start() -> Self {
             Self {}
+        }
+
+        pub fn set_hook_wake(&self, _wake: impl Fn() + Send + Sync + 'static) {}
+
+        pub fn reconcile_hooks(&self) -> Result<(), String> {
+            Ok(())
         }
 
         pub fn update_profile(

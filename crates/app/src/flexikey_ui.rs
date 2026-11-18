@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -10,102 +9,11 @@ use slint::{ComponentHandle, VecModel, Weak};
 
 use crate::MainWindow;
 use crate::diagnostics::log_action;
-use crate::flexikey_engine::{self, EngineReport, FlexiKeyEngine};
+use crate::flexikey_engine::{self, FlexiKeyEngine};
+use crate::flexikey_jobs::FlexiKeyJobs;
+pub(crate) use crate::flexikey_store::FlexiKeyViewState;
+use crate::flexikey_store::flexikey_profile_path;
 use crate::localization::tr;
-
-pub(crate) struct FlexiKeyViewState {
-    store: FlexiKeyStore,
-    path: PathBuf,
-    load_error: Option<String>,
-    activated_index: Option<usize>,
-    operation_error: Option<String>,
-    operation_notice: Option<String>,
-    engine_report: Option<EngineReport>,
-    engine_error: Option<String>,
-}
-
-fn flexikey_profile_path() -> PathBuf {
-    if let Some(path) = std::env::var_os("NEO_CONTROL_FLEXIKEY_XML") {
-        return PathBuf::from(path);
-    }
-    let system_drive = std::env::var_os("SystemDrive").unwrap_or_else(|| "C:".into());
-    PathBuf::from(system_drive)
-        .join("ComboKey")
-        .join("profile.xml")
-}
-
-fn blank_flexikey_store() -> FlexiKeyStore {
-    FlexiKeyStore {
-        profiles: vec![FlexiKeyProfile {
-            index: 0,
-            name: tr("Personal").to_owned(),
-            icon: String::new(),
-            current_device: 1,
-            keyboard_enabled: true,
-            mouse_enabled: true,
-            selected: true,
-            bindings: Vec::new(),
-        }],
-    }
-}
-
-fn load_flexikey_view(path: &Path) -> FlexiKeyViewState {
-    match std::fs::read_to_string(path) {
-        Ok(xml) => match FlexiKeyStore::from_xml(&xml) {
-            Ok(store) => FlexiKeyViewState {
-                store,
-                path: path.to_owned(),
-                load_error: None,
-                activated_index: None,
-                operation_error: None,
-                operation_notice: None,
-                engine_report: None,
-                engine_error: None,
-            },
-            Err(error) => FlexiKeyViewState {
-                store: FlexiKeyStore::default(),
-                path: path.to_owned(),
-                load_error: Some(error.to_string()),
-                activated_index: None,
-                operation_error: None,
-                operation_notice: None,
-                engine_report: None,
-                engine_error: None,
-            },
-        },
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => FlexiKeyViewState {
-            store: blank_flexikey_store(),
-            path: path.to_owned(),
-            load_error: None,
-            activated_index: None,
-            operation_error: None,
-            operation_notice: Some(tr("profile.xml was not found. A blank profile is ready; saving a binding creates the file.")
-            .to_owned()),
-            engine_report: None,
-            engine_error: None,
-        },
-        Err(error) => FlexiKeyViewState {
-            store: FlexiKeyStore::default(),
-            path: path.to_owned(),
-            load_error: Some(error.to_string()),
-            activated_index: None,
-            operation_error: None,
-            operation_notice: None,
-            engine_report: None,
-            engine_error: None,
-        },
-    }
-}
-
-fn sync_flexikey_engine(
-    engine: &FlexiKeyEngine,
-    store: &FlexiKeyStore,
-) -> (Option<EngineReport>, Option<String>) {
-    match engine.update_profile(store.active()) {
-        Ok(report) => (Some(report), None),
-        Err(error) => (None, Some(error)),
-    }
-}
 
 fn active_profile_position(store: &FlexiKeyStore) -> Option<usize> {
     store.profiles.iter().position(|profile| profile.selected)
@@ -273,12 +181,17 @@ fn format_binding_label(index: usize, binding: &FlexiKeyBinding) -> String {
     format!("{:02}  {device}  {trigger:<14}  →  {action}", index + 1)
 }
 
-fn start_flexikey_capture_poll(weak: Weak<MainWindow>, engine: FlexiKeyEngine) {
+fn start_flexikey_capture_poll(
+    weak: Weak<MainWindow>,
+    engine: FlexiKeyEngine,
+    jobs: Rc<FlexiKeyJobs>,
+    epoch: u64,
+) {
     slint::Timer::single_shot(Duration::from_millis(50), move || {
         let Some(ui) = weak.upgrade() else {
             return;
         };
-        if !ui.get_flexikey_capture_armed() {
+        if !ui.get_flexikey_capture_armed() || !jobs.capture_is_current(epoch) {
             return;
         }
         if let Some(trigger) = engine.take_captured_trigger() {
@@ -295,270 +208,236 @@ fn start_flexikey_capture_poll(weak: Weak<MainWindow>, engine: FlexiKeyEngine) {
                 tr("Trigger captured. Choose the action and save.").into(),
             );
         } else {
-            start_flexikey_capture_poll(ui.as_weak(), engine);
+            start_flexikey_capture_poll(ui.as_weak(), engine, jobs, epoch);
         }
     });
+}
+
+fn submit_store(
+    ui: &MainWindow,
+    state: &Rc<RefCell<FlexiKeyViewState>>,
+    jobs: &FlexiKeyJobs,
+    next: FlexiKeyStore,
+    notice: &str,
+    activated: Option<usize>,
+) -> bool {
+    let accepted = match jobs.save(next.clone(), notice.to_owned(), activated) {
+        Ok(()) => {
+            let mut state = state.borrow_mut();
+            state.store = next;
+            state.operation_error = None;
+            state.operation_notice = None;
+            state.activated_index = None;
+            state.engine_report = None;
+            true
+        }
+        Err(error) => {
+            state.borrow_mut().operation_error = Some(error);
+            false
+        }
+    };
+    render_flexikey(ui, &state.borrow());
+    accepted
 }
 
 pub(crate) fn wire_flexikey(
     ui: &MainWindow,
     engine: FlexiKeyEngine,
 ) -> Rc<RefCell<FlexiKeyViewState>> {
-    let path = flexikey_profile_path();
-    let mut initial = load_flexikey_view(&path);
-    let (engine_report, engine_error) = sync_flexikey_engine(&engine, &initial.store);
-    initial.engine_report = engine_report;
-    initial.engine_error = engine_error;
-    let state = Rc::new(RefCell::new(initial));
-    render_flexikey(ui, &state.borrow());
+    wire_flexikey_at(ui, engine, flexikey_profile_path())
+}
+
+pub(crate) fn wire_flexikey_at(
+    ui: &MainWindow,
+    engine: FlexiKeyEngine,
+    path: std::path::PathBuf,
+) -> Rc<RefCell<FlexiKeyViewState>> {
+    let state = Rc::new(RefCell::new(crate::flexikey_jobs::empty_state(
+        path.clone(),
+    )));
+    let weak = ui.as_weak();
+    let jobs = match FlexiKeyJobs::start(engine.clone(), path, move || {
+        let weak = weak.clone();
+        if let Err(error) = slint::invoke_from_event_loop(move || {
+            if let Some(ui) = weak.upgrade() {
+                ui.invoke_flexikey_worker_ready();
+            }
+        }) {
+            log_action(&format!("FlexiKey UI dispatch failed: {error}"));
+        }
+    }) {
+        Ok(jobs) => Rc::new(jobs),
+        Err(error) => {
+            state.borrow_mut().engine_error = Some(error);
+            render_flexikey(ui, &state.borrow());
+            return state;
+        }
+    };
 
     let weak = ui.as_weak();
-    let state_for_select = Rc::clone(&state);
-    let engine_for_select = engine.clone();
-    ui.on_select_flexikey_profile(move |index| {
-        log_action(&format!("select-flexikey-profile callback {index}"));
-        if let Some(ui) = weak.upgrade() {
-            ui.set_flexikey_delete_armed(false);
+    let completed_state = Rc::clone(&state);
+    let completed_jobs = Rc::clone(&jobs);
+    ui.on_flexikey_worker_ready(move || {
+        let Some(ui) = weak.upgrade() else {
+            return;
+        };
+        let replies = completed_jobs.take_replies();
+        if let Some((id, confirmed)) = replies.profile
+            && completed_jobs.is_current(id)
+        {
+            *completed_state.borrow_mut() = confirmed;
+            render_flexikey(&ui, &completed_state.borrow());
         }
+        if let Some((epoch, Err(error))) = replies.capture
+            && completed_jobs.capture_is_current(epoch)
+        {
+            ui.set_flexikey_capture_armed(false);
+            ui.set_flexikey_editor_status(error.into());
+        }
+    });
+
+    let weak = ui.as_weak();
+    let select_state = Rc::clone(&state);
+    let select_jobs = Rc::clone(&jobs);
+    ui.on_select_flexikey_profile(move |index| {
+        let Some(ui) = weak.upgrade() else {
+            return;
+        };
         let Ok(index) = usize::try_from(index) else {
             return;
         };
-        let mut state = state_for_select.borrow_mut();
-        if state.store.active().map(|profile| profile.index) == Some(index) {
-            state.activated_index = Some(index);
-            state.operation_error = None;
-            state.operation_notice = None;
-            drop(state);
-            if let Some(ui) = weak.upgrade() {
-                render_flexikey(&ui, &state_for_select.borrow());
-            }
+        ui.set_flexikey_delete_armed(false);
+        if select_state
+            .borrow()
+            .store
+            .active()
+            .map(|profile| profile.index)
+            == Some(index)
+        {
             return;
         }
-        let mut next = state.store.clone();
-        if !next.select_by_profile_index(index) {
-            return;
-        }
-        if let Err(error) = engine_for_select.update_profile(next.active()) {
-            state.operation_error = Some(format!(
-                "{}: {error}",
-                tr("Action engine rejected the profile")
-            ));
-            drop(state);
-            if let Some(ui) = weak.upgrade() {
-                render_flexikey(&ui, &state_for_select.borrow());
-            }
-            return;
-        }
-        if let Err(error) = save_flexikey_store(&state.path, &next) {
-            let _ = engine_for_select.update_profile(state.store.active());
-            state.operation_error = Some(format!("{}: {error}", tr("Could not save profile.xml")));
-            drop(state);
-            if let Some(ui) = weak.upgrade() {
-                render_flexikey(&ui, &state_for_select.borrow());
-            }
-            return;
-        }
-        state.store = next;
-        state.load_error = None;
-        state.operation_error = None;
-        state.operation_notice = None;
-        state.activated_index = Some(index);
-        let (report, error) = sync_flexikey_engine(&engine_for_select, &state.store);
-        state.engine_report = report;
-        state.engine_error = error;
-        drop(state);
-        if let Some(ui) = weak.upgrade() {
-            render_flexikey(&ui, &state_for_select.borrow());
+        let mut next = select_state.borrow().store.clone();
+        if next.select_by_profile_index(index) {
+            submit_store(&ui, &select_state, &select_jobs, next, "", Some(index));
         }
     });
 
     let weak = ui.as_weak();
-    let state_for_new_profile = Rc::clone(&state);
-    let engine_for_new_profile = engine.clone();
+    let new_state = Rc::clone(&state);
+    let new_jobs = Rc::clone(&jobs);
     ui.on_new_flexikey_profile(move || {
-        let mut next = state_for_new_profile.borrow().store.clone();
-        let name = format!(
+        let Some(ui) = weak.upgrade() else {
+            return;
+        };
+        let mut next = new_state.borrow().store.clone();
+        next.add_profile(format!(
             "{} {}",
             tr("Profile"),
             next.profiles.len().saturating_add(1)
-        );
-        next.add_profile(name);
-        match commit_flexikey_store(
-            &state_for_new_profile,
-            &engine_for_new_profile,
+        ));
+        if submit_store(
+            &ui,
+            &new_state,
+            &new_jobs,
             next,
-            tr("A new FlexiKey profile was created and activated.").to_owned(),
+            tr("A new FlexiKey profile was created and activated."),
+            None,
         ) {
-            Ok(()) => {
-                if let Some(ui) = weak.upgrade() {
-                    ui.set_flexikey_delete_armed(false);
-                    render_flexikey(&ui, &state_for_new_profile.borrow());
-                }
-            }
-            Err(error) => {
-                let mut state = state_for_new_profile.borrow_mut();
-                state.operation_error =
-                    Some(format!("{}: {error}", tr("Could not create profile")));
-                drop(state);
-                if let Some(ui) = weak.upgrade() {
-                    render_flexikey(&ui, &state_for_new_profile.borrow());
-                }
-            }
+            ui.set_flexikey_delete_armed(false);
         }
     });
 
     let weak = ui.as_weak();
-    let state_for_rename_profile = Rc::clone(&state);
-    let engine_for_rename_profile = engine.clone();
+    let rename_state = Rc::clone(&state);
+    let rename_jobs = Rc::clone(&jobs);
     ui.on_rename_flexikey_profile(move |name| {
-        log_action(&format!("rename-flexikey-profile callback: {name}"));
-        let state_snapshot = state_for_rename_profile.borrow();
-        let Some(profile_position) = active_profile_position(&state_snapshot.store) else {
+        let Some(ui) = weak.upgrade() else {
             return;
         };
-        let mut next = state_snapshot.store.clone();
-        drop(state_snapshot);
-        if !next.rename_profile(profile_position, name.as_str()) {
-            let mut state = state_for_rename_profile.borrow_mut();
-            state.operation_error = Some(tr("Profile name cannot be empty.").to_owned());
-            drop(state);
-            if let Some(ui) = weak.upgrade() {
-                render_flexikey(&ui, &state_for_rename_profile.borrow());
-            }
+        let mut next = rename_state.borrow().store.clone();
+        let Some(position) = active_profile_position(&next) else {
+            return;
+        };
+        if !next.rename_profile(position, name.as_str()) {
+            rename_state.borrow_mut().operation_error =
+                Some(tr("Profile name cannot be empty.").to_owned());
+            render_flexikey(&ui, &rename_state.borrow());
             return;
         }
-        match commit_flexikey_store(
-            &state_for_rename_profile,
-            &engine_for_rename_profile,
+        if submit_store(
+            &ui,
+            &rename_state,
+            &rename_jobs,
             next,
-            tr("FlexiKey profile name saved.").to_owned(),
+            tr("FlexiKey profile name saved."),
+            None,
         ) {
-            Ok(()) => {
-                if let Some(ui) = weak.upgrade() {
-                    ui.set_flexikey_delete_armed(false);
-                    render_flexikey(&ui, &state_for_rename_profile.borrow());
-                }
-            }
-            Err(error) => {
-                let mut state = state_for_rename_profile.borrow_mut();
-                state.operation_error =
-                    Some(format!("{}: {error}", tr("Could not rename profile")));
-                drop(state);
-                if let Some(ui) = weak.upgrade() {
-                    render_flexikey(&ui, &state_for_rename_profile.borrow());
-                }
-            }
+            ui.set_flexikey_delete_armed(false);
         }
     });
 
     let weak = ui.as_weak();
-    let state_for_delete_profile = Rc::clone(&state);
-    let engine_for_delete_profile = engine.clone();
+    let delete_state = Rc::clone(&state);
+    let delete_jobs = Rc::clone(&jobs);
     ui.on_delete_flexikey_profile(move || {
-        let state_snapshot = state_for_delete_profile.borrow();
-        let Some(profile_position) = active_profile_position(&state_snapshot.store) else {
+        let Some(ui) = weak.upgrade() else {
             return;
         };
-        let mut next = state_snapshot.store.clone();
-        drop(state_snapshot);
-        if !next.remove_profile(profile_position) {
-            let mut state = state_for_delete_profile.borrow_mut();
-            state.operation_error =
+        let mut next = delete_state.borrow().store.clone();
+        let Some(position) = active_profile_position(&next) else {
+            return;
+        };
+        if !next.remove_profile(position) {
+            delete_state.borrow_mut().operation_error =
                 Some(tr("At least one FlexiKey profile must remain.").to_owned());
-            drop(state);
-            if let Some(ui) = weak.upgrade() {
-                render_flexikey(&ui, &state_for_delete_profile.borrow());
-            }
+            render_flexikey(&ui, &delete_state.borrow());
             return;
         }
-        match commit_flexikey_store(
-            &state_for_delete_profile,
-            &engine_for_delete_profile,
+        if submit_store(
+            &ui,
+            &delete_state,
+            &delete_jobs,
             next,
-            tr("FlexiKey profile deleted and the next profile activated.").to_owned(),
+            tr("FlexiKey profile deleted and the next profile activated."),
+            None,
         ) {
-            Ok(()) => {
-                if let Some(ui) = weak.upgrade() {
-                    ui.set_flexikey_delete_armed(false);
-                    render_flexikey(&ui, &state_for_delete_profile.borrow());
-                }
-            }
-            Err(error) => {
-                let mut state = state_for_delete_profile.borrow_mut();
-                state.operation_error =
-                    Some(format!("{}: {error}", tr("Could not delete profile")));
-                drop(state);
-                if let Some(ui) = weak.upgrade() {
-                    render_flexikey(&ui, &state_for_delete_profile.borrow());
-                }
-            }
+            ui.set_flexikey_delete_armed(false);
         }
     });
 
     let weak = ui.as_weak();
-    let state_for_devices = Rc::clone(&state);
-    let engine_for_devices = engine.clone();
+    let devices_state = Rc::clone(&state);
+    let devices_jobs = Rc::clone(&jobs);
     ui.on_set_flexikey_device_enabled(move |device, enabled| {
-        let state_snapshot = state_for_devices.borrow();
-        let Some(profile_position) = active_profile_position(&state_snapshot.store) else {
+        let Some(ui) = weak.upgrade() else {
             return;
         };
-        let mut next = state_snapshot.store.clone();
-        drop(state_snapshot);
-        let Some(profile) = next.profiles.get_mut(profile_position) else {
+        let mut next = devices_state.borrow().store.clone();
+        let Some(position) = active_profile_position(&next) else {
             return;
         };
+        let profile = &mut next.profiles[position];
         match device {
             1 => profile.keyboard_enabled = enabled,
             2 => profile.mouse_enabled = enabled,
             _ => return,
         }
-        let report = match engine_for_devices.update_profile(next.active()) {
-            Ok(report) => report,
-            Err(error) => {
-                let mut state = state_for_devices.borrow_mut();
-                state.operation_error = Some(format!(
-                    "{}: {error}",
-                    tr("Action engine rejected the change")
-                ));
-                drop(state);
-                if let Some(ui) = weak.upgrade() {
-                    render_flexikey(&ui, &state_for_devices.borrow());
-                }
-                return;
-            }
-        };
-        let previous = state_for_devices.borrow().store.clone();
-        if let Err(error) = save_flexikey_store(&state_for_devices.borrow().path, &next) {
-            let _ = engine_for_devices.update_profile(previous.active());
-            let mut state = state_for_devices.borrow_mut();
-            state.operation_error = Some(format!("{}: {error}", tr("Could not save profile.xml")));
-            drop(state);
-            if let Some(ui) = weak.upgrade() {
-                render_flexikey(&ui, &state_for_devices.borrow());
-            }
-            return;
-        }
-        let mut state = state_for_devices.borrow_mut();
-        state.store = next;
-        state.operation_error = None;
-        state.operation_notice =
-            Some(tr("FlexiKey trigger devices saved and reloaded.").to_owned());
-        state.activated_index = None;
-        state.engine_report = Some(report);
-        state.engine_error = None;
-        drop(state);
-        if let Some(ui) = weak.upgrade() {
-            render_flexikey(&ui, &state_for_devices.borrow());
-        }
+        submit_store(
+            &ui,
+            &devices_state,
+            &devices_jobs,
+            next,
+            tr("FlexiKey trigger devices saved and reloaded."),
+            None,
+        );
     });
 
     let weak = ui.as_weak();
-    let state_for_open = Rc::clone(&state);
-    let engine_for_open = engine.clone();
+    let open_state = Rc::clone(&state);
+    let open_jobs = Rc::clone(&jobs);
     ui.on_open_flexikey_editor(move |binding_index| {
-        engine_for_open.cancel_capture();
-        let state = state_for_open.borrow();
+        open_jobs.cancel_capture();
+        let state = open_state.borrow();
         let Some(profile) = state.store.active() else {
             return;
         };
@@ -595,9 +474,9 @@ pub(crate) fn wire_flexikey(
     });
 
     let weak = ui.as_weak();
-    let engine_for_close = engine.clone();
+    let close_jobs = Rc::clone(&jobs);
     ui.on_close_flexikey_editor(move || {
-        engine_for_close.cancel_capture();
+        close_jobs.cancel_capture();
         if let Some(ui) = weak.upgrade() {
             ui.set_flexikey_capture_armed(false);
             ui.set_flexikey_editor_status("".into());
@@ -606,29 +485,33 @@ pub(crate) fn wire_flexikey(
     });
 
     let weak = ui.as_weak();
-    let engine_for_capture = engine.clone();
+    let capture_jobs = Rc::clone(&jobs);
     ui.on_capture_flexikey_trigger(move || {
-        if let Some(ui) = weak.upgrade() {
-            match engine_for_capture.arm_capture() {
-                Ok(()) => {
-                    ui.set_flexikey_editor_status(
-                        tr("Listening for one key or mouse button…").into(),
-                    );
-                    ui.set_flexikey_capture_armed(true);
-                    start_flexikey_capture_poll(ui.as_weak(), engine_for_capture.clone());
-                }
-                Err(error) => {
-                    ui.set_flexikey_editor_status(error.into());
-                    ui.set_flexikey_capture_armed(false);
-                }
+        let Some(ui) = weak.upgrade() else {
+            return;
+        };
+        match capture_jobs.arm_capture() {
+            Ok(epoch) => {
+                ui.set_flexikey_editor_status(tr("Listening for one key or mouse button…").into());
+                ui.set_flexikey_capture_armed(true);
+                start_flexikey_capture_poll(
+                    ui.as_weak(),
+                    engine.clone(),
+                    Rc::clone(&capture_jobs),
+                    epoch,
+                );
+            }
+            Err(error) => {
+                ui.set_flexikey_editor_status(error.into());
+                ui.set_flexikey_capture_armed(false);
             }
         }
     });
 
     let weak = ui.as_weak();
-    let engine_for_cancel_capture = engine.clone();
+    let cancel_jobs = Rc::clone(&jobs);
     ui.on_cancel_flexikey_capture(move || {
-        engine_for_cancel_capture.cancel_capture();
+        cancel_jobs.cancel_capture();
         if let Some(ui) = weak.upgrade() {
             ui.set_flexikey_capture_armed(false);
             ui.set_flexikey_editor_status(tr("Capture canceled").into());
@@ -636,19 +519,19 @@ pub(crate) fn wire_flexikey(
     });
 
     let weak = ui.as_weak();
-    let state_for_save = Rc::clone(&state);
-    let engine_for_save = engine.clone();
+    let save_state = Rc::clone(&state);
+    let save_jobs = Rc::clone(&jobs);
     ui.on_save_flexikey_editor(
         move |binding_index, device, key_code, key_name, action_type, value| {
-            let state_snapshot = state_for_save.borrow();
-            let Some(profile_position) = active_profile_position(&state_snapshot.store) else {
+            let Some(ui) = weak.upgrade() else {
                 return;
             };
-            let Some(profile) = state_snapshot.store.profiles.get(profile_position) else {
+            let mut next = save_state.borrow().store.clone();
+            let Some(position) = active_profile_position(&next) else {
                 return;
             };
             let binding = match editor_binding(
-                profile,
+                &next.profiles[position],
                 binding_index,
                 device,
                 key_code.as_str(),
@@ -658,151 +541,86 @@ pub(crate) fn wire_flexikey(
             ) {
                 Ok(binding) => binding,
                 Err(error) => {
-                    if let Some(ui) = weak.upgrade() {
-                        ui.set_flexikey_editor_status(error.into());
-                    }
+                    ui.set_flexikey_editor_status(error.into());
                     return;
                 }
             };
-            let mut next = state_snapshot.store.clone();
-            drop(state_snapshot);
             let changed = if let Ok(index) = usize::try_from(binding_index) {
-                next.replace_binding(profile_position, index, binding)
+                next.replace_binding(position, index, binding)
             } else {
-                next.add_binding(profile_position, binding)
+                next.add_binding(position, binding)
             };
             if !changed {
-                if let Some(ui) = weak.upgrade() {
-                    ui.set_flexikey_editor_status(
-                        tr("The selected binding no longer exists").into(),
-                    );
-                }
+                ui.set_flexikey_editor_status(tr("The selected binding no longer exists").into());
                 return;
             }
-            let report = match engine_for_save.update_profile(next.active()) {
-                Ok(report) => report,
-                Err(error) => {
-                    if let Some(ui) = weak.upgrade() {
-                        ui.set_flexikey_editor_status(
-                            format!("{}: {error}", tr("Action engine rejected the binding")).into(),
-                        );
-                    }
-                    return;
-                }
-            };
-            let previous = state_for_save.borrow().store.clone();
-            if let Err(error) = save_flexikey_store(&state_for_save.borrow().path, &next) {
-                let _ = engine_for_save.update_profile(previous.active());
-                let (engine_report, engine_error) =
-                    sync_flexikey_engine(&engine_for_save, &previous);
-                let mut state = state_for_save.borrow_mut();
-                state.engine_report = engine_report;
-                state.engine_error = engine_error;
-                state.operation_error =
-                    Some(format!("{}: {error}", tr("Could not save profile.xml")));
-                drop(state);
-                if let Some(ui) = weak.upgrade() {
-                    ui.set_flexikey_editor_status(error.into());
-                    render_flexikey(&ui, &state_for_save.borrow());
-                }
-                return;
-            }
-            let mut state = state_for_save.borrow_mut();
-            state.store = next;
-            state.load_error = None;
-            state.operation_error = None;
-            state.operation_notice = Some(
-                tr("Binding saved to profile.xml and loaded into the input engine.").to_owned(),
-            );
-            state.activated_index = None;
-            state.engine_report = Some(report);
-            state.engine_error = None;
-            drop(state);
-            if let Some(ui) = weak.upgrade() {
+            if submit_store(
+                &ui,
+                &save_state,
+                &save_jobs,
+                next,
+                tr("Binding saved to profile.xml and loaded into the input engine."),
+                None,
+            ) {
+                save_jobs.cancel_capture();
                 ui.set_flexikey_capture_armed(false);
                 ui.set_flexikey_editor_status("".into());
                 ui.set_flexikey_editor_open(false);
-                render_flexikey(&ui, &state_for_save.borrow());
             }
         },
     );
 
     let weak = ui.as_weak();
-    let state_for_delete = Rc::clone(&state);
-    let engine_for_delete = engine.clone();
+    let binding_state = Rc::clone(&state);
+    let binding_jobs = Rc::clone(&jobs);
     ui.on_delete_flexikey_binding(move |binding_index| {
-        let Ok(binding_index) = usize::try_from(binding_index) else {
+        let Some(ui) = weak.upgrade() else {
             return;
         };
-        let state_snapshot = state_for_delete.borrow();
-        let Some(profile_position) = active_profile_position(&state_snapshot.store) else {
+        let Ok(index) = usize::try_from(binding_index) else {
             return;
         };
-        let mut next = state_snapshot.store.clone();
-        drop(state_snapshot);
-        if !next.remove_binding(profile_position, binding_index) {
+        let mut next = binding_state.borrow().store.clone();
+        let Some(position) = active_profile_position(&next) else {
+            return;
+        };
+        if !next.remove_binding(position, index) {
             return;
         }
-        let report = match engine_for_delete.update_profile(next.active()) {
-            Ok(report) => report,
-            Err(error) => {
-                if let Some(ui) = weak.upgrade() {
-                    ui.set_flexikey_editor_status(
-                        format!("{}: {error}", tr("Action engine rejected the change")).into(),
-                    );
-                }
-                return;
-            }
-        };
-        let previous = state_for_delete.borrow().store.clone();
-        if let Err(error) = save_flexikey_store(&state_for_delete.borrow().path, &next) {
-            let _ = engine_for_delete.update_profile(previous.active());
-            let mut state = state_for_delete.borrow_mut();
-            state.operation_error = Some(format!("{}: {error}", tr("Could not save profile.xml")));
-            drop(state);
-            if let Some(ui) = weak.upgrade() {
-                ui.set_flexikey_editor_status(error.into());
-                render_flexikey(&ui, &state_for_delete.borrow());
-            }
-            return;
-        }
-        let mut state = state_for_delete.borrow_mut();
-        state.store = next;
-        state.load_error = None;
-        state.operation_error = None;
-        state.operation_notice =
-            Some(tr("Binding removed from profile.xml and the input engine.").to_owned());
-        state.activated_index = None;
-        state.engine_report = Some(report);
-        state.engine_error = None;
-        drop(state);
-        if let Some(ui) = weak.upgrade() {
+        if submit_store(
+            &ui,
+            &binding_state,
+            &binding_jobs,
+            next,
+            tr("Binding removed from profile.xml and the input engine."),
+            None,
+        ) {
+            binding_jobs.cancel_capture();
+            ui.set_flexikey_capture_armed(false);
             ui.set_flexikey_editor_open(false);
             ui.set_flexikey_editor_status("".into());
-            render_flexikey(&ui, &state_for_delete.borrow());
         }
     });
 
     let weak = ui.as_weak();
-    let state_for_reload = Rc::clone(&state);
-    let engine_for_reload = engine.clone();
+    let reload_state = Rc::clone(&state);
+    let reload_jobs = Rc::clone(&jobs);
     ui.on_reload_flexikey(move || {
-        engine_for_reload.cancel_capture();
-        {
-            let mut state = state_for_reload.borrow_mut();
-            let mut next = load_flexikey_view(&state.path);
-            let (report, error) = sync_flexikey_engine(&engine_for_reload, &next.store);
-            next.engine_report = report;
-            next.engine_error = error;
-            *state = next;
-        }
         if let Some(ui) = weak.upgrade() {
+            if let Err(error) = reload_jobs.reload() {
+                reload_state.borrow_mut().operation_error = Some(error);
+            } else {
+                reload_state.borrow_mut().engine_report = None;
+            }
             ui.set_flexikey_capture_armed(false);
             ui.set_flexikey_editor_open(false);
-            render_flexikey(&ui, &state_for_reload.borrow());
+            render_flexikey(&ui, &reload_state.borrow());
         }
     });
-
+    if let Err(error) = jobs.reload() {
+        state.borrow_mut().operation_error = Some(error);
+    }
+    render_flexikey(ui, &state.borrow());
     state
 }
 
@@ -926,95 +744,11 @@ fn format_flexikey_profile(profile: &FlexiKeyProfile) -> String {
     )
 }
 
-fn save_flexikey_store(path: &Path, store: &FlexiKeyStore) -> Result<(), String> {
-    let started = std::time::Instant::now();
-    if let Some(parent) = path.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        std::fs::create_dir_all(parent)
-            .map_err(|error| format!("could not create {}: {error}", parent.display()))?;
-    }
-    let temporary = path.with_extension("xml.neo.tmp");
-    std::fs::write(&temporary, store.to_xml()).map_err(|error| {
-        format!(
-            "could not write temporary profile file {}: {error}",
-            temporary.display()
-        )
-    })?;
-
-    #[cfg(windows)]
-    {
-        use std::os::windows::ffi::OsStrExt as _;
-        use windows_sys::Win32::Storage::FileSystem::{MOVEFILE_REPLACE_EXISTING, MoveFileExW};
-        let source = temporary
-            .as_os_str()
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect::<Vec<_>>();
-        let destination = path
-            .as_os_str()
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect::<Vec<_>>();
-        // SAFETY: both paths are live NUL-terminated UTF-16 buffers, and the
-        // source file remains available until this synchronous move returns.
-        let moved = unsafe {
-            MoveFileExW(
-                source.as_ptr(),
-                destination.as_ptr(),
-                MOVEFILE_REPLACE_EXISTING,
-            )
-        };
-        if moved == 0 {
-            let error = std::io::Error::last_os_error();
-            let _ = std::fs::remove_file(&temporary);
-            return Err(format!("could not replace {}: {error}", path.display()));
-        }
-    }
-    #[cfg(not(windows))]
-    {
-        std::fs::rename(&temporary, path)
-            .map_err(|error| format!("could not replace {}: {error}", path.display()))?;
-    }
-    log_action(&format!(
-        "flexikey: saved {} in {}us",
-        path.display(),
-        started.elapsed().as_micros()
-    ));
-    Ok(())
-}
-
-fn commit_flexikey_store(
-    state: &Rc<RefCell<FlexiKeyViewState>>,
-    engine: &FlexiKeyEngine,
-    next: FlexiKeyStore,
-    notice: String,
-) -> Result<(), String> {
-    let previous = state.borrow().store.clone();
-    let path = state.borrow().path.clone();
-    let report = engine.update_profile(next.active())?;
-    if let Err(error) = save_flexikey_store(&path, &next) {
-        let _ = engine.update_profile(previous.active());
-        let (engine_report, engine_error) = sync_flexikey_engine(engine, &previous);
-        let mut state = state.borrow_mut();
-        state.engine_report = engine_report;
-        state.engine_error = engine_error;
-        return Err(error);
-    }
-    let mut state = state.borrow_mut();
-    state.store = next;
-    state.load_error = None;
-    state.operation_error = None;
-    state.operation_notice = Some(notice);
-    state.activated_index = None;
-    state.engine_report = Some(report);
-    state.engine_error = None;
-    Ok(())
-}
-
 #[cfg(test)]
 mod flexikey_tests {
     use super::*;
+    use crate::flexikey_store::{load_flexikey_view, save_flexikey_store};
+    use std::path::PathBuf;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);

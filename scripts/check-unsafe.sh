@@ -20,7 +20,7 @@ declare -A ceilings=(
     ["crates/app/src/system_controls/audio.rs"]=2
     ["crates/app/src/input.rs"]=2
     ["crates/app/src/runtime_state.rs"]=1
-    ["crates/app/src/flexikey_ui.rs"]=1
+    ["crates/app/src/flexikey_store.rs"]=1
     ["crates/app/src/input_hooks.rs"]=5
     ["crates/app/src/bin/ram-control-center-uninstaller.rs"]=6
 )
