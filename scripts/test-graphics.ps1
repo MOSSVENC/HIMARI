@@ -80,6 +80,7 @@ try {
         CpuTimeMs = $cpuTimeMs
         DurationMs = $clock.Elapsed.TotalMilliseconds
         Performance = $performance
+        SnapshotSource = if ($output -match 'snapshot=written source=vulkan-swapchain') { 'vulkan-swapchain' } else { $null }
         Output = $output
         Errors = $errors
     }
@@ -104,6 +105,10 @@ try {
     if (($RequireSnapshot -or $output -match 'snapshot=written') -and
         (-not (Test-Path -LiteralPath $snapshot) -or (Get-Item -LiteralPath $snapshot).Length -lt 1024)) {
         throw 'The Vulkan window snapshot is missing or too small'
+    }
+    if (($RequireSnapshot -or $output -match 'snapshot=written') -and
+        $output -notmatch 'snapshot=written source=vulkan-swapchain') {
+        throw 'The rendering snapshot did not come from the Vulkan swapchain'
     }
     if ($performance.BudgetStatus -eq 'Exceeded') {
         throw "Vulkan frame-gap budget exceeded: $($performance.MaximumSubmissionIntervalMs) ms > $MaximumFrameGapMs ms"

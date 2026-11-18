@@ -23,6 +23,7 @@ struct Measurements {
     previous_submission: Option<Instant>,
     intervals_ms: Vec<f64>,
     frame_timings: Vec<(usize, FrameTimings)>,
+    snapshot: Option<graphics::SnapshotResult>,
 }
 
 pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -85,9 +86,12 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!("resize_and_restore=passed idle_interval_ms=1000 idle_submissions=0");
     if let Some(path) = std::env::var_os("RAM_GRAPHICS_SMOKE_SNAPSHOT") {
-        let pixels = ui.window().take_snapshot()?;
+        let pixels = data
+            .snapshot
+            .take()
+            .ok_or("Vulkan GPU snapshot did not complete")??;
         crate::write_snapshot_ppm(&std::path::PathBuf::from(path), &pixels)?;
-        println!("snapshot=written");
+        println!("snapshot=written source=vulkan-swapchain");
     }
     if data.intervals_ms.len() < PAGES.len() * 2 {
         return Err("Vulkan transitions submitted too few frames to measure".into());
@@ -227,11 +231,41 @@ fn check_resize(ui: slint::Weak<MainWindow>, measurements: Rc<RefCell<Measuremen
                 drop(data);
                 let before_idle = measurements.borrow().total_submissions;
                 slint::Timer::single_shot(Duration::from_secs(1), move || {
-                    let mut data = measurements.borrow_mut();
-                    data.idle_submissions = Some(data.total_submissions - before_idle);
-                    let _ = slint::quit_event_loop();
+                    {
+                        let mut data = measurements.borrow_mut();
+                        data.idle_submissions = Some(data.total_submissions - before_idle);
+                    }
+                    finish_with_snapshot(ui, measurements);
                 });
             });
         });
+    });
+}
+
+fn finish_with_snapshot(ui: slint::Weak<MainWindow>, measurements: Rc<RefCell<Measurements>>) {
+    if std::env::var_os("RAM_GRAPHICS_SMOKE_SNAPSHOT").is_none() {
+        let _ = slint::quit_event_loop();
+        return;
+    }
+    let Some(window) = ui.upgrade() else {
+        measurements.borrow_mut().failure = Some("Vulkan capture window disappeared".into());
+        let _ = slint::quit_event_loop();
+        return;
+    };
+    let result = Rc::clone(&measurements);
+    if !graphics::request_snapshot(move |pixels| {
+        result.borrow_mut().snapshot = Some(pixels);
+        let _ = slint::quit_event_loop();
+    }) {
+        measurements.borrow_mut().failure = Some("Vulkan snapshot already pending".into());
+        let _ = slint::quit_event_loop();
+        return;
+    }
+    window.window().request_redraw();
+    slint::Timer::single_shot(Duration::from_secs(3), move || {
+        if measurements.borrow().snapshot.is_none() {
+            measurements.borrow_mut().failure = Some("Vulkan GPU snapshot timed out".into());
+            let _ = slint::quit_event_loop();
+        }
     });
 }

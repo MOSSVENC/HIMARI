@@ -4,6 +4,13 @@ The Windows UI is rendered by Slint 1.17's Skia renderer directly on a native Vu
 
 The tracked renderer source is Slint's renderer crate with a narrow patch. It reports the physical adapter and successful queue submissions, supplies the correct Vulkan queue-family metadata to Skia, waits for acquired images before Skia draws, declares the enabled swapchain extension to Skia, transitions the rendered image to presentation layout, and waits for Skia GPU completion before presenting on the same Vulkan queue. The swapchain uses FIFO presentation. Review PATCHES.md alongside the source when upgrading Slint.
 
+Swapchain images are created with color-attachment, transfer-source and
+transfer-destination usages. Surface capabilities are checked before creation,
+and the exact image usage is supplied to Skia's Vulkan ImageInfo. Ganesh's
+check_image_info requires both transfer bits for a wrapped render target.
+Leaving ImageInfo.image_usage_flags at zero makes Skia assume these bits; it
+does not add them to an image created with color-attachment usage alone.
+
 ## Windows hardware validation
 
 Build from WSL/Arch against the Windows SDK and MSVC libraries already mounted into the environment:
@@ -19,14 +26,17 @@ Then run the bounded test with Windows PowerShell 7:
 
     pwsh -File scripts/test-graphics.ps1 -Executable '<release directory>\ram-control-center.exe' -OutputDirectory '<measurement directory>'
 
-Add -RequireSnapshot when checking a snapshot-tools build. A default-feature
-Release can run the same test without taking an off-screen snapshot.
+The script requests a GPU snapshot in default-feature and snapshot-tools builds.
+Add -RequireSnapshot to enforce that a readable image was written from the
+Vulkan swapchain. The image is read while acquired by Skia, before presentation.
+The capture frame runs after cadence and idle measurements because GPU readback
+introduces synchronization.
 To enforce a submission-gap budget, add -MaximumFrameGapMs 33.34 (or the
 appropriate budget for the target display). The script writes results.json
 before reporting a budget failure. Without this argument, BudgetStatus is
 MeasuredOnly; passing the lifecycle checks is not a performance acceptance.
 
-The isolated process starts no hardware worker, service, or input hook. It verifies the production navigation callbacks over all eleven pages twice, checks resize and minimize/restore, confirms zero queue submissions during a one-second idle interval, and optionally writes an off-screen snapshot of the rendered Overview. It also verifies that vulkan-1.dll was loaded and that the selected Vulkan adapter is integrated or discrete hardware.
+The isolated process starts no hardware worker, service, or input hook. It verifies the production navigation callbacks over all eleven pages twice, checks resize and minimize/restore, confirms zero queue submissions during a one-second idle interval, and writes a GPU readback of the rendered Overview when requested by the script. It also verifies that vulkan-1.dll was loaded and that the selected Vulkan adapter is integrated or discrete hardware.
 The lighting capability is enabled in this isolated UI fixture so that its
 sliders and color preview are rendered. The fixture does not exercise hardware
 writes or establish correctness of device capabilities and telemetry.
@@ -36,6 +46,11 @@ The first submission interval is measured from Slint component creation to the f
 A separate snapshot-tools bar test exercises pointer movement and pixel endpoints for the RGB/monitor bars:
 
     pwsh -File scripts/test-bars.ps1 -Executable '<release executable>' -OutputDirectory '<measurement directory>'
+
+The bar test's Slint take_snapshot() images are CPU-rendered layout checks.
+They do not establish Vulkan pixel output. Graphics-smoke uses the renderer's
+one-shot request_snapshot() instead and reports source=vulkan-swapchain. Even a
+GPU readback verifies the target image rather than compositor timing or scanout.
 
 Each transition also reports frame_stages with the maxima for acquisition,
 target preparation, drawing, submission and presentation, plus the stages of
@@ -115,3 +130,32 @@ resize, minimize/restore and idle checks. These values still do not establish
 value cases and thirty pointer moves with the Vulkan renderer. Both the
 instrumented snapshot and the final rendering measurements were inspected;
 76 Windows unit tests, host verification and strict Windows Clippy passed.
+
+### Swapchain usage and GPU readback verification
+
+The image-usage correction and GPU readback were tested on a default-feature
+Windows Release. The snapshot-source gate rejected the previously installed
+build, which used Slint's CPU take_snapshot() path. The corrected build
+reported source=vulkan-swapchain, and its 1180 × 820 GPU image was inspected.
+The isolated fixture keeps hardware workers disabled, so its unavailable
+sensors and driver labels are expected.
+
+The final Release completed 22 page transitions, resize, minimize/restore and
+the one-second zero-submission idle check on the AMD Radeon 610M. It measured
+a 4.35 ms 95th-percentile submission interval and a 30.36 ms maximum. The
+first Cooling draw took 26.27 ms. The explicit 4.17 ms budget returned
+BudgetStatus=Exceeded. Two preceding runs also exceeded their 16.67 ms and
+4.17 ms budgets, with maxima of 28.75 ms and 30.99 ms. Functional lifecycle
+checks passed; first-visit latency and high-refresh pacing remain open.
+
+Host verification passed 87 tests. Windows passed 90 native unit tests,
+strict all-target/all-feature Clippy, Settings renderer initialization and
+control-state synchronization checks. The Windows normal dependency graph
+contains Skia, Vulkano and ash. The Release executable is 19,068,928 bytes.
+The installed canonical copy was hash-verified against this Release and
+launched with --background. It reported Vulkan / Skia / AMD Radeon 610M;
+the installation directory contained neither a pending nor a previous image.
+
+Local evidence is in target/validation/vulkan-latency/: release-graphics/,
+baseline-gate/, native-results.json, final-verify.log and windows-clippy.log.
+The inspected GPU readback is release-graphics/overview.png.

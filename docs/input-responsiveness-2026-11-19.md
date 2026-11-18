@@ -40,9 +40,9 @@
 
 默认 Release 的 --graphics-smoke 支持通过 RAM_GRAPHICS_SMOKE_SNAPSHOT 指定最终渲染快照路径；性能采样在快照生成之前结束。
 
-最终构建复测：最大提交间隔 **30.61 ms**，P95 **4.30 ms**，散热页首次绘制 **25.04 ms**，22 次转换和 33.34 ms 门槛通过。窗口缩放、最小化恢复及一秒空闲零提交检查通过。应用自身生成的最终快照已检查，记录在 final-graphics/；屏幕遮挡采集未用于此结论。
+最终构建复测：最大提交间隔 **30.61 ms**，P95 **4.30 ms**，散热页首次绘制 **25.04 ms**，22 次转换和 33.34 ms 门槛通过。窗口缩放、最小化恢复及一秒空闲零提交检查通过。当轮最终快照由 Slint take_snapshot() 在 CPU 上重新绘制，只验证静态布局，不能验证 Vulkan 目标图像；记录在 final-graphics/。屏幕遮挡采集未用于此结论。后续 GPU 直接读回的检查见 rendering.md。
 
-## 本机部署
+## 输入修复轮次的部署记录
 
 正式副本为 C:\ProgramData\RAM Control Center\ram-control-center.exe，以 --background 启动。安装与构建哈希核对一致，实际提交帧报告 Vulkan / Skia / AMD Radeon 610M。
 
@@ -50,6 +50,8 @@
 - SHA-256：c25a3799bfd13b78d943f977c2ba121b9ec1a1938536f15652fad71003b0fa1f。
 - 替换前副本保留一份恢复文件；安装目录的 pending、previous 临时文件均已清除。
 - 本轮替换应用文件，未变更服务、登录项和驱动配置。部署记录为 deployment.json。
+
+这是该轮次的历史构建记录。后续 Vulkan 图像用途修正与 GPU 读回验证的部署记录见 rendering.md。
 
 ## 仍需验收的项目
 

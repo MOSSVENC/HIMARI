@@ -17,6 +17,11 @@ vulkan_diagnostics.rs module:
   software/virtual device types.
 - Pass the Vulkan queue family index, rather than its index within that family,
   to Skia's backend context, and declare the enabled swapchain extension.
+- Create swapchain images with the color and transfer usages required by
+  Ganesh, check surface support, and supply the exact usage bits in ImageInfo.
+- Support explicit one-shot GPU readback of the acquired target before
+  presentation. Capture runs outside the application's cadence measurements;
+  normal frames allocate no readback buffer.
 - Wait for the acquired image before Skia renders. Flush with Present access and
   wait for Skia GPU completion before handing the image to the presentation
   engine. FIFO presentation supplies display pacing. CPU-side completion

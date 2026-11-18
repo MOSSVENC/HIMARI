@@ -3,6 +3,7 @@
 
 //! Read-only lifecycle observations from the native Vulkan surface.
 
+use i_slint_core::graphics::{Rgba8Pixel, SharedPixelBuffer};
 use std::cell::RefCell;
 use std::time::Duration;
 
@@ -40,8 +41,30 @@ pub enum FrameEvent {
 }
 
 type Observer = Box<dyn FnMut(FrameEvent, &DeviceInfo)>;
+/// RGBA pixels copied from an acquired Vulkan render target, or a readback error.
+pub type SnapshotResult = Result<SharedPixelBuffer<Rgba8Pixel>, String>;
+pub(crate) type SnapshotCallback = Box<dyn FnOnce(SnapshotResult)>;
 thread_local! {
     static OBSERVER: RefCell<Option<Observer>> = const { RefCell::new(None) };
+    static SNAPSHOT: RefCell<Option<SnapshotCallback>> = const { RefCell::new(None) };
+}
+
+/// Read back the next acquired Vulkan image after drawing and deliver its pixels
+/// after submission. Callers must request a redraw and keep the event loop running.
+/// Returns false if a capture is already pending. GPU readback stalls the frame;
+/// callers must keep capture frames outside performance measurement windows.
+pub fn request_snapshot(callback: impl FnOnce(SnapshotResult) + 'static) -> bool {
+    SNAPSHOT.with_borrow_mut(|slot| {
+        if slot.is_some() {
+            return false;
+        }
+        *slot = Some(Box::new(callback));
+        true
+    })
+}
+
+pub(crate) fn take_snapshot_request() -> Option<SnapshotCallback> {
+    SNAPSHOT.with_borrow_mut(Option::take)
 }
 
 /// Replaces the observer for Vulkan surfaces on the current UI thread.

@@ -129,6 +129,13 @@ impl VulkanSurface {
                 .physical_device()
                 .surface_capabilities(&surface, Default::default())
                 .map_err(|vke| format!("Error matching Vulkan surface capabilities: {vke}"))?;
+            // Ganesh requires both transfer usages for wrapped Vulkan render targets.
+            // The metadata passed to Skia below must match these creation flags.
+            let image_usage =
+                ImageUsage::COLOR_ATTACHMENT | ImageUsage::TRANSFER_SRC | ImageUsage::TRANSFER_DST;
+            if !surface_capabilities.supported_usage_flags.contains(image_usage) {
+                return Err("Vulkan surface lacks the color/transfer usages required by Skia".into());
+            }
             let image_format = vulkano::format::Format::B8G8R8A8_UNORM;
 
             Swapchain::new(
@@ -138,7 +145,7 @@ impl VulkanSurface {
                     min_image_count: surface_capabilities.min_image_count,
                     image_format,
                     image_extent: [size.width, size.height],
-                    image_usage: ImageUsage::COLOR_ATTACHMENT,
+                    image_usage,
                     present_mode: PresentMode::Fifo,
                     composite_alpha: surface_capabilities
                         .supported_composite_alpha
@@ -429,7 +436,9 @@ impl super::Surface for VulkanSurface {
         );
 
         let alloc = skia_safe::gpu::vk::Alloc::default();
-        let image_info = &unsafe {
+        // SAFETY: the acquired swapchain image outlives its temporary Skia wrapper,
+        // and acquisition has completed before this frame starts using it.
+        let mut image_info = unsafe {
             skia_safe::gpu::vk::ImageInfo::new(
                 image_object.handle().as_raw() as _,
                 alloc,
@@ -444,9 +453,10 @@ impl super::Surface for VulkanSurface {
                 None,
             )
         };
+        image_info.image_usage_flags = ash::vk::ImageUsageFlags::from(image_object.usage()).as_raw();
 
         let render_target =
-            &skia_safe::gpu::backend_render_targets::make_vk((width, height), image_info);
+            &skia_safe::gpu::backend_render_targets::make_vk((width, height), &image_info);
 
         let mut skia_surface = skia_safe::gpu::surfaces::wrap_backend_render_target(
             gr_context,
@@ -465,6 +475,31 @@ impl super::Surface for VulkanSurface {
         );
         callback(skia_surface.canvas(), Some(gr_context), 0);
         let drawn = Instant::now();
+
+        // Read the actual GPU target while this acquired image is still ours.
+        // A request is explicit and one-shot; normal frames allocate no pixel buffer.
+        let snapshot = super::vulkan_diagnostics::take_snapshot_request().map(|callback| {
+            let mut pixels = i_slint_core::graphics::SharedPixelBuffer::<
+                i_slint_core::graphics::Rgba8Pixel,
+            >::new(width as u32, height as u32);
+            let info = skia_safe::ImageInfo::new(
+                (width, height),
+                skia_safe::ColorType::RGBA8888,
+                skia_safe::AlphaType::Unpremul,
+                None,
+            );
+            let result = if skia_surface.read_pixels(
+                &info,
+                pixels.make_mut_bytes(),
+                width as usize * 4,
+                (0, 0),
+            ) {
+                Ok(pixels)
+            } else {
+                Err("Failed to read the Vulkan swapchain render target".to_string())
+            };
+            (callback, result)
+        });
 
         gr_context.flush_surface_with_access(
             &mut skia_surface,
@@ -524,6 +559,10 @@ impl super::Surface for VulkanSurface {
                 *self.previous_frame_end.borrow_mut() = Some(sync::now(device.clone()).boxed());
                 return Err(format!("Skia Vulkan renderer: failed to flush future: {e}").into());
             }
+        }
+
+        if let Some((callback, pixels)) = snapshot {
+            callback(pixels);
         }
 
         Ok(DrawOutcome::Success)

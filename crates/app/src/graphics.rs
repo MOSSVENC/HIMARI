@@ -1,7 +1,7 @@
 //! Select the native Skia Vulkan renderer for all application windows.
 
 pub(crate) use i_slint_renderer_skia::vulkan_diagnostics::{
-    DeviceInfo, FrameEvent, FrameTimings, set_observer,
+    DeviceInfo, FrameEvent, FrameTimings, SnapshotResult, request_snapshot, set_observer,
 };
 
 pub(crate) fn report(info: &DeviceInfo) -> String {
