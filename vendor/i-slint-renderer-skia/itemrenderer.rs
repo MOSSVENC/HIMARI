@@ -1048,7 +1048,7 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
         if layer_item.cache_rendering_hint() {
             self.render_and_blend_layer(self_rc)
         } else {
-            self.image_cache.release(self_rc);
+            self.layer_cache.release(self_rc);
             RenderingResult::ContinueRenderingChildren
         }
     }
@@ -1067,9 +1067,15 @@ impl<'a> LayerRenderer<'a> for SkiaItemRenderer<'a> {
         _item_rc: &ItemRc,
         physical_size: euclid::Size2D<f32, PhysicalPx>,
     ) -> Option<Self::LayerTarget> {
+        // Keep cached Vulkan layers in the parent target's attachment format.
+        let color_type = if self.surface.is_some_and(|surface| surface.name() == "vulkan") {
+            self.canvas.image_info().color_type()
+        } else {
+            skia_safe::ColorType::RGBA8888
+        };
         let image_info = skia_safe::ImageInfo::new(
             to_skia_size(&physical_size).to_ceil(),
-            skia_safe::ColorType::RGBA8888,
+            color_type,
             skia_safe::AlphaType::Premul,
             None,
         );

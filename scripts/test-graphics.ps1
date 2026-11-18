@@ -3,7 +3,8 @@ param(
     [Parameter(Mandatory)] [string] $Executable,
     [Parameter(Mandatory)] [string] $OutputDirectory,
     [ValidateRange(0, 1000)] [double] $MaximumFrameGapMs = 0,
-    [switch] $RequireSnapshot
+    [switch] $RequireSnapshot,
+    [switch] $RequireContentUpdates
 )
 
 $ErrorActionPreference = 'Stop'
@@ -81,6 +82,7 @@ try {
         DurationMs = $clock.Elapsed.TotalMilliseconds
         Performance = $performance
         SnapshotSource = if ($output -match 'snapshot=written source=vulkan-swapchain') { 'vulkan-swapchain' } else { $null }
+        ContentUpdates = if ($output -match 'gpu_content_updates=passed restored_pixels=exact') { 'Passed' } else { 'NotMeasured' }
         Output = $output
         Errors = $errors
     }
@@ -112,6 +114,9 @@ try {
     }
     if ($performance.BudgetStatus -eq 'Exceeded') {
         throw "Vulkan frame-gap budget exceeded: $($performance.MaximumSubmissionIntervalMs) ms > $MaximumFrameGapMs ms"
+    }
+    if ($RequireContentUpdates -and $result.ContentUpdates -ne 'Passed') {
+        throw 'Vulkan content updates and restoration did not pass'
     }
 } finally {
     if (-not $process.HasExited) {

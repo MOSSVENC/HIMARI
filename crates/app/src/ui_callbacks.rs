@@ -22,6 +22,7 @@ static THEME_EPOCH: AtomicU64 = AtomicU64::new(0);
 
 const PAGE_DIM_MS: u64 = 90;
 const PAGE_SWAP_SETTLE_MS: u64 = 2;
+const PAGE_CACHE_DELAY_MS: u64 = 50;
 const PAGE_ENTER_FADE_MS: u64 = 170;
 const PAGE_DIM_OPACITY: f32 = 0.74;
 const THEME_ANIMATION_MS: u64 = 260;
@@ -73,7 +74,19 @@ fn begin_page_switch(ui: &MainWindow, page: i32, epoch: u64) {
         };
         ui.set_page_fade_duration(0);
         ui.set_page_opacity(PAGE_DIM_OPACITY);
+        ui.set_page_cache_ready(false);
         ui.set_selected_page(page);
+
+        // Defer GPU layer creation away from the page selection callback.
+        // A newer navigation request owns its own cache activation.
+        let cache_weak = ui.as_weak();
+        slint::Timer::single_shot(Duration::from_millis(PAGE_CACHE_DELAY_MS), move || {
+            if PAGE_EPOCH.load(Ordering::Relaxed) == epoch
+                && let Some(ui) = cache_weak.upgrade()
+            {
+                ui.set_page_cache_ready(true);
+            }
+        });
 
         let weak = ui.as_weak();
         slint::Timer::single_shot(Duration::from_millis(PAGE_SWAP_SETTLE_MS), move || {

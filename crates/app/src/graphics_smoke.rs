@@ -158,15 +158,17 @@ fn schedule(ui: slint::Weak<MainWindow>, measurements: Rc<RefCell<Measurements>>
                 let valid = ui.upgrade().is_some_and(|window| {
                     let valid = window.get_selected_page() == page
                         && window.get_navigation_page() == page
+                        && window.get_page_cache_ready()
                         && !window.get_page_transitioning()
                         && (window.get_page_opacity() - 1.0).abs() < 0.001;
                     if !valid {
                         eprintln!(
-                            "page={page} selected={} navigation={} transitioning={} opacity={}",
+                            "page={page} selected={} navigation={} transitioning={} opacity={} cache_ready={}",
                             window.get_selected_page(),
                             window.get_navigation_page(),
                             window.get_page_transitioning(),
-                            window.get_page_opacity()
+                            window.get_page_opacity(),
+                            window.get_page_cache_ready()
                         );
                     }
                     valid
@@ -247,25 +249,74 @@ fn finish_with_snapshot(ui: slint::Weak<MainWindow>, measurements: Rc<RefCell<Me
         let _ = slint::quit_event_loop();
         return;
     }
-    let Some(window) = ui.upgrade() else {
-        measurements.borrow_mut().failure = Some("Vulkan capture window disappeared".into());
-        let _ = slint::quit_event_loop();
-        return;
-    };
-    let result = Rc::clone(&measurements);
-    if !graphics::request_snapshot(move |pixels| {
-        result.borrow_mut().snapshot = Some(pixels);
-        let _ = slint::quit_event_loop();
-    }) {
-        measurements.borrow_mut().failure = Some("Vulkan snapshot already pending".into());
-        let _ = slint::quit_event_loop();
-        return;
-    }
-    window.window().request_redraw();
+    capture_content_update(ui, Rc::clone(&measurements), None, 0);
     slint::Timer::single_shot(Duration::from_secs(3), move || {
         if measurements.borrow().snapshot.is_none() {
             measurements.borrow_mut().failure = Some("Vulkan GPU snapshot timed out".into());
             let _ = slint::quit_event_loop();
         }
     });
+}
+
+type Pixels = slint::SharedPixelBuffer<slint::Rgba8Pixel>;
+
+fn capture_content_update(
+    ui: slint::Weak<MainWindow>,
+    measurements: Rc<RefCell<Measurements>>,
+    baseline: Option<Pixels>,
+    step: u8,
+) {
+    let Some(window) = ui.upgrade() else {
+        measurements.borrow_mut().failure = Some("Vulkan capture window disappeared".into());
+        let _ = slint::quit_event_loop();
+        return;
+    };
+    window.set_cpu_temp(if step == 1 { "88°C" } else { "--°C" }.into());
+    let result = Rc::clone(&measurements);
+    if !graphics::request_snapshot(move |pixels| {
+        let pixels = match pixels {
+            Ok(pixels) => pixels,
+            Err(error) => {
+                result.borrow_mut().failure = Some(error);
+                let _ = slint::quit_event_loop();
+                return;
+            }
+        };
+        let baseline = match baseline {
+            Some(baseline) => baseline,
+            None => pixels.clone(),
+        };
+        let changed = baseline
+            .as_bytes()
+            .iter()
+            .zip(pixels.as_bytes())
+            .filter(|(a, b)| a != b)
+            .count();
+        let valid = baseline.width() == pixels.width()
+            && baseline.height() == pixels.height()
+            && match step {
+                0 => true,
+                1 => changed >= 32,
+                _ => changed == 0,
+            };
+        if !valid {
+            result.borrow_mut().failure = Some(format!(
+                "Vulkan content update failed at step {step}: changed_bytes={changed}"
+            ));
+            let _ = slint::quit_event_loop();
+        } else if step == 2 {
+            println!("gpu_content_updates=passed restored_pixels=exact");
+            result.borrow_mut().snapshot = Some(Ok(pixels));
+            let _ = slint::quit_event_loop();
+        } else {
+            slint::Timer::single_shot(Duration::ZERO, move || {
+                capture_content_update(ui, result, Some(baseline), step + 1);
+            });
+        }
+    }) {
+        measurements.borrow_mut().failure = Some("Vulkan snapshot already pending".into());
+        let _ = slint::quit_event_loop();
+        return;
+    }
+    window.window().request_redraw();
 }

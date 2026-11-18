@@ -335,6 +335,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         },
         Some("--thermal-smoke") => std::process::exit(smoke::thermal_smoke()),
+        #[cfg(windows)]
+        Some("--cpu-frequency-smoke") => std::process::exit(telemetry::cpu_frequency_smoke()),
         Some("--input-hooks-smoke") => std::process::exit(flexikey_engine::hook_lifecycle_smoke()),
         Some("--system-smoke") => std::process::exit(system_smoke()),
         Some("--io-smoke") => std::process::exit(io_smoke()),

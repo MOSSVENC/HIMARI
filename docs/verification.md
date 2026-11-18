@@ -1,7 +1,8 @@
 # Verification log
 
-This document records historical runs. Current deployment and repair validation
-are recorded in [the November 16 repair record](repair-status-2026-11-16.md).
+This document records historical runs and the CPU sampling check below.
+Recent rendering and deployment measurements are in [Windows rendering](rendering.md);
+the baseline repair record is [November 16](repair-status-2026-11-16.md).
 
 Date: 2026-11-07
 Target: Firebat/Clevo ZY-T6K, Windows host, signed AcpiBridge device
@@ -652,3 +653,36 @@ The driver-health card is rendered on the Overview page. It shows the required
 explicit install button when the required driver is unavailable. Driver files
 are loaded from the executable-adjacent `drivers/` directory or the
 ProgramData fallback.
+
+## CPU performance sampling — November 19, 2026
+
+The Windows sampler calculates the displayed clock from the same PDH query's
+`Processor Information(_Total)\% Processor Performance` and the nominal MHz
+reported by `CallNtPowerInformation`. It requests `PDH_FMT_DOUBLE |
+PDH_FMT_NOCAP100` (0x8200). The extra flag explicitly permits boost values.
+The fixed `Processor Frequency` is retained as a diagnostic reference; firmware
+current-MHz readings are no longer a live-clock fallback. When the performance
+query cannot be opened, the application retries every five seconds. Unavailable
+samples remain unavailable in the Overview.
+
+Run the read-only diagnostic on Windows:
+
+    ram-control-center.exe --cpu-frequency-smoke
+
+It collects twelve samples, 250 ms apart. Each record includes both PDH format
+variants read from the same collected sample, the reference frequency, and the
+clock used by the application. On this machine the reference stayed at
+3601 MHz while the initial measured clocks varied from 4549 to 5017 MHz.
+Both format variants returned the same values above 100%; clipping by the
+original format was **not reproduced on this machine**. The change removes
+the nominal-frequency fallback and makes the sampling contract explicit.
+
+Host tests cover boost conversion and missing/invalid performance values.
+The Windows diagnostic completed all twelve valid samples. Its observations
+are Windows performance-counter estimates, rather than per-core clock probes.
+Neither these observations nor the service's successful profile readback
+establish that cold-boot CPU throttling has been resolved. That remains a
+separate boot-time hardware acceptance item.
+
+Local evidence: `target/validation/vulkan-followup/native-7.stdout.log` and
+`native-results.json` in that directory. The directory is excluded from Git.

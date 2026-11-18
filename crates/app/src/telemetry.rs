@@ -52,7 +52,47 @@ fn percent(used: u64, total: u64) -> u32 {
 }
 
 #[cfg(windows)]
-pub use windows_impl::SystemSampler;
+pub use windows_impl::{SystemSampler, cpu_frequency_smoke};
+
+// PDH_FMT_NOCAP100 from the Windows SDK's Pdh.h. windows-sys does not
+// expose this flag; processor performance legitimately exceeds 100% in boost.
+#[cfg(any(windows, test))]
+const CPU_PERFORMANCE_FORMAT: u32 = 0x0000_0200 | 0x0000_8000;
+
+#[cfg(any(windows, test))]
+fn performance_clock_mhz(performance: Option<f64>, nominal_mhz: u32) -> u32 {
+    let Some(performance) = performance.filter(|value| value.is_finite() && *value > 0.0) else {
+        return 0;
+    };
+    (performance / 100.0 * f64::from(nominal_mhz)).round() as u32
+}
+
+#[cfg(test)]
+mod frequency_tests {
+    use super::*;
+
+    #[test]
+    fn performance_format_preserves_boost_values() {
+        assert_eq!(CPU_PERFORMANCE_FORMAT, 0x8200);
+        assert_eq!(performance_clock_mhz(Some(142.0), 3600), 5112);
+        assert_eq!(performance_clock_mhz(Some(100.0), 3600), 3600);
+        assert_eq!(performance_clock_mhz(Some(12.5), 3600), 450);
+    }
+
+    #[test]
+    fn missing_performance_does_not_become_a_nominal_clock() {
+        for value in [
+            None,
+            Some(0.0),
+            Some(-1.0),
+            Some(f64::NAN),
+            Some(f64::INFINITY),
+        ] {
+            assert_eq!(performance_clock_mhz(value, 3600), 0);
+        }
+        assert_eq!(performance_clock_mhz(Some(142.0), 0), 0);
+    }
+}
 
 #[cfg(not(windows))]
 pub use demo_impl::SystemSampler;
@@ -63,6 +103,7 @@ mod windows_impl {
     use std::ffi::c_void;
     use std::os::windows::ffi::OsStrExt;
     use std::path::Path;
+    use std::time::{Duration, Instant};
     use windows_sys::Win32::Foundation::{FILETIME, FreeLibrary, HMODULE};
     use windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
     use windows_sys::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
@@ -90,6 +131,7 @@ mod windows_impl {
     pub struct SystemSampler {
         previous_cpu: Option<CpuTimes>,
         cpu_frequency: Option<CpuFrequencySampler>,
+        next_frequency_retry: Instant,
         nvml: Option<Nvml>,
     }
 
@@ -98,6 +140,7 @@ mod windows_impl {
             Self {
                 previous_cpu: None,
                 cpu_frequency: CpuFrequencySampler::open(),
+                next_frequency_retry: Instant::now() + Duration::from_secs(5),
                 nvml: Nvml::open(),
             }
         }
@@ -123,11 +166,15 @@ mod windows_impl {
 
             let (memory_used_bytes, memory_total_bytes) = read_memory();
             let (disk_used_bytes, disk_total_bytes) = read_disk();
+            if self.cpu_frequency.is_none() && Instant::now() >= self.next_frequency_retry {
+                self.cpu_frequency = CpuFrequencySampler::open();
+                self.next_frequency_retry = Instant::now() + Duration::from_secs(5);
+            }
             let (cpu_clock_mhz, cpu_max_clock_mhz) = self
                 .cpu_frequency
                 .as_mut()
                 .map(CpuFrequencySampler::sample)
-                .unwrap_or_else(read_processor_power);
+                .unwrap_or((0, 0));
 
             SystemSnapshot {
                 cpu_load_percent,
@@ -285,26 +332,22 @@ mod windows_impl {
 
     struct CpuFrequencySampler {
         query: PdhQuery,
-        frequency: Option<PDH_HCOUNTER>,
-        performance: Option<PDH_HCOUNTER>,
+        performance: PDH_HCOUNTER,
         nominal_mhz: u32,
     }
 
     impl CpuFrequencySampler {
         fn open() -> Option<Self> {
-            let (_, nominal_mhz) = read_processor_power();
-            let query = PdhQuery::open()?;
-            let frequency =
-                query.add_english_counter(r"\Processor Information(_Total)\Processor Frequency");
-            let performance = query
-                .add_english_counter(r"\Processor Information(_Total)\% Processor Performance");
-            if frequency.is_none() && performance.is_none() {
+            let nominal_mhz = read_nominal_clock_mhz();
+            if nominal_mhz == 0 {
                 return None;
             }
+            let query = PdhQuery::open()?;
+            let performance = query
+                .add_english_counter(r"\Processor Information(_Total)\% Processor Performance")?;
             query.collect();
             Some(Self {
                 query,
-                frequency,
                 performance,
                 nominal_mhz,
             })
@@ -314,27 +357,49 @@ mod windows_impl {
             if !self.query.collect() {
                 return (0, self.nominal_mhz);
             }
-            let frequency = self.frequency.and_then(formatted_value).unwrap_or(0.0);
-            let performance = self.performance.and_then(formatted_value).unwrap_or(0.0);
-            let current = if performance > 0.0 && self.nominal_mhz > 0 {
-                (performance / 100.0 * f64::from(self.nominal_mhz)).round() as u32
-            } else if frequency > 0.0 {
-                frequency.round() as u32
-            } else {
-                0
-            };
+            let performance = formatted_value(self.performance, super::CPU_PERFORMANCE_FORMAT);
+            let current = super::performance_clock_mhz(performance, self.nominal_mhz);
             (current, self.nominal_mhz)
         }
     }
 
-    fn formatted_value(counter: PDH_HCOUNTER) -> Option<f64> {
+    pub fn cpu_frequency_smoke() -> i32 {
+        let Some(mut sampler) = CpuFrequencySampler::open() else {
+            eprintln!("CPU performance counter is unavailable");
+            return 1;
+        };
+        let frequency = sampler
+            .query
+            .add_english_counter(r"\Processor Information(_Total)\Processor Frequency");
+        let mut valid = 0;
+        for index in 0..12 {
+            std::thread::sleep(Duration::from_millis(250));
+            let (current, nominal) = sampler.sample();
+            // Both formatted reads use the query's same collected sample.
+            let default_format = formatted_value(sampler.performance, PDH_FMT_DOUBLE);
+            let uncapped = formatted_value(sampler.performance, super::CPU_PERFORMANCE_FORMAT);
+            let reported = frequency.and_then(|counter| formatted_value(counter, PDH_FMT_DOUBLE));
+            let expected = super::performance_clock_mhz(uncapped, nominal);
+            println!(
+                "cpu_frequency sample={index} nominal_mhz={nominal} reported_mhz={reported:?} default_format_percent={default_format:?} performance_percent={uncapped:?} current_mhz={current} expected_mhz={expected}"
+            );
+            if current != expected {
+                return 1;
+            }
+            valid += usize::from(current > 0);
+        }
+        println!("cpu_frequency valid_samples={valid}/12");
+        i32::from(valid == 0)
+    }
+
+    fn formatted_value(counter: PDH_HCOUNTER, format: u32) -> Option<f64> {
         // SAFETY: `counter` is a live PDH counter returned by this query; the
         // format and output pointers match PdhGetFormattedCounterValue's ABI.
         let value = unsafe {
             let mut value = PDH_FMT_COUNTERVALUE::default();
             let mut counter_type = 0_u32;
             let status =
-                PdhGetFormattedCounterValue(counter, PDH_FMT_DOUBLE, &mut counter_type, &mut value);
+                PdhGetFormattedCounterValue(counter, format, &mut counter_type, &mut value);
             if status != 0
                 || (value.CStatus != PDH_CSTATUS_VALID_DATA
                     && value.CStatus != PDH_CSTATUS_NEW_DATA)
@@ -358,7 +423,7 @@ mod windows_impl {
         current_idle_state: u32,
     }
 
-    fn read_processor_power() -> (u32, u32) {
+    fn read_nominal_clock_mhz() -> u32 {
         // SAFETY: GetActiveProcessorCount takes only a scalar group selector
         // and has no pointer or lifetime preconditions.
         let count = unsafe { GetActiveProcessorCount(ALL_PROCESSOR_GROUPS) }.max(1) as usize;
@@ -376,11 +441,9 @@ mod windows_impl {
             )
         };
         if status < 0 {
-            return (0, 0);
+            return 0;
         }
-        let current = info.iter().map(|item| item.current_mhz).max().unwrap_or(0);
-        let maximum = info.iter().map(|item| item.max_mhz).max().unwrap_or(0);
-        (current, maximum)
+        info.iter().map(|item| item.max_mhz).max().unwrap_or(0)
     }
 
     #[repr(C)]

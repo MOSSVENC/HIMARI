@@ -503,6 +503,7 @@ impl SkiaRenderer {
     /// Reset the surface to a new surface. (destroy the previously set surface if any)
     pub fn set_surface(&self, surface: Box<dyn Surface + 'static>) {
         self.image_cache.clear_all();
+        self.layer_cache.clear_all();
         self.path_cache.clear_all();
         self.text_layout_cache.clear_all();
         self.rendering_first_time.set(true);
@@ -535,6 +536,7 @@ impl SkiaRenderer {
     /// window surface for subsequent rendering.
     pub fn suspend(&self) -> Result<(), PlatformError> {
         self.image_cache.clear_all();
+        self.layer_cache.clear_all();
         self.path_cache.clear_all();
         self.text_layout_cache.clear_all();
         // Destroy the old surface before allocating the new one, to work around
@@ -684,6 +686,7 @@ impl SkiaRenderer {
         let mut box_shadow_cache = Default::default();
 
         self.image_cache.clear_cache_if_scale_factor_changed(window);
+        self.layer_cache.clear_cache_if_scale_factor_changed(window);
         self.path_cache.clear_cache_if_scale_factor_changed(window);
         self.text_layout_cache.clear_cache_if_scale_factor_changed(window);
 
@@ -968,6 +971,7 @@ impl i_slint_core::renderer::RendererSealed for SkiaRenderer {
         items: &mut dyn Iterator<Item = std::pin::Pin<i_slint_core::items::ItemRef<'_>>>,
     ) -> Result<(), i_slint_core::platform::PlatformError> {
         self.image_cache.component_destroyed(component);
+        self.layer_cache.component_destroyed(component);
         self.path_cache.component_destroyed(component);
         self.text_layout_cache.component_destroyed(component);
 
@@ -981,6 +985,7 @@ impl i_slint_core::renderer::RendererSealed for SkiaRenderer {
     fn set_window_adapter(&self, window_adapter: &Rc<dyn WindowAdapter>) {
         *self.maybe_window_adapter.borrow_mut() = Some(Rc::downgrade(window_adapter));
         self.image_cache.clear_all();
+        self.layer_cache.clear_all();
         self.path_cache.clear_all();
         self.text_layout_cache.clear_all();
 

@@ -3,8 +3,8 @@
 Source: crates.io i-slint-renderer-skia 1.17.0, published by Slint.
 The upstream license notices and LICENSES directory are retained.
 
-Application changes are limited to lib.rs, vulkan_surface.rs, and the new
-vulkan_diagnostics.rs module:
+Application changes are limited to lib.rs, itemrenderer.rs, vulkan_surface.rs,
+and the vulkan_diagnostics.rs module:
 
 - Expose read-only physical-device and successful-submission events on the UI
   thread. Observers do not receive device handles or submit rendering commands.
@@ -13,6 +13,10 @@ vulkan_diagnostics.rs module:
   submission stage; these observations are not GPU timestamps.
 - Enable Skia's reduced shader variations option to favor first-interaction
   latency for the control center's text, paths and gradients.
+- Match cached Vulkan layers to their parent target's attachment format.
+- Clear cached layer images on surface/adapter replacement, suspension, DPI
+  changes and component destruction. Disabling a cache hint releases the
+  layer-cache entry.
 - Prefer a presentation-capable integrated GPU; allow discrete GPUs and reject
   software/virtual device types.
 - Pass the Vulkan queue family index, rather than its index within that family,
@@ -31,4 +35,4 @@ vulkan_diagnostics.rs module:
   and acquisition timeouts during window state changes.
 
 The other files retain upstream source. The application pins the complete Slint
-family to 1.17.0. Review these three files explicitly when updating the renderer.
+family to 1.17.0. Review these four files explicitly when updating the renderer.

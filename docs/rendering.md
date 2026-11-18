@@ -26,6 +26,11 @@ Then run the bounded test with Windows PowerShell 7:
 
     pwsh -File scripts/test-graphics.ps1 -Executable '<release directory>\ram-control-center.exe' -OutputDirectory '<measurement directory>'
 
+Add -RequireContentUpdates to require a GPU readback check of Overview content
+invalidation: changing its temperature text must change the rendered pixels,
+and restoring that text must reproduce the original image exactly. These
+captures run after cadence and idle measurements.
+
 The script requests a GPU snapshot in default-feature and snapshot-tools builds.
 Add -RequireSnapshot to enforce that a readable image was written from the
 Vulkan swapchain. The image is read while acquired by Skia, before presentation.
@@ -159,3 +164,72 @@ the installation directory contained neither a pending nor a previous image.
 Local evidence is in target/validation/vulkan-latency/: release-graphics/,
 baseline-gate/, native-results.json, final-verify.log and windows-clippy.log.
 The inspected GPU readback is release-graphics/overview.png.
+
+### Page-layer caching and content invalidation
+
+The workspace uses Slint's GPU layer cache while navigation and overlays animate.
+Page selection clears its cache-ready state; a 50 ms timer enables caching only
+if that navigation request still owns the page. This defers allocation away from
+the selection callback, but does not guarantee that a frame has been presented
+before allocation. Theme interpolation draws directly until its final color.
+
+Cached Vulkan layers use the parent target's color format. Renderer caches are
+cleared on surface replacement, suspension, DPI changes, component destruction
+and adapter replacement. Turning off a layer's cache hint releases its layer
+entry. Overview GPU readback now verifies that a temperature change modifies
+the pixels and that restoring the text reproduces the original image exactly.
+
+Two final default-feature Release runs on the AMD Radeon 610M completed all
+22 transitions, resize, minimize/restore, one-second zero-submission idle and
+GPU content-update/restoration checks:
+
+| Measurement | Run 1 | Run 2 |
+| --- | ---: | ---: |
+| Submission interval, median | 3.41 ms | 3.20 ms |
+| Submission interval, 95th percentile | 4.28 ms | 4.24 ms |
+| Maximum submission interval | 31.83 ms | 33.84 ms |
+| First Cooling-page draw | 26.78 ms | 29.56 ms |
+| Process CPU time | 2187.50 ms | 2281.25 ms |
+| Diagnostic elapsed time | 14443.84 ms | 14441.58 ms |
+| Component creation to first submission | 534.82 ms | 545.11 ms |
+| 16.67 ms submission-gap budget | Exceeded | Exceeded |
+
+The two installed-baseline runs recorded 2734.38–2875.00 ms CPU time,
+4.32–4.38 ms 95th percentiles and 24.09–25.58 ms maximum gaps. The final runs
+used less CPU time, but their worst gaps increased. Background load and driver
+caches were uncontrolled. These results do not establish an improvement in
+first-visit latency, smooth animation, or high-refresh display pacing. The
+first complex-page draw and the 16.67 ms budget remain unresolved.
+
+An earlier development run failed to settle page 10. Its cause was not
+established; later runs passed the state checks. The failure log is retained
+with the other local measurements.
+
+Final validation passed 89 host unit tests, 92 Windows unit tests, strict
+all-target/all-feature Windows Clippy, formatting, and the default Release
+build. Settings initialization, control-state synchronization, CPU-frequency
+sampling and all eleven FlexiKey UI callbacks also passed. The application and
+protocol unsafe ceiling remains 102.
+
+Local evidence is in target/validation/vulkan-followup/: release-1/results.json,
+release-2/results.json, native-results.json, final-verify.log and
+final-windows-clippy.log. The inspected final GPU image is release-2/overview.png.
+
+The 19,074,048-byte Release was deployed to
+C:\ProgramData\RAM Control Center\ram-control-center.exe and launched with
+--background. The installed file matched Release SHA-256
+4C9722E6FA76AC58EE090BCF253741F0FFA0568FB872F7B75D7F3593C14ABAA3. Its first
+submitted frame reported Vulkan / Skia / AMD Radeon 610M. Only the canonical
+background instance remained after validation, with no pending replacement
+images. Startup registration and drivers were unchanged.
+
+The installed binary returned twelve valid changing CPU-performance samples.
+A separate read-only thermal check completed twenty valid samples over 26.97 s
+(CPU 66–73°C, GPU 47°C), with no zero or empty sensor results in that interval.
+Its first attempt had been stopped at the harness's 25 s deadline after eighteen
+valid samples; the completed run used a 40 s deadline because each sample also
+incurs synchronous device-read time. This short check does not establish
+long-term sensor reliability or resolve cold-boot throttling. Deployment and
+sensor evidence are deployment.json, deployed-renderer.txt,
+installed-cpu-frequency-smoke.stdout.log and installed-thermal-results.json
+in the same local directory.
