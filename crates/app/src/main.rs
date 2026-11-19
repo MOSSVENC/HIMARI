@@ -24,6 +24,8 @@ mod input;
 mod input_bindings;
 #[cfg(windows)]
 mod input_hooks;
+#[cfg(any(windows, test))]
+mod input_replay;
 mod localization;
 #[allow(dead_code)]
 mod product;

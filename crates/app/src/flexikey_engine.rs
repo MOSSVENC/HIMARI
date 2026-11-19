@@ -157,6 +157,7 @@ mod platform {
     use super::{CapturedTrigger, EngineReport, FlexiKeyEngine};
 
     use crate::input::{INJECTION_MAGIC, insert_inputs};
+    use crate::input_replay::{ReplayKey, ReplaySink, replay};
 
     struct EngineState {
         router: InputRouter,
@@ -742,22 +743,16 @@ mod platform {
 
     fn execute_action(action: &FlexiKeyAction) -> Result<(), String> {
         match action {
-            FlexiKeyAction::Keypress { steps } => {
-                send_steps(steps)?;
+            FlexiKeyAction::Keypress { .. } => {
+                replay(action, &mut WindowsReplay)?;
                 log_line("keypress action dispatched");
             }
             FlexiKeyAction::Launch { app_path, .. } => {
                 launch(app_path)?;
                 log_line(&format!("launch action dispatched: {app_path}"));
             }
-            FlexiKeyAction::Text {
-                start_keys,
-                text,
-                send_keys,
-            } => {
-                send_steps(start_keys)?;
-                send_unicode(text)?;
-                send_steps(send_keys)?;
+            FlexiKeyAction::Text { .. } => {
+                replay(action, &mut WindowsReplay)?;
                 log_line("text action dispatched");
             }
             FlexiKeyAction::Disable => {
@@ -767,25 +762,39 @@ mod platform {
         Ok(())
     }
 
-    fn send_steps(steps: &[MacroStep]) -> Result<(), String> {
-        for step in steps {
-            if step.delay_ms > 0 {
-                thread::sleep(Duration::from_millis(
-                    u64::try_from(step.delay_ms.min(5000)).unwrap_or(0),
-                ));
-            }
-            let key = u16::try_from(step.key_code)
-                .map_err(|_| format!("macro key {} does not fit 16 bits", step.key_code))?;
-            let up = step.kind == MacroStepKind::Break;
-            send_scan_key(key, up)?;
+    struct WindowsReplay;
+
+    impl ReplaySink for WindowsReplay {
+        fn held(&mut self, key: u16) -> bool {
+            let vk = map_virtual_key(u32::from(key), MAPVK_VSC_TO_VK_EX) as u16;
+            vk != 0 && crate::input::held_keys(&[vk])[0].1
         }
-        Ok(())
+
+        fn send(&mut self, key: ReplayKey, up: bool) -> Result<(), String> {
+            match key {
+                ReplayKey::Scan(key) => send_scan_key(key, up),
+                ReplayKey::Unicode(unit) => send_input(&[keyboard_input(
+                    unit,
+                    0,
+                    KEYEVENTF_UNICODE | if up { KEYEVENTF_KEYUP } else { 0 },
+                )?]),
+            }
+        }
+
+        fn delay(&mut self, milliseconds: u64) {
+            thread::sleep(Duration::from_millis(milliseconds));
+        }
     }
 
     fn send_scan_key(key: u16, up: bool) -> Result<(), String> {
-        let extended = key >= 0xe000;
-        let scan = if extended { key & 0xff } else { key };
-        let virtual_key = map_virtual_key(u32::from(scan), MAPVK_VSC_TO_VK_EX) as u16;
+        let (scan, virtual_key, flags) = scan_key_parts(key, up);
+        send_input(&[keyboard_input(scan, virtual_key, flags)?])
+    }
+
+    fn scan_key_parts(key: u16, up: bool) -> (u16, u16, u32) {
+        let extended = key & 0xff00 == 0xe000;
+        let scan = key & 0xff;
+        let virtual_key = map_virtual_key(u32::from(key), MAPVK_VSC_TO_VK_EX) as u16;
         let mut flags = 0;
         if extended {
             flags |= KEYEVENTF_EXTENDEDKEY;
@@ -798,22 +807,11 @@ mod platform {
         } else {
             flags
         };
-        send_input(&[keyboard_input(scan, virtual_key, flags)?])
-    }
-
-    fn send_unicode(text: &str) -> Result<(), String> {
-        for unit in text.encode_utf16() {
-            send_input(&[
-                keyboard_input(unit, 0, KEYEVENTF_UNICODE)?,
-                keyboard_input(unit, 0, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP)?,
-            ])?;
-            thread::sleep(Duration::from_millis(2));
-        }
-        Ok(())
+        (scan, virtual_key, flags)
     }
 
     fn keyboard_input(scan: u16, virtual_key: u16, flags: u32) -> Result<INPUT, String> {
-        if scan == 0 && virtual_key == 0 {
+        if scan == 0 && virtual_key == 0 && flags & KEYEVENTF_UNICODE == 0 {
             return Err("keyboard input has neither scan nor virtual key".to_owned());
         }
         Ok(INPUT {
@@ -884,6 +882,37 @@ mod platform {
             .open(path)
         {
             let _ = writeln!(file, "{message}");
+        }
+    }
+
+    #[cfg(test)]
+    mod replay_tests {
+        use super::*;
+
+        #[test]
+        fn extended_scan_codes_keep_their_virtual_key_identity() {
+            for (scan, vk) in [
+                (0xe053, 0x2e),
+                (0xe047, 0x24),
+                (0xe04b, 0x25),
+                (0xe01d, 0xa3),
+                (0xe035, 0x6f),
+            ] {
+                let (_, actual_vk, flags) = scan_key_parts(scan, false);
+                assert_eq!(actual_vk, vk, "scan {scan:#x}");
+                assert_ne!(flags & KEYEVENTF_EXTENDEDKEY, 0);
+                assert_eq!(flags & KEYEVENTF_KEYUP, 0);
+            }
+        }
+
+        #[test]
+        fn pause_keeps_its_e1_mapping_and_unicode_accepts_zero() {
+            let (_, vk, flags) = scan_key_parts(0xe11d, true);
+            assert_eq!(vk, 0x13);
+            assert_eq!(flags & KEYEVENTF_EXTENDEDKEY, 0);
+            assert_ne!(flags & KEYEVENTF_KEYUP, 0);
+            assert!(keyboard_input(0, 0, KEYEVENTF_UNICODE).is_ok());
+            assert!(keyboard_input(0, 0, 0).is_err());
         }
     }
 }
