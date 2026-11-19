@@ -6,7 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
-use ram_control_center_protocol::{Dchu, KeyboardFilter};
+use ram_control_center_protocol::Dchu;
 
 use crate::product::product_data_dir;
 
@@ -40,7 +40,7 @@ struct AcpiPayload {
 pub(crate) fn detect(acpi_ready: bool) -> DriverHealth {
     let root = payload_root();
     let payload = acpi_payload_at(&root);
-    let keyboard_ready = KeyboardFilter::open().is_ok();
+    let keyboard_ready = service_running(KEYBOARD_SERVICE);
     DriverHealth {
         core_ready: acpi_ready,
         core_installed: acpi_ready || service_exists(ACPI_SERVICE),
@@ -154,6 +154,21 @@ fn keyboard_payload_at(root: &Path) -> Option<PathBuf> {
 }
 
 #[cfg(windows)]
+fn service_running(name: &str) -> bool {
+    use windows_service::service::{ServiceAccess, ServiceState};
+    use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
+
+    let Ok(manager) = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)
+    else {
+        return false;
+    };
+    manager
+        .open_service(name, ServiceAccess::QUERY_STATUS)
+        .and_then(|service| service.query_status())
+        .is_ok_and(|status| status.current_state == ServiceState::Running)
+}
+
+#[cfg(windows)]
 fn service_exists(name: &str) -> bool {
     use windows_service::service::ServiceAccess;
     use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
@@ -165,6 +180,11 @@ fn service_exists(name: &str) -> bool {
     manager
         .open_service(name, ServiceAccess::QUERY_STATUS)
         .is_ok()
+}
+
+#[cfg(not(windows))]
+fn service_running(_name: &str) -> bool {
+    false
 }
 
 #[cfg(not(windows))]

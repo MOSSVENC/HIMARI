@@ -85,7 +85,16 @@ input_replay.rs 负责单次按键或文本动作的校验、按键归属与释�
 
 已安装的 `HKKbdFltr` 和 `HKMouFltr` 位于键盘、鼠标类的 `UpperFilters` 首位。原厂键盘过滤器的 `0xBA400` 控制拦截是否启用，`0xBA41C` 控制 USB 键盘是否进入该过滤链。实机扫描同时确认：鼠标过滤器接口不接受这两个键盘控制码，返回 `ERROR_INVALID_FUNCTION`。
 
-RAM CONTROL CENTER 的 FlexiKey 使用自有的低级键盘/鼠标钩子，不需要原厂过滤器的宏拦截。启动服务现在在请求 AcpiBridge 和执行电源回放之前调用过滤器守护，桌面进程启动后也会启动同一守护；守护每五秒重新确认以下状态：
+原厂 `CC40/kb.dll` 静态导入 `HKFltrLib`，并调用 `HKFltrLib_OpenDevice`、`HKFltrLib_EnableFilter` 和宏注册接口。过滤器设备及其开关是机器级共享状态，不携带客户端所有权；RAM CONTROL CENTER 又会在原实现里通过打开设备探测驱动健康。两套客户端同时运行时，最后写入者决定共享状态，启动先后和设备枚举快慢会改变结果，因此共存时故障呈时序性、偶发性，而非每次稳定复现。
+
+RAM CONTROL CENTER 的 FlexiKey 使用自有的低级键盘/鼠标钩子，不需要原厂过滤器的宏拦截。当前行为是：
+
+- 驱动健康检查读取服务状态，不再周期性打开过滤器设备；
+- 检测到原厂 `CC40.exe`、`ControlCenter30.exe`、`COUWP.exe` 或 `ControlCenter.exe` 运行时，本程序让出输入过滤所有权，不与其争写；
+- 原厂控制中心退出后，本程序恢复自己的过滤器旁路；
+- 启动服务在请求 AcpiBridge 和执行电源回放之前调用守护，桌面进程启动后也会启动同一守护。
+
+守护每五秒重新确认以下状态：
 
 ```text
 HKKbdFltr 0xBA41C(false)  USB keyboard bypass
@@ -98,7 +107,7 @@ HKKbdFltr 0xBA400(false)  interception disabled
 
 ## 本机构建与部署回执
 
-Windows Release 构建后的安装版 SHA-256 为 `985b5c5dfea78ae56c00d1e1bfcb9f9565ab82d1e467b07316fc915410aa380f`，大小 19,088,384 字节。部署回执显示 `RAMControlCenterBoot` 启动模式为自动、本次退出码 0，启动项仍为 `--background`。安装版以 `--boot-agent --observe-only --observe-ms 6000` 运行时输出：
+Windows Release 构建后的安装版 SHA-256 为 `1d325c11a7cc3efe9280370c2cbc7e9a5cc5d3d71fdef821a0ad5ef3733d5c05`，大小 19,089,408 字节。部署回执显示 `RAMControlCenterBoot` 启动模式为自动、本次退出码 0，启动项仍为 `--background`。安装版以 `--boot-agent --observe-only --observe-ms 6000` 运行时输出：
 
 ```text
 input filter guard: keyboard interception disabled; USB keyboard bypass active
@@ -106,4 +115,4 @@ observer_exit=0
 live_processes=1
 ```
 
-后台进程路径另行实测，`input-guard.log` 在启动服务与 `--background` 进程各产生一条执行回执。Windows 原生测试共 106 项通过，严格 Clippy 通过。上述回执证明两条进程路径都能执行守护并保持单实例；它不证明下一次冷启动后的物理输入已恢复。最终验收必须在重启后、未触碰内置键盘的情况下使用外接键鼠完成连续输入和 Ctrl/Win 组合键测试。
+后台进程路径另行实测，`input-guard.log` 在启动服务与 `--background` 进程各产生一条执行回执。Windows 原生测试共 107 项通过，严格 Clippy 通过。上述回执证明两条进程路径都能执行守护并保持单实例；它不证明下一次冷启动后的物理输入已恢复。最终验收必须在重启后、未触碰内置键盘的情况下使用外接键鼠完成连续输入和 Ctrl/Win 组合键测试。
