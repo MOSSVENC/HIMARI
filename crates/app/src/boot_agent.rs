@@ -31,6 +31,7 @@ impl Default for BootProfile {
 /// power succeeds. A bounded read-only CPU observation then records actual
 /// performance independently of the settings acknowledgement.
 pub fn run() -> i32 {
+    crate::input_recovery::start_filter_guard();
     let started = Instant::now();
     let config_path = config_path();
     let mut profile = read_profile(&config_path)

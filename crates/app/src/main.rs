@@ -26,6 +26,7 @@ mod input;
 mod input_bindings;
 #[cfg(windows)]
 mod input_hooks;
+mod input_recovery;
 #[cfg(any(windows, test))]
 mod input_replay;
 mod localization;
@@ -373,6 +374,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("--flexikey-ui-smoke") => return flexikey_smoke::run(),
         _ => {}
     }
+
+    input_recovery::start_filter_guard();
 
     let ui = MainWindow::new()?;
     if let Err(error) = slint::select_bundled_translation("zh-CN") {
