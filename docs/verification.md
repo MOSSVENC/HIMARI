@@ -787,3 +787,24 @@ This proves the resident owner can acquire the direct AcpiBridge notification
 channel after the vendor handler releases it and that the original runtime can
 be restored. Physical Fn key presses during ownership and action-by-action
 hardware validation remain open.
+
+### Fn payload format follow-up
+
+The first physical ownership window exposed a real transport mismatch:
+some firmware notifications returned four bytes while the listener required
+eight. The parser now accepts both forms, sign-extending the four-byte i32
+payload. Protocol tests cover positive and negative narrow/wide values.
+
+Deployed Release SHA-256:
+`861777cdd55cc4b6b339deda1c38721df1aba30c12192f4b3f3df5193d7f656b`
+(19,129,344 bytes). A second 60-second physical window acquired the channel and
+restored FnKey/service/background process, but recorded no new key notifications:
+
+```text
+Fn notification channel acquired
+restored_app_processes=1
+restored_fnk=1 restored_service=Running
+```
+
+Therefore the four-byte parser fix is verified by unit tests, but the physical
+Fn action/OSD loop is still not accepted.

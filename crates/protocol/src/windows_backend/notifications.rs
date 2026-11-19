@@ -61,12 +61,12 @@ impl AcpiNotificationListener {
             &mut value,
             "DeviceIoControl(0x322408 notification value)",
         )?;
-        if returned as usize != value.len() {
+        if returned == 0 || returned > value.len() as u32 {
             return Err(DchuError::ControlFailed {
                 operation: "read AcpiBridge notification value",
-                detail: format!("expected 8 bytes, received {returned}"),
+                detail: format!("expected 4 or 8 bytes, received {returned}"),
             });
         }
-        FnNotification::from_payload(&value)
+        FnNotification::from_driver_payload(&value[..returned as usize])
     }
 }

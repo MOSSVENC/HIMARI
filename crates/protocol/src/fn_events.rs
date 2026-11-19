@@ -23,6 +23,24 @@ impl FnNotification {
         })
     }
 
+    /// Parse the payload returned by the AcpiBridge notification IOCTL.
+    /// Firmware on the reference machine returns either an i32 or an i64;
+    /// the i32 form is sign-extended so negative arguments retain their value.
+    pub fn from_driver_payload(payload: &[u8]) -> Result<Self> {
+        match payload.len() {
+            4 => Ok(Self {
+                raw: i64::from(i32::from_le_bytes(
+                    payload.try_into().expect("length checked"),
+                )),
+            }),
+            8 => Self::from_payload(payload),
+            length => Err(DchuError::ControlFailed {
+                operation: "read AcpiBridge notification value",
+                detail: format!("expected 4 or 8 bytes, received {length}"),
+            }),
+        }
+    }
+
     pub const fn raw(self) -> i64 {
         self.raw
     }
@@ -146,6 +164,17 @@ mod tests {
             let result = FnNotification::from_payload(&vec![0xf7; size]);
             assert_eq!(result.is_ok(), size == 8, "frame size {size}");
         }
+    }
+
+    #[test]
+    fn driver_payload_accepts_i32_and_i64_forms() {
+        let narrow = FnNotification::from_driver_payload(&(-9_i32).to_le_bytes()).unwrap();
+        let wide = FnNotification::from_driver_payload(&(-9_i64).to_le_bytes()).unwrap();
+        assert_eq!(narrow.raw(), -9);
+        assert_eq!(wide.raw(), -9);
+        assert_eq!(narrow.event(), Some(FnEvent::Camera(true)));
+        assert_eq!(wide.event(), Some(FnEvent::Camera(true)));
+        assert!(FnNotification::from_driver_payload(&[0_u8; 2]).is_err());
     }
 
     #[test]
