@@ -8,7 +8,6 @@ mod platform {
     use std::ffi::OsStr;
     use std::os::windows::ffi::OsStrExt;
     use std::ptr;
-    use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::mpsc;
     use std::sync::{Mutex, OnceLock};
     use std::thread;
@@ -17,7 +16,7 @@ mod platform {
     use raw_window_handle::{HasWindowHandle as _, RawWindowHandle};
     use slint::ComponentHandle as _;
     use windows_sys::Win32::Foundation::{
-        CloseHandle, ERROR_ALREADY_EXISTS, GetLastError, HANDLE, HWND, RECT,
+        CloseHandle, ERROR_ALREADY_EXISTS, GetLastError, HANDLE, HWND,
     };
     use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
     use windows_sys::Win32::System::Threading::CreateMutexW;
@@ -28,10 +27,8 @@ mod platform {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         AppendMenuW, CreateIconFromResourceEx, CreatePopupMenu, CreateWindowExW, DefWindowProcW,
         DestroyIcon, DestroyMenu, DestroyWindow, DispatchMessageW, FindWindowW, GetCursorPos,
-        GetMessageW, GetSystemMetrics, GetWindowRect, HICON, HWND_TOP, IDI_APPLICATION,
-        LR_DEFAULTCOLOR, LoadIconW, MF_STRING, PostMessageW, PostQuitMessage, RegisterClassW,
-        RegisterWindowMessageW, SM_CXSCREEN, SM_CYSCREEN, SW_HIDE, SW_RESTORE, SW_SHOW,
-        SWP_NOZORDER, SWP_SHOWWINDOW, SetForegroundWindow, SetWindowPos, ShowWindow, TPM_NONOTIFY,
+        GetMessageW, HICON, IDI_APPLICATION, LR_DEFAULTCOLOR, LoadIconW, MF_STRING, PostMessageW,
+        PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SetForegroundWindow, TPM_NONOTIFY,
         TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WM_APP, WM_CLOSE,
         WM_COMMAND, WM_CONTEXTMENU, WM_DESTROY, WM_LBUTTONUP, WM_RBUTTONUP, WNDCLASSW,
         WS_OVERLAPPED,
@@ -51,7 +48,6 @@ mod platform {
 
     struct TrayContext {
         window: usize,
-        main_window: usize,
         icon: usize,
         owns_icon: bool,
         ui: slint::Weak<MainWindow>,
@@ -59,90 +55,6 @@ mod platform {
     }
 
     static CONTEXT: OnceLock<Mutex<TrayContext>> = OnceLock::new();
-    static VISIBLE_REQUESTED: AtomicBool = AtomicBool::new(false);
-
-    pub fn hide_main_window(window: usize) {
-        if window == 0 {
-            return;
-        }
-        let window = window as HWND;
-        // SAFETY: callers only pass non-zero top-level HWNDs previously obtained
-        // from Slint or this tray thread. The window remains owned by that event
-        // loop for the duration of these window-management calls.
-        unsafe {
-            let mut rect = RECT::default();
-            let (width, height) = if GetWindowRect(window, &mut rect) != 0 {
-                (rect.right - rect.left, rect.bottom - rect.top)
-            } else {
-                (1180, 820)
-            };
-            SetWindowPos(
-                window,
-                ptr::null_mut(),
-                -30_000,
-                -30_000,
-                width,
-                height,
-                SWP_NOZORDER,
-            );
-            ShowWindow(window, SW_HIDE);
-        }
-    }
-
-    pub fn begin_background_hide(window: usize) {
-        VISIBLE_REQUESTED.store(false, Ordering::Relaxed);
-        crate::log_action("background hide loop started");
-        thread::spawn(move || {
-            for _ in 0..120 {
-                if VISIBLE_REQUESTED.load(Ordering::Relaxed) {
-                    break;
-                }
-                hide_main_window(window);
-                thread::sleep(Duration::from_millis(50));
-            }
-            crate::log_action("background hide loop finished");
-        });
-    }
-
-    pub fn show_main_window(window: usize) {
-        VISIBLE_REQUESTED.store(true, Ordering::Relaxed);
-        if window == 0 {
-            return;
-        }
-        let window = window as HWND;
-        // SAFETY: callers only pass non-zero top-level HWNDs owned by Slint;
-        // all measured values are scalar and the handle stays live during the
-        // positioning and visibility calls.
-        unsafe {
-            let mut rect = RECT::default();
-            let (width, height) = if GetWindowRect(window, &mut rect) != 0 {
-                (rect.right - rect.left, rect.bottom - rect.top)
-            } else {
-                (1180, 820)
-            };
-            let screen_width = GetSystemMetrics(SM_CXSCREEN);
-            let screen_height = GetSystemMetrics(SM_CYSCREEN);
-            let x = ((screen_width - width) / 2).max(0);
-            let y = ((screen_height - height) / 2).max(0);
-            SetWindowPos(window, HWND_TOP, x, y, width, height, SWP_SHOWWINDOW);
-            ShowWindow(window, SW_RESTORE);
-            ShowWindow(window, SW_SHOW);
-            SetForegroundWindow(window);
-        }
-    }
-
-    pub fn main_window_handle(ui: &MainWindow) -> Option<usize> {
-        let handle = ui.window().window_handle();
-        if let Ok(raw) = handle.window_handle()
-            && let RawWindowHandle::Win32(window) = raw.as_raw()
-        {
-            return Some(window.hwnd.get() as usize);
-        }
-        let title = wide(PRODUCT_NAME);
-        // SAFETY: `title` is NUL-terminated and remains alive for the call.
-        let window = unsafe { FindWindowW(ptr::null(), title.as_ptr()) };
-        (!window.is_null()).then_some(window as usize)
-    }
 
     pub fn install_startup(executable: &std::path::Path) -> Result<(), String> {
         let executable = executable
@@ -223,10 +135,10 @@ mod platform {
     }
 
     impl Tray {
-        pub fn start(ui: slint::Weak<MainWindow>, main_window: usize) -> Result<Self, String> {
+        pub fn start(ui: slint::Weak<MainWindow>) -> Result<Self, String> {
             let (ready_tx, ready_rx) = mpsc::channel();
             thread::spawn(move || {
-                if let Err(error) = run_tray_thread(ui, main_window, ready_tx.clone()) {
+                if let Err(error) = run_tray_thread(ui, ready_tx.clone()) {
                     let _ = ready_tx.send(Err(error));
                 }
             });
@@ -253,7 +165,6 @@ mod platform {
 
     fn run_tray_thread(
         ui: slint::Weak<MainWindow>,
-        main_window: usize,
         ready: mpsc::Sender<Result<usize, String>>,
     ) -> Result<(), String> {
         let class_name = wide(WINDOW_CLASS);
@@ -292,7 +203,6 @@ mod platform {
         }
         let context = TrayContext {
             window: 0,
-            main_window,
             icon: icon.0 as usize,
             owns_icon: icon.1,
             ui,
@@ -508,18 +418,28 @@ mod platform {
     }
 
     fn show_ui(context: &Mutex<TrayContext>) {
-        let (ui, main_window) = context
+        let ui = context
             .lock()
             .ok()
-            .map(|context| (context.ui.clone(), context.main_window as HWND))
+            .map(|context| context.ui.clone())
             .unwrap_or_default();
-        if main_window.is_null() {
-            return;
-        }
-        show_main_window(main_window as usize);
         let _ = slint::invoke_from_event_loop(move || {
             if let Some(ui) = ui.upgrade() {
+                if let Err(error) = ui.show() {
+                    crate::log_action(&format!("resident window show failed: {error}"));
+                    return;
+                }
+                ui.window().set_minimized(false);
                 ui.window().request_redraw();
+                let handle = ui.window().window_handle();
+                if let Ok(raw) = handle.window_handle()
+                    && let RawWindowHandle::Win32(window) = raw.as_raw()
+                {
+                    // SAFETY: Slint owns this live HWND, and the window-management
+                    // call runs on the UI thread immediately after showing it.
+                    unsafe { SetForegroundWindow(window.hwnd.get() as HWND) };
+                }
+                crate::log_action("resident window shown");
             }
         });
     }
@@ -606,10 +526,7 @@ mod platform {
 }
 
 #[cfg(windows)]
-pub use platform::{
-    SingleInstance, Tray, begin_background_hide, hide_main_window, install_startup,
-    main_window_handle, startup_enabled, uninstall_startup,
-};
+pub use platform::{SingleInstance, Tray, install_startup, startup_enabled, uninstall_startup};
 
 #[cfg(not(windows))]
 mod platform {
@@ -628,14 +545,6 @@ mod platform {
         false
     }
 
-    pub fn main_window_handle(_ui: &crate::MainWindow) -> Option<usize> {
-        None
-    }
-
-    pub fn hide_main_window(_window: usize) {}
-
-    pub fn begin_background_hide(_window: usize) {}
-
     impl SingleInstance {
         pub fn acquire() -> Result<Option<Self>, String> {
             Ok(Some(Self))
@@ -643,10 +552,7 @@ mod platform {
     }
 
     impl Tray {
-        pub fn start(
-            _ui: slint::Weak<crate::MainWindow>,
-            _main_window: usize,
-        ) -> Result<Self, String> {
+        pub fn start(_ui: slint::Weak<crate::MainWindow>) -> Result<Self, String> {
             Err("tray support is only available on Windows".to_owned())
         }
 
@@ -655,7 +561,4 @@ mod platform {
 }
 
 #[cfg(not(windows))]
-pub use platform::{
-    SingleInstance, Tray, begin_background_hide, hide_main_window, install_startup,
-    main_window_handle, startup_enabled, uninstall_startup,
-};
+pub use platform::{SingleInstance, Tray, install_startup, startup_enabled, uninstall_startup};

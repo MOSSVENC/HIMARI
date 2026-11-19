@@ -196,10 +196,17 @@ The interactive process has three Windows responsibilities:
   second hook from starting.
 
 The main window uses the standard Windows application frame and taskbar entry.
-Closing the window moves it off-screen and keeps the Slint event loop alive; the
-tray restores and centers the same HWND. A current-user Run entry starts the
-process with `--background` at logon. No helper executable or scheduled task is
-used.
+Window visibility belongs to Slint: closing hides the main window, and tray
+activation shows it and clears its minimized state on the UI thread. The event
+loop continues until the tray's Exit command. A current-user Run entry starts
+the process with `--background` at logon; this creates the tray before showing
+any main window. Renderer readiness is reported after its first actual frame.
+
+Run scripts/test-tray.ps1 on Windows against the Release executable to check
+background and foreground launches, repeated close/restore and minimize/restore,
+continued Vulkan submission after each restoration, and tray Exit. The isolated
+--tray-smoke fixture starts the same resident-window code with hardware workers
+and input hooks disabled. Its window enumeration and messages are PID-scoped.
 
 ## Threading
 

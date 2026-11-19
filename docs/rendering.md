@@ -283,3 +283,56 @@ replaced the installed 4C9722E6 image recorded above.
 
 GitHub Actions run 44423413168 for commit 9bb2c76 completed successfully
 on Linux and Windows, including the Windows Release build.
+
+### Tray visibility and Vulkan restoration
+
+Main-window visibility now stays in Slint's event loop. Background launch
+starts the tray and waits for an explicit activation. Closing hides the
+window through Slint, and tray activation shows it and restores it from
+minimized state. The former off-screen repositioning and six-second hide
+thread were removed. A hidden window does not trigger the visible-window
+renderer-readiness timeout.
+
+The native Windows test in scripts/test-tray.ps1 covers background and
+foreground launch. Each launch completes three close/restore and three
+minimize/restore cycles, requiring a new Vulkan submission after each
+restoration, and exits through the tray command. The background case is
+polled for 6.5 seconds before activation: no visible application surface and
+no main-window submission are allowed. Winit's transparent layered event
+target is identified by its exact class and extended styles; WS_VISIBLE
+alone does not mean that this internal message window displays content.
+The fixture starts the production resident-window code with hardware workers
+and input hooks disabled.
+
+Two default Release graphics runs completed 22 transitions each, window
+lifecycle checks, idle zero-submission checks and GPU content-change/restore
+checks on the AMD Radeon 610M:
+
+| Measurement | Run 1 | Run 2 |
+| --- | ---: | ---: |
+| Submission interval, 95th percentile | 4.25 ms | 4.26 ms |
+| Maximum submission interval | 35.41 ms | 32.26 ms |
+| First Cooling-page draw | 31.70 ms | 27.57 ms |
+| 16.67 ms submission-gap budget | Exceeded | Exceeded |
+
+The second run's 1180 × 820 GPU readback was inspected. These results verify
+restoration and pixel updates; first-visit drawing latency remains open.
+Host verification passed 89 tests, Windows passed 92 native unit tests, and
+all-target/all-feature Windows Clippy passed with warnings denied. Removing
+the redundant visibility boundaries lowered the application/protocol unsafe
+keyword ceiling from 102 to 100.
+
+The default Release is 19,073,536 bytes with SHA-256
+29E96FD64A15B97ED527E6A7B1488BF9D599877190526EF07EA220E531E28640.
+It replaced the canonical C:\ProgramData\RAM Control Center executable.
+The installed process stayed hidden for 6.5 seconds with zero main-window
+submissions, then a second invocation activated the existing process. Its
+first frame reported Vulkan / Skia / AMD Radeon 610M. Closing returned it to
+the tray. Runtime diagnostic logging was then removed by a clean background
+relaunch. Startup registration, service configuration and drivers were
+unchanged. These window tests do not establish cold-boot CPU performance.
+
+Local evidence is in target/validation/vulkan-startup/: final-tray/results.json,
+release-1/results.json, release-2/results.json, native-results.json,
+deployment.json, host-verify.log and windows-clippy.log. The retained GPU image
+is release-2/overview.png.

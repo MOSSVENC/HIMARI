@@ -30,6 +30,7 @@ pub(crate) fn install_frame_diagnostics(ui: &MainWindow) {
     slint::Timer::single_shot(Duration::from_secs(5), move || {
         if !ready.get()
             && let Some(ui) = weak.upgrade()
+            && ui.window().is_visible()
         {
             ui.set_renderer_text(tr("Renderer initialization timed out").into());
         }

@@ -9,7 +9,7 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 declare -A ceilings=(
     ["crates/app/src/telemetry.rs"]=26
     ["crates/app/src/driver_manager.rs"]=7
-    ["crates/app/src/tray.rs"]=20
+    ["crates/app/src/tray.rs"]=18
     ["crates/app/src/flexikey_engine.rs"]=8
     ["crates/app/src/system_controls/registry.rs"]=1
     ["crates/app/src/system_controls/display_care.rs"]=5
@@ -29,7 +29,7 @@ total=0
 failed=0
 # Includes the five audited hook handle/event boundaries and six uninstaller
 # boundaries; the dispatcher and tray ceilings were lowered after refactoring.
-max_total=102
+max_total=100
 
 while IFS= read -r file; do
     count=$(grep -o -E '\bunsafe\b' "$file" | wc -l)

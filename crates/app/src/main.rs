@@ -27,6 +27,7 @@ mod input_hooks;
 mod localization;
 #[allow(dead_code)]
 mod product;
+mod resident_ui;
 mod runtime_state;
 #[cfg(windows)]
 mod service_lifecycle;
@@ -39,11 +40,13 @@ mod ui_callbacks;
 mod ui_update;
 mod worker;
 
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
+#[cfg(any(debug_assertions, feature = "snapshot-tools"))]
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use slint::{CloseRequestResponse, ComponentHandle};
+use slint::ComponentHandle;
 
 use diagnostics::{install_frame_diagnostics, log_action};
 use flexikey_engine::FlexiKeyEngine;
@@ -53,55 +56,6 @@ use ui_callbacks::wire_ui;
 use worker::spawn_worker;
 
 slint::include_modules!();
-
-fn schedule_tray_start(
-    weak: slint::Weak<MainWindow>,
-    tray_slot: Rc<RefCell<Option<tray::Tray>>>,
-    start_background: bool,
-    attempt: u32,
-) {
-    const MAX_ATTEMPTS: u32 = 20;
-    let delay_ms = if attempt == 0 { 150 } else { 250 };
-    slint::Timer::single_shot(Duration::from_millis(delay_ms), move || {
-        let Some(ui) = weak.upgrade() else {
-            return;
-        };
-        if tray_slot.borrow().is_some() {
-            return;
-        }
-        let Some(main_window) = tray::main_window_handle(&ui) else {
-            log_action(&format!(
-                "tray unavailable: native window handle was not available (attempt {})",
-                attempt + 1
-            ));
-            if attempt + 1 < MAX_ATTEMPTS {
-                schedule_tray_start(ui.as_weak(), tray_slot, start_background, attempt + 1);
-            }
-            return;
-        };
-        match tray::Tray::start(ui.as_weak(), main_window) {
-            Ok(tray) => {
-                *tray_slot.borrow_mut() = Some(tray);
-                ui.window().on_close_requested(move || {
-                    tray::hide_main_window(main_window);
-                    CloseRequestResponse::KeepWindowShown
-                });
-                if start_background {
-                    tray::begin_background_hide(main_window);
-                }
-            }
-            Err(error) => {
-                // `Tray::start` owns a background thread after this point. Do
-                // not retry an uncertain start and risk installing a duplicate
-                // tray icon; only a missing top-level handle is retried above.
-                log_action(&format!(
-                    "tray unavailable: {error} (attempt {})",
-                    attempt + 1
-                ));
-            }
-        }
-    });
-}
 
 fn write_snapshot_ppm(
     path: &std::path::Path,
@@ -353,6 +307,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--control-sync-smoke"
                 | "--settings-smoke"
                 | "--graphics-smoke"
+                | "--tray-smoke"
                 | "--flexikey-ui-smoke"
         ) || (cfg!(any(debug_assertions, feature = "snapshot-tools"))
             && (argument.starts_with("--snapshot=")
@@ -410,6 +365,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("--control-sync-smoke") => std::process::exit(control_sync_smoke::run()),
         Some("--settings-smoke") => std::process::exit(settings_backend_smoke()),
         Some("--graphics-smoke") => return graphics_smoke::run(),
+        Some("--tray-smoke") => return resident_ui::smoke(start_background),
         Some("--flexikey-ui-smoke") => return flexikey_smoke::run(),
         _ => {}
     }
@@ -429,13 +385,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     install_frame_diagnostics(&ui);
     spawn_worker(receiver, weak);
 
-    let tray_slot = Rc::new(RefCell::new(None::<tray::Tray>));
-    schedule_tray_start(ui.as_weak(), Rc::clone(&tray_slot), start_background, 0);
-
-    ui.run()?;
-    let tray = tray_slot.borrow_mut().take();
-    if let Some(tray) = tray {
-        tray.shutdown();
-    }
-    Ok(())
+    resident_ui::run(&ui, start_background)
 }
