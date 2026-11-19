@@ -318,7 +318,7 @@ pub(crate) fn wire_ui(
         if let Some(ui) = weak.upgrade() {
             ui.set_quiet_dialog_open(false);
             ui.set_busy(true);
-            ui.set_status_message(tr("Applying Quiet mode and staging the GPU choice…").into());
+            ui.set_status_message(tr("Applying Quiet mode and the GPU power policy…").into());
             ui.set_status_tone(0);
         }
         let _ = tx.send(WorkerCommand::ApplyQuiet(disable_dgpu));

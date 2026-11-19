@@ -56,6 +56,14 @@ impl Dchu {
         })
     }
 
+    /// Apply the runtime NVIDIA platform-controller power state recovered
+    /// from the vendor worker's `0x0013` operation. The device-node transition
+    /// that accompanies this command lives in the application layer.
+    pub fn set_nvidia_power(&self, enabled: bool) -> Result<()> {
+        let mut output = [0_u8; 256];
+        self.set_data_ex(4, &[34, u8::from(enabled)], &mut output)
+    }
+
     /// Stage a GPU mode exactly as the vendor pre-boot control does. This
     /// value is consumed by the BIOS at POST, so there is intentionally no
     /// online readback. It must only be called after an explicit user choice.

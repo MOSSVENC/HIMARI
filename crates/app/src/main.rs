@@ -19,6 +19,7 @@ mod flexikey_store;
 mod flexikey_ui;
 mod fn_diagnostics;
 mod formatting;
+mod gpu_power;
 mod graphics;
 mod graphics_smoke;
 mod input;
@@ -266,6 +267,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match std::env::args().nth(1).as_deref() {
         Some("--boot-agent") => std::process::exit(boot_agent::run()),
         Some("--install-drivers") => std::process::exit(driver_manager::run_installer()),
+        Some("--gpu-power") => {
+            let enabled = match std::env::args().nth(2).as_deref() {
+                Some("on") => true,
+                Some("off") => false,
+                _ => {
+                    eprintln!("usage: ram-control-center --gpu-power <on|off>");
+                    std::process::exit(2);
+                }
+            };
+            std::process::exit(gpu_power::run_cli(enabled));
+        }
+        Some("--gpu-power-status") => std::process::exit(gpu_power::status()),
         Some("--driver-smoke") => std::process::exit(driver_manager::smoke()),
         Some("--boot-service") => std::process::exit(boot_service::run_dispatcher()),
         Some("--install-boot-service") => std::process::exit(boot_service::install()),

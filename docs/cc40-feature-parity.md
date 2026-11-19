@@ -14,7 +14,7 @@ The implemented control surfaces and their verification scopes are:
 | Cooling | Automatic, maximum, Turbo, Noiseless, offsets and ten-point RPM table | Direct reads and selected writes verified; complete physical behavior and sustained vendor coexistence remain open |
 | Keyboard lighting | Color, effects, brightness, sleep and boot effect | Direct read/write paths and UI preview checks exist; complete hardware interaction acceptance remains open |
 | Input settings | Preference toggles, camera, touchpad and related controls | Touchpad tested with FnKey running and stopped; all physical modifier-key interactions remain open |
-| GPU and system controls | Staged dGPU/MSHybrid selection, display brightness, audio and radio controls | Control paths exist; reboot-dependent GPU changes and complete physical acceptance remain open |
+| GPU and system controls | Runtime NVIDIA power-off/on, staged dGPU/MSHybrid selection, display brightness, audio and radio controls | Runtime NVPCF off/on and device-node state verified; reboot-dependent MUX changes and complete physical acceptance remain open |
 | FlexiKey | Binding editor, text, keys, launch actions and mouse bindings | Hook lifecycle, callback/persistence and replay fault tests pass; physical input coexistence remains open |
 | Battery | Status and FlexiCharger thresholds | Selected same-value writes verified; complete charging-cycle acceptance remains open |
 | Display care | Taskbar, appearance, monitor timeout and screen saver | Selected Windows state transitions and readbacks verified |
@@ -84,6 +84,27 @@ the original mode byte. `energy_star_mode` is `0` for Performance, `1` for
 Power saving/Quiet+, and `2` for Quiet/Entertainment. FnKey identifies command
 79 as `SetEnergyStarMode`; this is not evidence that it releases CPU throttling.
 Actual boot-time CPU performance requires a separate measurement.
+
+### Quiet mode GPU policy
+
+CC4.0's worker command `0x0013` controls the runtime NVIDIA platform
+controller, not the next-boot MUX selection. RAM CONTROL CENTER now implements
+the recovered sequence directly:
+
+```text
+disable: CM_Disable_DevNode(ACPI\NVDA0820)
+         SetDCHU_DataEx(4, [34, 0])
+enable:  SetDCHU_DataEx(4, [34, 1])
+         CM_Enable_DevNode(ACPI\NVDA0820)
+```
+
+The operation changes device state only and is reversible without a reboot.
+Device-node changes require administrator rights, so the application launches
+its own executable through the Windows `runas` verb with the narrow
+`--gpu-power off|on` command. It never invokes the vendor worker executable.
+The Quiet power profile is applied first; a power-profile failure stops before
+the GPU operation, and a GPU failure is reported separately after the profile
+change. This removes the previous false-success path.
 
 ### Panel low refresh rate
 
@@ -337,6 +358,7 @@ the binding.
 - Direct command 12 telemetry and command 13 fan identity.
 - Direct page 7 support decode.
 - Full two-stage power transition with readback of page 1/1 and page 1/16.
+- Quiet mode runtime NVIDIA power-off and restore: NVPCF changed from `CM_PROB_DISABLED/STARTED=false` to `OK/STARTED=true`; both DCHU transitions were verified.
 - Direct RGB keyboard state read.
 - Same-value RGB brightness, sleep timer, and boot-effect writes.
 - Same-value ten-point RPM fan table write with full readback.

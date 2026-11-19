@@ -133,34 +133,58 @@ pub(super) fn apply_quiet(dchu: Option<&Dchu>, disable_dgpu: bool) -> CommandOut
     let Some(active) = dchu else {
         return CommandOutcome::missing_transport();
     };
-    let quiet_applied = tr("Quiet mode applied.");
-    let mut message = match active.set_power_mode(PowerMode::Quiet) {
-        Ok(()) => {
-            persist_power_mode(PowerMode::Quiet);
-            quiet_applied.to_owned()
+    let result = apply_quiet_sequence(
+        disable_dgpu,
+        || {
+            active.set_power_mode(PowerMode::Quiet).map(|()| {
+                persist_power_mode(PowerMode::Quiet);
+            })
+        },
+        || crate::gpu_power::request(false),
+    );
+    match result {
+        Ok(QuietGpuOutcome::Kept) => CommandOutcome::success(tr(
+            "Quiet mode applied. The discrete GPU remains available.",
+        )),
+        Ok(QuietGpuOutcome::Disabled) => {
+            CommandOutcome::success(tr("Quiet mode applied. The discrete GPU was powered off."))
         }
-        Err(error) => error.to_string(),
-    };
-    let mut tone = if message == quiet_applied { 1 } else { 2 };
-    if disable_dgpu {
-        match active.stage_gpu_switch(GpuSwitchMode::Integrated) {
-            Ok(()) => {
-                message =
-                    tr("Quiet mode applied. Discrete GPU disable was staged for the next reboot.")
-                        .to_owned();
-                tone = 1;
-            }
-            Err(error) => {
-                message = format!(
-                    "{} {}",
-                    tr("Quiet mode applied, but GPU staging failed:"),
-                    error
-                );
-                tone = 2;
-            }
-        }
+        Err(QuietError::Power(error)) => CommandOutcome::failure(error),
+        Err(QuietError::Gpu(error)) => CommandOutcome::failure(format!(
+            "{} {}",
+            tr("Quiet mode applied, but the discrete GPU power-off failed:"),
+            error
+        )),
     }
-    CommandOutcome::with_tone(message, tone)
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum QuietGpuOutcome {
+    Kept,
+    Disabled,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum QuietError<E> {
+    Power(E),
+    Gpu(String),
+}
+
+fn apply_quiet_sequence<E, P, G>(
+    disable_dgpu: bool,
+    power: P,
+    gpu: G,
+) -> Result<QuietGpuOutcome, QuietError<E>>
+where
+    P: FnOnce() -> Result<(), E>,
+    G: FnOnce() -> Result<(), String>,
+{
+    power().map_err(QuietError::Power)?;
+    if !disable_dgpu {
+        return Ok(QuietGpuOutcome::Kept);
+    }
+    gpu().map_err(QuietError::Gpu)?;
+    Ok(QuietGpuOutcome::Disabled)
 }
 
 pub(super) fn apply_gpu_switch(dchu: Option<&Dchu>, mode: GpuSwitchMode) -> CommandOutcome {
@@ -194,4 +218,63 @@ pub(super) fn apply_flexi_charger(
         active.set_flexi_charger(mode, start, stop),
         tr("Charge policy applied and verified."),
     )
+}
+
+#[cfg(test)]
+mod quiet_tests {
+    use std::cell::Cell;
+
+    use super::{QuietError, QuietGpuOutcome, apply_quiet_sequence};
+
+    #[test]
+    fn power_failure_stops_before_gpu_power() {
+        let gpu_called = Cell::new(false);
+        let result = apply_quiet_sequence(
+            true,
+            || Err("power failed"),
+            || {
+                gpu_called.set(true);
+                Ok(())
+            },
+        );
+        assert_eq!(result, Err(QuietError::Power("power failed")));
+        assert!(!gpu_called.get());
+    }
+
+    #[test]
+    fn keeping_dgpu_does_not_request_power_off() {
+        let gpu_called = Cell::new(false);
+        let result = apply_quiet_sequence(
+            false,
+            || Ok::<(), ()>(()),
+            || {
+                gpu_called.set(true);
+                Ok(())
+            },
+        );
+        assert_eq!(result, Ok(QuietGpuOutcome::Kept));
+        assert!(!gpu_called.get());
+    }
+
+    #[test]
+    fn gpu_power_off_runs_after_successful_quiet_power() {
+        let gpu_called = Cell::new(false);
+        let result = apply_quiet_sequence(
+            true,
+            || Ok::<(), ()>(()),
+            || {
+                gpu_called.set(true);
+                Ok(())
+            },
+        );
+        assert_eq!(result, Ok(QuietGpuOutcome::Disabled));
+        assert!(gpu_called.get());
+    }
+
+    #[test]
+    fn gpu_failure_is_reported_after_power_changed() {
+        let result =
+            apply_quiet_sequence(true, || Ok::<(), ()>(()), || Err("gpu failed".to_owned()));
+        assert_eq!(result, Err(QuietError::Gpu("gpu failed".to_owned())));
+    }
 }

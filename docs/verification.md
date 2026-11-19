@@ -688,3 +688,26 @@ separate boot-time hardware acceptance item.
 
 Local evidence: `target/validation/vulkan-followup/native-7.stdout.log` and
 `native-results.json` in that directory. The directory is excluded from Git.
+
+## 2026-11-19 Quiet GPU power verification
+
+Windows Release SHA-256:
+`aff175b654d5615191fc24dd78b3c34746059fa1e54b134be35044848b522ecb`
+(19,098,112 bytes). The installed background process remained a single
+instance after deployment.
+
+The recovered CC4.0 `0x0013` operation was exercised on the reference machine:
+
+```text
+off_exit=0
+ACPI\NVDA0820\NPCF  CM_PROB_DISABLED  STARTED=false
+
+on_exit=0
+ACPI\NVDA0820\NPCF  OK  CM_PROB_NONE  STARTED=true
+```
+
+The helper log records both `disabling device node and NVPCF` and
+`enabling NVPCF and device node` with `transition verified`. This validates the
+runtime GPU power path and its immediate restore. It does not validate a reboot
+into a different MUX mode. Windows native tests passed 74 application tests,
+3 uninstaller tests and 34 protocol tests; strict Clippy passed.

@@ -79,7 +79,7 @@ Rectangle {
                     padding-bottom: 10px;
                     spacing: 4px;
                     Text { text: @tr("Keep dGPU"); color: Palette.text; font-family: "Bahnschrift"; font-size: 12px; font-weight: 600; }
-                    Text { text: @tr("Quiet platform profile with the discrete GPU available immediately. This choice takes effect now."); color: Palette.text-dim; font-family: "Microsoft YaHei UI"; font-size: 10px; wrap: word-wrap; }
+                    Text { text: @tr("Applies the Quiet platform profile while keeping the NVIDIA discrete GPU available."); color: Palette.text-dim; font-family: "Microsoft YaHei UI"; font-size: 10px; wrap: word-wrap; }
                 }
             }
 
@@ -96,7 +96,7 @@ Rectangle {
                     padding-bottom: 10px;
                     spacing: 4px;
                     Text { text: @tr("Disable dGPU · maximum quiet"); color: Palette.text; font-family: "Bahnschrift"; font-size: 12px; font-weight: 600; }
-                    Text { text: @tr("Stages iGPU-only mode for the next boot. Restart when you are ready; the staged mode applies on that boot."); color: Palette.text-dim; font-family: "Microsoft YaHei UI"; font-size: 10px; wrap: word-wrap; }
+                    Text { text: @tr("Powers off the NVIDIA discrete GPU at runtime. Windows will request administrator approval and the GPU remains off until re-enabled."); color: Palette.text-dim; font-family: "Microsoft YaHei UI"; font-size: 10px; wrap: word-wrap; }
                 }
             }
 

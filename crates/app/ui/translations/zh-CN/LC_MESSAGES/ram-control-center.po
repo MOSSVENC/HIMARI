@@ -1538,3 +1538,21 @@ msgstr "系统没有为按键提供扫描码"
 
 msgid "Input hooks idle"
 msgstr "输入钩子待命"
+
+msgid "Quiet mode applied. The discrete GPU remains available."
+msgstr "安静模式已应用，独立显卡保持可用。"
+
+msgid "Quiet mode applied. The discrete GPU was powered off."
+msgstr "安静模式已应用，独立显卡已关闭电源。"
+
+msgid "Quiet mode applied, but the discrete GPU power-off failed:"
+msgstr "安静模式已应用，但独立显卡断电失败："
+
+msgid "Applying Quiet mode and the GPU power policy…"
+msgstr "正在应用安静模式和独显电源策略…"
+
+msgid "Powers off the NVIDIA discrete GPU at runtime. Windows will request administrator approval and the GPU remains off until re-enabled."
+msgstr "运行时关闭 NVIDIA 独立显卡电源。Windows 会请求管理员授权，显卡将保持关闭，直到再次启用。"
+
+msgid "Applies the Quiet platform profile while keeping the NVIDIA discrete GPU available."
+msgstr "应用安静平台配置，同时保持 NVIDIA 独立显卡可用。"
