@@ -18,6 +18,7 @@ mod flexikey_smoke;
 mod flexikey_store;
 mod flexikey_ui;
 mod fn_diagnostics;
+mod fn_owner;
 mod formatting;
 mod gpu_power;
 mod graphics;
@@ -31,7 +32,9 @@ mod input_recovery;
 #[cfg(any(windows, test))]
 mod input_replay;
 mod localization;
+mod osd;
 #[allow(dead_code)]
+mod process_query;
 mod product;
 mod resident_ui;
 mod resume_recovery;
@@ -315,6 +318,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("--io-smoke") => std::process::exit(io_smoke()),
         Some("--touchpad-smoke") => std::process::exit(smoke::touchpad_smoke()),
         Some("--fn-events-smoke") => std::process::exit(fn_diagnostics::smoke()),
+        Some("--osd-smoke") => return fn_owner::osd_smoke(),
+        Some("--fn-event-smoke") => {
+            let code = std::env::args()
+                .nth(2)
+                .and_then(|value| {
+                    value
+                        .strip_prefix("0x")
+                        .or_else(|| value.strip_prefix("0X"))
+                        .and_then(|value| u8::from_str_radix(value, 16).ok())
+                        .or_else(|| value.parse().ok())
+                })
+                .unwrap_or(0xca);
+            return fn_owner::event_smoke(code);
+        }
         Some("--display-care-smoke") => std::process::exit(display_care_smoke()),
         _ => {}
     }
@@ -393,6 +410,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     resume_recovery::start();
 
     let ui = MainWindow::new()?;
+    let osd = OsdWindow::new()?;
+    osd::install(osd.as_weak());
+    fn_owner::install_ui(ui.as_weak());
     if let Err(error) = slint::select_bundled_translation("zh-CN") {
         log_action(&format!("Chinese translation unavailable: {error}"));
     }
@@ -406,6 +426,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     wire_ui(&ui, sender.clone(), flexikey_state);
     install_frame_diagnostics(&ui);
     spawn_worker(receiver, weak);
+    fn_owner::start();
 
-    resident_ui::run(&ui, start_background)
+    let result = resident_ui::run(&ui, start_background);
+    drop(osd);
+    result
 }

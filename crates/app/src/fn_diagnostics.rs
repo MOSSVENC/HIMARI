@@ -74,13 +74,12 @@ fn require_services_stopped() -> ram_control_center_protocol::Result<()> {
 
 /// The diagnostic caller also coordinates the resident FnKey process. The
 /// forwarding flag and service status are checked before driver registration.
-fn open_listener()
+pub(crate) fn open_listener()
 -> ram_control_center_protocol::Result<ram_control_center_protocol::AcpiNotificationListener> {
     use ram_control_center_protocol::{AcpiNotificationListener, Dchu};
 
     let device = Dchu::open()?;
     let flag = device.read_setting_byte(1, 12);
-    println!("Fn notifications: Arg001 forwarding status={flag:?}");
     #[cfg(windows)]
     require_services_stopped()?;
     require_direct_mode(flag)?;

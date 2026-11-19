@@ -1556,3 +1556,102 @@ msgstr "运行时关闭 NVIDIA 独立显卡电源。Windows 会请求管理员�
 
 msgid "Applies the Quiet platform profile while keeping the NVIDIA discrete GPU available."
 msgstr "应用安静平台配置，同时保持 NVIDIA 独立显卡可用。"
+
+msgid "Action failed"
+msgstr "操作失败"
+
+msgid "Keyboard backlight"
+msgstr "键盘背光"
+
+msgid "Brightness down"
+msgstr "降低亮度"
+
+msgid "Brightness up"
+msgstr "提高亮度"
+
+msgid "Toggle"
+msgstr "切换"
+
+msgid "Cycle brightness"
+msgstr "循环亮度"
+
+msgid "Fn Lock"
+msgstr "Fn 锁定"
+
+msgid "Anti-dust running"
+msgstr "正在运行防尘"
+
+msgid "MaxQ fan profile"
+msgstr "MaxQ 风扇配置"
+
+msgid "Custom fan profile"
+msgstr "自定义风扇配置"
+
+msgid "Maximum fan"
+msgstr "最大风扇"
+
+msgid "Noiseless fan toggle"
+msgstr "切换安静风扇"
+
+msgid "Switch profile"
+msgstr "切换配置"
+
+msgid "Toggle window"
+msgstr "显示或隐藏窗口"
+
+msgid "Docking"
+msgstr "扩展坞"
+
+msgid "Connected"
+msgstr "已连接"
+
+msgid "Disconnected"
+msgstr "已断开"
+
+msgid "Num Lock"
+msgstr "数字锁定"
+
+msgid "On"
+msgstr "开启"
+
+msgid "Off"
+msgstr "关闭"
+
+msgid "Caps Lock"
+msgstr "大写锁定"
+
+msgid "Scroll Lock"
+msgstr "滚动锁定"
+
+msgid "Silent mode"
+msgstr "静音模式"
+
+msgid "Mobile radio"
+msgstr "移动网络"
+
+msgid "Camera and microphone"
+msgstr "摄像头和麦克风"
+
+msgid "Camera on"
+msgstr "摄像头已开启"
+
+msgid "Camera off"
+msgstr "摄像头已关闭"
+
+msgid "Brightness"
+msgstr "亮度"
+
+msgid "Fn Lock state is unavailable"
+msgstr "Fn 锁定状态不可用"
+
+msgid "Noiseless fan state is unavailable"
+msgstr "安静风扇状态不可用"
+
+msgid "Power mode is unavailable"
+msgstr "电源模式不可用"
+
+msgid "No power profiles are supported"
+msgstr "没有受支持的电源配置"
+
+msgid "Main window is unavailable"
+msgstr "主窗口不可用"

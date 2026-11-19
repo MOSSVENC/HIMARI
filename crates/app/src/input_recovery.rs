@@ -71,51 +71,13 @@ fn guard_loop() {
 }
 
 #[cfg(windows)]
-fn is_original_control_center_process(name: &str) -> bool {
-    matches!(
-        name.to_ascii_lowercase().as_str(),
-        "cc40.exe" | "controlcenter30.exe" | "couwp.exe" | "controlcenter.exe"
-    )
-}
-
-#[cfg(windows)]
 fn original_control_center_running() -> bool {
-    use std::mem::size_of;
-    use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
-    use windows_sys::Win32::System::Diagnostics::ToolHelp::{
-        CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW,
-        TH32CS_SNAPPROCESS,
-    };
-
-    // SAFETY: the snapshot handle is checked before use and closed exactly once;
-    // PROCESSENTRY32W is initialized with its required structure size.
-    unsafe {
-        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-        if snapshot == INVALID_HANDLE_VALUE {
-            return false;
-        }
-        let mut entry = PROCESSENTRY32W {
-            dwSize: size_of::<PROCESSENTRY32W>() as u32,
-            ..PROCESSENTRY32W::default()
-        };
-        let mut found = false;
-        let mut present = Process32FirstW(snapshot, &mut entry) != 0;
-        while present {
-            let end = entry
-                .szExeFile
-                .iter()
-                .position(|character| *character == 0)
-                .unwrap_or(entry.szExeFile.len());
-            let name = String::from_utf16_lossy(&entry.szExeFile[..end]);
-            if is_original_control_center_process(&name) {
-                found = true;
-                break;
-            }
-            present = Process32NextW(snapshot, &mut entry) != 0;
-        }
-        CloseHandle(snapshot);
-        found
-    }
+    crate::process_query::any_running(&[
+        "CC40.exe",
+        "ControlCenter30.exe",
+        "COUWP.exe",
+        "ControlCenter.exe",
+    ])
 }
 
 #[cfg(windows)]
@@ -150,21 +112,5 @@ fn reconcile_once() -> Result<(), String> {
             "keyboard interception is disabled, but USB bypass is unavailable: {error}"
         )),
         (Ok(()), Ok(())) => Ok(()),
-    }
-}
-
-#[cfg(all(test, windows))]
-mod tests {
-    use super::is_original_control_center_process;
-
-    #[test]
-    fn original_control_center_names_are_case_insensitive() {
-        assert!(is_original_control_center_process("CC40.exe"));
-        assert!(is_original_control_center_process("controlcenter30.EXE"));
-        assert!(is_original_control_center_process("COUWP.exe"));
-        assert!(!is_original_control_center_process(
-            "ram-control-center.exe"
-        ));
-        assert!(!is_original_control_center_process("FnKey.exe"));
     }
 }

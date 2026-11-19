@@ -1,0 +1,59 @@
+import { Palette } from "theme.slint";
+
+export component OsdWindow inherits Window {
+    in property <string> osd-title: "";
+    in property <string> osd-detail: "";
+    in property <color> osd-accent: Palette.cyan;
+
+    width: 360px;
+    height: 96px;
+    background: Palette.surface;
+    title: "RAM CONTROL CENTER OSD";
+    no-frame: true;
+    always-on-top: true;
+
+    Rectangle {
+        width: parent.width;
+        height: parent.height;
+        border-radius: 18px;
+        background: Palette.surface-gradient;
+        border-width: 1px;
+        border-color: root.osd-accent.with-alpha(0.72);
+        drop-shadow-blur: 24px;
+        drop-shadow-color: #00000099;
+
+        HorizontalLayout {
+            padding-left: 18px;
+            padding-right: 18px;
+            padding-top: 14px;
+            padding-bottom: 14px;
+            spacing: 14px;
+
+            Rectangle {
+                width: 4px;
+                border-radius: 2px;
+                background: root.osd-accent;
+            }
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 5px;
+                Text {
+                    text: root.osd-title;
+                    color: Palette.text;
+                    font-family: "Bahnschrift";
+                    font-size: 18px;
+                    font-weight: 650;
+                    overflow: elide;
+                }
+                Text {
+                    text: root.osd-detail;
+                    color: Palette.text-dim;
+                    font-family: "Microsoft YaHei UI";
+                    font-size: 12px;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+}

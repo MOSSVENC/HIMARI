@@ -19,8 +19,8 @@ The implemented control surfaces and their verification scopes are:
 | Battery | Status and FlexiCharger thresholds | Selected same-value writes verified; complete charging-cycle acceptance remains open |
 | Display care | Taskbar, appearance, monitor timeout and screen saver | Selected Windows state transitions and readbacks verified |
 | Drivers and lifecycle | Driver detection/install entry, tray, startup, service and uninstaller | Selected deployment and lifecycle checks verified; complete uninstall acceptance remains open |
-| Physical Fn keys | Protocol decoding and diagnostic subscription | Resident ownership, action dispatch and physical combinations remain incomplete |
-| OSD | Vendor notification meanings documented | Independent OSD presentation and full action feedback remain incomplete |
+| Physical Fn keys | Resident ownership arbitration, mapped action dispatch and independent OSD | Implementation and synthetic dispatch verified; physical Fn combinations and full branch hardware acceptance remain open |
+| OSD | Independent Slint overlay, state text and action errors | Visual smoke and synthetic Caps Lock event verified; physical Fn event feedback remains open |
 
 Animation smoothness is a separate acceptance item: native Vulkan submission
 is verified, but the latest measured maximum interval is 57.51 ms, exceeding
@@ -406,18 +406,25 @@ the binding.
 - CPU/GPU overclocking remains locked because this machine reports no supported
   OC path.
 
-## Remaining Fn parity
+## Fn and OSD implementation status
 
-The platform exposes the vendor ACPI notification channel used by FnKey for
-hardware Fn events and OSD updates. The opt-in `--trace-fn-events` diagnostic registers
-once, waits on the event channel, and records the complete 8-byte notification,
-its event ID / argument, and the verified dispatch subset. FnKey's Arg001 receiver
-uses the low byte as the event ID and a signed right shift for the argument.
-The static dispatch evidence and the touchpad toggle distinction are recorded in
-[Fn event protocol](fn-event-protocol.md). `--fn-events-smoke` exercises three bounded
-waits and subscription cleanup. The diagnostic checks service status and the
-AppSettings 1/12 forwarding flag before registration; its caller also coordinates
-FnKey. Normal startup retains the existing vendor service/FnKey notification route.
-Physical Fn combinations, channel ownership during actual delivery,
-action execution, and OSD UI still require Windows validation before parity can
-be considered complete.
+The resident Fn owner starts with the interactive process. It checks for
+`FnKey.exe` and defers while the original handler is running. Once FnKey and
+the forwarding services release the channel, it registers the AcpiBridge
+notification stream directly. The AppSettings 1/12 forwarding flag and service
+state remain mandatory ownership gates.
+
+Mapped Fn events dispatch through the same DCHU and Windows-control paths used
+by the UI. Implemented actions include keyboard backlight stepping/toggle/cycle,
+Fn Lock, Noiseless fan toggle, power-profile cycling, camera state, touchpad
+toggle, and show/hide of RAM CONTROL CENTER. Other confirmed events provide OSD
+state feedback and preserve their raw notification in logs.
+
+The OSD is a separate always-on-top Slint window with a bottom-center rounded
+region, 2.2-second auto-hide and generation-based duplicate suppression.
+`--osd-smoke` validates rendering and `--fn-event-smoke <code>` sends a synthetic
+notification through the production presentation/dispatch path.
+
+Physical Fn combinations, channel takeover during an actual key press and
+one-by-one hardware validation of every event branch remain open. The synthetic
+tests do not claim those physical results.

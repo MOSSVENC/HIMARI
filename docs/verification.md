@@ -731,3 +731,35 @@ resume policy restored: power=2 fan=0
 This proves the callback, transport wait, persisted-policy read, power write
 and fan write complete on the installed build. It does not replace a physical
 sleep/wake cycle or a cold boot; those remain separate acceptance items.
+
+## 2026-11-19 Fn ownership and OSD verification
+
+Windows Release SHA-256:
+`01d0fa84ea934cf5903ae3a2969c7a407dcd066e86028e92d8dc6963736208cf`
+(19,128,832 bytes). The installed background process remained a single
+instance.
+
+The original `FnKey.exe` was running during deployment. The resident owner
+therefore deferred instead of registering a second channel:
+
+```text
+Fn ownership deferred: FnKey.exe is running
+```
+
+Installed-release smoke commands completed with exit code 0:
+
+```text
+ram-control-center.exe --osd-smoke
+ram-control-center.exe --fn-event-smoke 0xca
+```
+
+The OSD visual capture is
+`target/validation/osd/osd.png`; it shows the bottom-center Caps Lock OSD with
+the rounded window region and Chinese state text. Windows native tests passed
+75 application tests, 3 uninstaller tests and 34 protocol tests; strict Clippy
+passed.
+
+These checks prove resident ownership arbitration, the production synthetic
+event path and OSD rendering. They do not prove physical Fn capture or a
+hardware transition after FnKey is removed; those remain separate acceptance
+items.

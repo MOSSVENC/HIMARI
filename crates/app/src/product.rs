@@ -1,7 +1,6 @@
 //! Product identity and migration names used by the Windows application.
 
 pub(crate) const PRODUCT_NAME: &str = "RAM CONTROL CENTER";
-pub(crate) const PRODUCT_EXE: &str = "ram-control-center.exe";
 pub(crate) const PRODUCT_DATA_DIR: &str = "RAM Control Center";
 pub(crate) const LEGACY_DATA_DIR: &str = "NeoControl";
 
