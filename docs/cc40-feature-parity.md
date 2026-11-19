@@ -19,7 +19,7 @@ The implemented control surfaces and their verification scopes are:
 | Battery | Status and FlexiCharger thresholds | Selected same-value writes verified; complete charging-cycle acceptance remains open |
 | Display care | Taskbar, appearance, monitor timeout and screen saver | Selected Windows state transitions and readbacks verified |
 | Drivers and lifecycle | Driver detection/install entry, tray, startup, service and uninstaller | Selected deployment and lifecycle checks verified; complete uninstall acceptance remains open |
-| Physical Fn keys | Resident ownership arbitration, mapped action dispatch and independent OSD | Implementation and synthetic dispatch verified; physical Fn combinations and full branch hardware acceptance remain open |
+| Physical Fn keys | Resident ownership arbitration, mapped action dispatch and independent OSD | Direct channel acquisition and restoration verified; physical Fn combinations and full branch hardware acceptance remain open |
 | OSD | Independent Slint overlay, state text and action errors | Visual smoke and synthetic Caps Lock event verified; physical Fn event feedback remains open |
 
 Animation smoothness is a separate acceptance item: native Vulkan submission

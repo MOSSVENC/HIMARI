@@ -94,3 +94,11 @@ RVA `0xdd10` 将这两个参数调度到 UI 线程；嵌套回调 RVA `0x133b0` 
 - Windows 原生 75 项测试通过；新增两项覆盖服务转发、未知和不可读标记拒绝路径。
 
 该测试没有发送物理按键，仍不能作为热键投递、动作或 OSD 完成的证据。
+
+## 常驻接管实测
+
+2026-11-19 进行了可逆所有权切换：停止原厂 `FnKey.exe` 与
+`CCDCHUService`，启动 RAM CONTROL CENTER，常驻 owner 成功输出
+`Fn notification channel acquired`。随后停止测试进程，恢复服务和 FnKey，
+再启动 RAM CONTROL CENTER；恢复结果为服务 Running、FnKey 进程存在、后台单实例。
+该测试证明通知通道可由独立实现获取和释放，但不等于已经完成物理 Fn 组合逐项验收。

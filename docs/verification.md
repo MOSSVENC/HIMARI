@@ -763,3 +763,27 @@ These checks prove resident ownership arbitration, the production synthetic
 event path and OSD rendering. They do not prove physical Fn capture or a
 hardware transition after FnKey is removed; those remain separate acceptance
 items.
+
+### Fn channel ownership transition
+
+A controlled ownership test stopped the original `FnKey.exe` and
+`CCDCHUService`, started RAM CONTROL CENTER, and observed:
+
+```text
+takeover_app_processes=1
+Fn notification channel acquired
+```
+
+The test then stopped the owned listener, restarted `CCDCHUService` and
+`FnKey.exe`, and relaunched RAM CONTROL CENTER:
+
+```text
+restored_app_processes=1
+restored_fnk=1
+restored_service=Running
+```
+
+This proves the resident owner can acquire the direct AcpiBridge notification
+channel after the vendor handler releases it and that the original runtime can
+be restored. Physical Fn key presses during ownership and action-by-action
+hardware validation remain open.
