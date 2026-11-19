@@ -2,22 +2,22 @@
 
 ## Scope
 
-The installed OEM software has two package boundaries:
+The current OEM package boundary on this machine is:
 
 ```text
-CLEVOCO.ControlCenter3.0
-  ControlCenter30\ControlCenter30.exe
-  separate legacy control-center package
-
 CLEVOCO.FnhotkeysandOSD
   FnKey\FnKey.exe
   FnKey\CC40\CC40.exe
   FnKey\CC40\kb.dll and the CC4.0 UI resources
 ```
 
-The separate Control Center 3.0 package does not provide the current FnKey or
-OSD. It was removed on 2026-11-19 with
-`scripts/retire-vendor-console.ps1 -Execute`. The receipt is stored at:
+`CLEVOCO.ControlCenter3.0` was a legacy package installed locally from
+`C:\Users\Administrator\Downloads\Clevo_ControlCenter_7.057.zip`
+(Control Center 3.0 Package v7.057), archived 2026-11-06. It was not the
+current OEM package and did not provide FnKey or OSD. It was removed on
+2026-11-19 with `scripts/retire-vendor-console.ps1 -Execute`. The source archive SHA-256 is
+`3f29bfc1a4307ee6014238e37e4bc6844d19b76bed4e5215c555fe4f5818afac`. The
+receipt is stored at:
 
 ```text
 C:\ProgramData\RAM Control Center\vendor-console-retirement.json
@@ -32,6 +32,9 @@ FnKey.exe                        running
 CCDCHUService                    Running / Automatic
 RAM CONTROL CENTER               one background process
 ```
+
+The current CC4.0 console is still installed inside
+`CLEVOCO.FnhotkeysandOSD`; it was not removed by the CC3.0 cleanup.
 
 ## CC4.0 target
 
@@ -59,7 +62,7 @@ Read-only inventory:
 pwsh -File scripts/retire-vendor-console.ps1
 ```
 
-Remove the separate old Control Center 3.0 package:
+Remove the locally installed legacy Control Center 3.0 package:
 
 ```powershell
 pwsh -File scripts/retire-vendor-console.ps1 -Execute

@@ -803,7 +803,7 @@ Fn action/OSD loop is still not accepted.
 
 ### Legacy Control Center 3.0 retirement
 
-The separate `CLEVOCO.ControlCenter3.0` package was removed with
+The locally installed legacy `CLEVOCO.ControlCenter3.0` package was removed with
 `scripts/retire-vendor-console.ps1 -Execute`. The receipt confirms the package
 was removed while `CLEVOCO.FnhotkeysandOSD`, FnKey, CCDCHUService and the
 RAM CONTROL CENTER background process remained present. The package containing
