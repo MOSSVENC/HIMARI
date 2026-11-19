@@ -154,7 +154,8 @@ The same binary exposes a native Windows service mode:
 
 The installed `RAMControlCenterBoot` service is automatic, runs as `LocalSystem`,
 and declares a dependency on the signed `AcpiBridge` driver. The Service
-Control Manager starts it before the user shell. It creates no UI, opens
+Control Manager schedules it during automatic service startup. This registration
+does not enforce an ordering dependency with the user shell. It creates no UI, opens
 AcpiBridge, retries at 10 ms, applies the complete vendor power transition
 (`page 1/16`, `page 1/1`, DCHU `121/25`, DCHU `79`), verifies the persisted
 profile and exits. Automatic fan mode is already the firmware fallback and is
@@ -171,6 +172,19 @@ ram-control-center.exe --uninstall-boot-service
 
 `--boot-agent` remains available as a direct diagnostic invocation of the
 headless worker.
+
+On the recorded November 18, 2026 boot, Windows reported a boot time of
+21:22:07.500 +08:00. The agent started at 21:22:44.888 and completed at
+21:22:44.993, 37.493 s after that boot time. Explorer's current process was
+created at 21:23:05.013 and FnKey at 21:23:20.623. Thus the power-command
+readback preceded this shell process by about 20 s. The log establishes the
+command timing, but contains no contemporary CPU-performance samples and does
+not establish when throttling ended. AcpiBridge remains a demand-start driver
+started through the service dependency. The read-only observation is retained
+in target/validation/frame-drawing/boot-observation.json.
+
+Microsoft documents automatic service ordering in terms of load-order groups,
+tags and dependencies in [Automatically Starting Services](https://learn.microsoft.com/en-us/windows/win32/services/automatically-starting-services).
 
 ## Resident UI and FlexiKey
 

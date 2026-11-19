@@ -133,6 +133,16 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
             milliseconds(longest.submit),
             milliseconds(longest.present),
         );
+        #[cfg(feature = "render-tracing")]
+        println!(
+            "text_stages round={} page={} draw_ms={:.2} measure_ms={:.2} glyph_ms={:.2} font_ms={:.2}",
+            step / PAGES.len() + 1,
+            PAGES[step % PAGES.len()],
+            milliseconds(longest.text.draw),
+            milliseconds(longest.text.measure),
+            milliseconds(longest.text.glyph),
+            milliseconds(longest.text.font),
+        );
     }
     Ok(())
 }

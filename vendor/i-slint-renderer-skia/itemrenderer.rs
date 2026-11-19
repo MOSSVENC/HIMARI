@@ -681,6 +681,10 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
         size: LogicalSize,
         _cache: &CachedRenderingData,
     ) {
+        #[cfg(feature = "render-tracing")]
+        let _span = super::vulkan_diagnostics::TextSpan::new(
+            super::vulkan_diagnostics::TextStage::Draw,
+        );
         let restore = self.save_canvas_and_pixel_align_origin();
         sharedparley::draw_text(self, text, Some(self_rc), size, Some(self.text_layout_cache));
         if restore {
@@ -694,6 +698,10 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
         self_rc: &i_slint_core::items::ItemRc,
         size: LogicalSize,
     ) {
+        #[cfg(feature = "render-tracing")]
+        let _span = super::vulkan_diagnostics::TextSpan::new(
+            super::vulkan_diagnostics::TextStage::Draw,
+        );
         let restore = self.save_canvas_and_pixel_align_origin();
         sharedparley::draw_text_input(self, text_input, self_rc, size, None);
         if restore {
@@ -1176,6 +1184,10 @@ impl GlyphRenderer for SkiaItemRenderer<'_> {
         y_offset: sharedparley::PhysicalLength,
         glyphs_it: &mut dyn Iterator<Item = sharedparley::parley::layout::Glyph>,
     ) {
+        #[cfg(feature = "render-tracing")]
+        let _span = super::vulkan_diagnostics::TextSpan::new(
+            super::vulkan_diagnostics::TextStage::Glyph,
+        );
         let Some(type_face) = crate::font_cache::FONT_CACHE
             .with_borrow_mut(|font_cache| font_cache.font_with_variations(font, synthesis))
         else {

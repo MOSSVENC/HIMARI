@@ -3,14 +3,17 @@
 Source: crates.io i-slint-renderer-skia 1.17.0, published by Slint.
 The upstream license notices and LICENSES directory are retained.
 
-Application changes are limited to lib.rs, itemrenderer.rs, vulkan_surface.rs,
-and the vulkan_diagnostics.rs module:
+Application changes are limited to lib.rs, itemrenderer.rs, font_cache.rs,
+vulkan_surface.rs, the vulkan_diagnostics.rs module and Cargo.toml:
 
 - Expose read-only physical-device and successful-submission events on the UI
   thread. Observers do not receive device handles or submit rendering commands.
 - Report CPU wall times for image acquisition, target preparation, scene drawing,
   flush/submission and presentation. GPU-completion waiting is included in the
   submission stage; these observations are not GPU timestamps.
+- Offer compile-time render-tracing of text measurement, text drawing, glyph
+  drawing and font lookup. Timings stay in memory until the diagnostic finishes;
+  default builds omit the text spans and counters.
 - Enable Skia's reduced shader variations option to favor first-interaction
   latency for the control center's text, paths and gradients.
 - Match cached Vulkan layers to their parent target's attachment format.
@@ -35,4 +38,5 @@ and the vulkan_diagnostics.rs module:
   and acquisition timeouts during window state changes.
 
 The other files retain upstream source. The application pins the complete Slint
-family to 1.17.0. Review these four files explicitly when updating the renderer.
+family to 1.17.0. Review these five source files and the feature declaration
+explicitly when updating the renderer.

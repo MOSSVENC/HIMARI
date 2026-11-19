@@ -31,6 +31,10 @@ impl FontCache {
         font: &parley::FontData,
         synthesis: &fontique::Synthesis,
     ) -> Option<skia_safe::Typeface> {
+        #[cfg(feature = "render-tracing")]
+        let _span = super::vulkan_diagnostics::TextSpan::new(
+            super::vulkan_diagnostics::TextStage::Font,
+        );
         let variation_settings = synthesis.variation_settings();
 
         let mut variations_hash = 0u64;

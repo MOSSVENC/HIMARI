@@ -54,7 +54,8 @@ ReadAppSettings(page 1, offset 16)
 
 `boost_mode` is `0` for Performance, `1` for Power saving/Quiet+, and `2`
 for Quiet/Entertainment, matching the FnKey transition. This second command is
-what actually commits the processor boost policy during boot.
+the processor-boost step in the recovered transition. Actual boot-time CPU
+performance requires a separate measurement.
 
 ### Panel low refresh rate
 

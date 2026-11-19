@@ -473,8 +473,12 @@ impl super::Surface for VulkanSurface {
             super::vulkan_diagnostics::FrameEvent::BeforeRendering,
             &self.diagnostic_info,
         );
+        #[cfg(feature = "render-tracing")]
+        let _ = super::vulkan_diagnostics::take_text_timings();
         callback(skia_surface.canvas(), Some(gr_context), 0);
         let drawn = Instant::now();
+        #[cfg(feature = "render-tracing")]
+        let text_timings = super::vulkan_diagnostics::take_text_timings();
 
         // Read the actual GPU target while this acquired image is still ours.
         // A request is explicit and one-shot; normal frames allocate no pixel buffer.
@@ -546,6 +550,8 @@ impl super::Surface for VulkanSurface {
                             submit: submitted.duration_since(drawn),
                             present: presented.duration_since(submitted),
                             total: presented.duration_since(frame_started),
+                            #[cfg(feature = "render-tracing")]
+                            text: text_timings,
                         },
                     ),
                     &self.diagnostic_info,

@@ -197,9 +197,9 @@ impl Dchu {
         // Match the vendor's power transition rather than treating one byte as
         // the whole operation. FnKey writes the platform policy at page 1/16,
         // persists the UI profile at page 1/1, sends 121/25, then commits the
-        // processor boost policy with command 79. Without the last command
-        // AppSettings can report Performance while the EC/CPU remains in its
-        // cold-boot low-power state.
+        // processor boost policy with command 79. The settings readback below
+        // confirms the persisted profile; actual CPU performance needs its
+        // own measurement.
         self.write_settings(1, 16, &[mode])?;
         self.write_settings(1, 1, &[mode])?;
         self.set_data(121, &[mode, 0, 0, 25])?;

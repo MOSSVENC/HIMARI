@@ -878,6 +878,10 @@ impl i_slint_core::renderer::RendererSealed for SkiaRenderer {
         max_width: Option<LogicalLength>,
         text_wrap: TextWrap,
     ) -> LogicalSize {
+        #[cfg(feature = "render-tracing")]
+        let _span = vulkan_diagnostics::TextSpan::new(
+            vulkan_diagnostics::TextStage::Measure,
+        );
         sharedparley::text_size(
             self,
             text_item,

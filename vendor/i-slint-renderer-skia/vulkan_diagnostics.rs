@@ -18,6 +18,67 @@ pub struct FrameTimings {
     pub submit: Duration,
     pub present: Duration,
     pub total: Duration,
+    #[cfg(feature = "render-tracing")]
+    pub text: TextTimings,
+}
+
+/// Inclusive CPU wall times inside a frame's text rendering. Glyph drawing
+/// includes font lookup; text drawing includes glyph drawing. Do not sum them.
+#[cfg(feature = "render-tracing")]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TextTimings {
+    pub draw: Duration,
+    pub glyph: Duration,
+    pub font: Duration,
+    pub measure: Duration,
+}
+
+#[cfg(feature = "render-tracing")]
+#[derive(Clone, Copy)]
+pub(crate) enum TextStage {
+    Draw,
+    Glyph,
+    Font,
+    Measure,
+}
+
+#[cfg(feature = "render-tracing")]
+thread_local! {
+    static TEXT_TIMINGS: RefCell<TextTimings> = const { RefCell::new(TextTimings {
+        draw: Duration::ZERO, glyph: Duration::ZERO,
+        font: Duration::ZERO, measure: Duration::ZERO,
+    }) };
+}
+
+#[cfg(feature = "render-tracing")]
+pub(crate) fn take_text_timings() -> TextTimings {
+    TEXT_TIMINGS.with_borrow_mut(std::mem::take)
+}
+
+#[cfg(feature = "render-tracing")]
+pub(crate) struct TextSpan(TextStage, std::time::Instant);
+
+#[cfg(feature = "render-tracing")]
+impl TextSpan {
+    pub(crate) fn new(stage: TextStage) -> Self {
+        Self(stage, std::time::Instant::now())
+    }
+}
+
+#[cfg(feature = "render-tracing")]
+impl Drop for TextSpan {
+    fn drop(&mut self) {
+        let elapsed = self.1.elapsed();
+        TEXT_TIMINGS.with_borrow_mut(|timings| {
+            let total = match self.0 {
+                TextStage::Draw => &mut timings.draw,
+                TextStage::Glyph => &mut timings.glyph,
+                TextStage::Font => &mut timings.font,
+                TextStage::Measure => &mut timings.measure,
+            };
+            *total += elapsed;
+        });
+    }
 }
 
 /// The physical device that owns the surface's logical device and swapchain.

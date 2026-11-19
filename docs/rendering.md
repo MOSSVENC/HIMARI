@@ -233,3 +233,53 @@ long-term sensor reliability or resolve cold-boot throttling. Deployment and
 sensor evidence are deployment.json, deployed-renderer.txt,
 installed-cpu-frequency-smoke.stdout.log and installed-thermal-results.json
 in the same local directory.
+
+### Text-stage profiling
+
+Build the optional diagnostic configuration with:
+
+    ./scripts/build-windows.sh --features render-tracing
+
+Run scripts/test-graphics.ps1 against that build as above. Each frame_stages
+record is followed by text_stages for the same longest frame: text drawing,
+text measurement, glyph drawing and font lookup, in CPU wall milliseconds.
+The recorder resets at the scene callback boundary and stores durations in
+thread-local memory. Output is emitted after cadence sampling has finished;
+render callbacks perform no profiling-log I/O.
+
+These are inclusive spans: glyph drawing is inside text drawing, and font
+lookup is inside glyph drawing. Lazy text measurement may also occur during
+drawing. The values must not be summed. Timers themselves have overhead, so
+use the default-feature Release for performance acceptance. Default builds
+compile out the text spans, counters and additional timing fields.
+
+The final diagnostic ran twice on the AMD Radeon 610M. Both runs completed
+22 transitions, resize/minimize/restore, the idle check and GPU pixel
+update/restoration checks, and emitted 22 matching text_stages records.
+Their 16.67 ms submission-gap budgets were exceeded (37.53 and 30.47 ms).
+For the longest first-visit Cooling frame:
+
+| CPU wall time | Run 1 | Run 2 |
+| --- | ---: | ---: |
+| Scene drawing | 32.72 ms | 25.71 ms |
+| Text drawing | 17.52 ms | 12.62 ms |
+| Glyph drawing, inside text drawing | 16.59 ms | 11.91 ms |
+| Font lookup, inside glyph drawing | 1.89 ms | 1.11 ms |
+| Text measurement, potentially nested | 6.22 ms | 5.24 ms |
+
+The measurements locate substantial work in the text/glyph drawing calls,
+but do not distinguish all work done inside Skia or its driver calls. They
+are diagnostic observations, not evidence of a rendering-speed improvement.
+Early exploratory traces wrote logs inside the draw callback and are excluded
+from these values. Local evidence: target/validation/frame-drawing/tracing-1/
+and tracing-2/results.json.
+
+The default-feature Release passed the same lifecycle and GPU-pixel checks
+with a 4.28 ms 95th percentile and a 36.38 ms maximum submission gap. Its
+16.67 ms budget was exceeded. The optional text recorder was absent from
+that build. Host verification passed 89 tests; Windows passed 92 native
+unit tests and strict all-target/all-feature Clippy. These builds have not
+replaced the installed 4C9722E6 image recorded above.
+
+GitHub Actions run 44423413168 for commit 9bb2c76 completed successfully
+on Linux and Windows, including the Windows Release build.

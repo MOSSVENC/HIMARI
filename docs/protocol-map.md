@@ -134,9 +134,10 @@ ReadAppSettings(page=1, offset=1, length=1)
 ReadAppSettings(page=1, offset=16, length=1)
 ```
 
-The second command is required to commit the processor boost policy. Without
-it the persisted UI byte can say Performance while the EC/CPU stays in its
-cold-boot low-power state. FnKey's mapping is:
+The recovered FnKey transition includes the second command for processor boost
+policy. RAM CONTROL CENTER sends both commands. Settings-byte readback verifies
+the stored selection; it does not measure actual CPU performance or establish
+that cold-boot throttling has ended. FnKey's mapping is:
 
 | UI profile | DCHU command 79 value |
 |---|---:|

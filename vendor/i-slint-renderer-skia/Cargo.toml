@@ -34,6 +34,7 @@ rustdoc-args = ["--generate-link-to-definition"]
 default = ["softbuffer"]
 kms = ["softbuffer/kms"]
 opengl = []
+render-tracing = []
 unstable-wgpu-28 = [
     "i-slint-core/unstable-wgpu-28",
     "wgpu-28",
