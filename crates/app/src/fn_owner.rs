@@ -347,7 +347,7 @@ fn log_line(message: &str) {
 pub(crate) fn osd_smoke() -> Result<(), Box<dyn std::error::Error>> {
     let ui = MainWindow::new()?;
     let osd = crate::OsdWindow::new()?;
-    osd::install(osd.as_weak());
+    osd::install(osd.as_weak(), ui.as_weak());
     install_ui(ui.as_weak());
     dispatch_notification(FnNotification::from_payload(
         &i64::from(0xcau8).to_le_bytes(),
@@ -366,7 +366,7 @@ pub(crate) fn osd_smoke() -> Result<(), Box<dyn std::error::Error>> {
 pub(crate) fn event_smoke(code: u8) -> Result<(), Box<dyn std::error::Error>> {
     let ui = MainWindow::new()?;
     let osd = crate::OsdWindow::new()?;
-    osd::install(osd.as_weak());
+    osd::install(osd.as_weak(), ui.as_weak());
     install_ui(ui.as_weak());
     dispatch_notification(FnNotification::from_payload(
         &i64::from(code).to_le_bytes(),

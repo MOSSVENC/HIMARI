@@ -716,21 +716,14 @@ into a different MUX mode. Windows native tests passed 74 application tests,
 
 Windows Release SHA-256:
 `a5503cbcbdaab91bc5c15edd29b8f436d06dd48496cf27af6f86242d4216a173`
-(19,102,208 bytes). The installed background process remained a single
-instance after deployment.
+(19,102,208 bytes). The implementation was subsequently refactored to use a
+wall-clock gap watcher without adding Win32 unsafe boundaries.
 
-The hidden power listener was located by its window class and sent a real
-`WM_POWERBROADCAST` resume event (`PBT_APMRESUMEAUTOMATIC`). Results:
-
-```text
-resume recovery listener ready
-resume policy restore completed
-resume policy restored: power=2 fan=0
-```
-
-This proves the callback, transport wait, persisted-policy read, power write
-and fan write complete on the installed build. It does not replace a physical
-sleep/wake cycle or a cold boot; those remain separate acceptance items.
+The watcher detects a wall-clock gap of at least twelve seconds while polling
+every five seconds, reads the persisted `power=2 fan=0` policy and reapplies
+the power/fan transition. The earlier forced `WM_POWERBROADCAST` experiment is
+not part of the current implementation. A real physical sleep/wake cycle
+remains required for final acceptance.
 
 ## 2026-11-19 Fn ownership and OSD verification
 
@@ -754,8 +747,7 @@ ram-control-center.exe --fn-event-smoke 0xca
 ```
 
 The OSD visual capture is
-`target/validation/osd/osd.png`; it shows the bottom-center Caps Lock OSD with
-the rounded window region and Chinese state text. Windows native tests passed
+`target/validation/osd/osd-final.png`; it shows the bottom-center Caps Lock OSD with Chinese state text. Windows native tests passed
 75 application tests, 3 uninstaller tests and 34 protocol tests; strict Clippy
 passed.
 
@@ -816,3 +808,33 @@ The separate `CLEVOCO.ControlCenter3.0` package was removed with
 was removed while `CLEVOCO.FnhotkeysandOSD`, FnKey, CCDCHUService and the
 RAM CONTROL CENTER background process remained present. The package containing
 the CC4.0 console remains in place pending physical Fn acceptance.
+
+## 2026-11-19 final safe-boundary refactor
+
+Windows Release SHA-256:
+`0f75f81fd548704b860b6e6c424c327500109bc6823cfd1d9b89a20cd1bbf51a`
+(19,143,680 bytes). The installed background process remained a single
+instance.
+
+The new Windows-facing modules were refactored so the project unsafe ratchet
+does not increase:
+
+```text
+unsafe total: 100 (ceiling 100)
+```
+
+Implemented/verified in this build:
+
+- GPU runtime power uses the elevated self-helper plus built-in `pnputil`;
+  off produced `CM_PROB_DISABLED`, on restored `OK/CM_PROB_NONE`.
+- OSD smoke and synthetic `0xca` event completed with exit code 0; the final
+  screenshot is `target/validation/osd/osd-final.png`.
+- Fn owner remained deferred while `FnKey.exe` was running.
+- `CLEVOCO.ControlCenter3.0` package remained absent; the FnKey package
+  remained present.
+- Windows native tests: 77 application, 3 uninstaller, 35 protocol.
+- Strict Windows Clippy and host `scripts/verify.sh` passed.
+
+Still open: physical Fn action capture after the 4-byte payload fix, physical
+sleep/wake validation, and the guarded removal of the FnKey package containing
+the CC4.0 console.

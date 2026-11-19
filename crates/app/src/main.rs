@@ -35,6 +35,7 @@ mod localization;
 mod osd;
 #[allow(dead_code)]
 mod process_query;
+#[allow(dead_code)]
 mod product;
 mod resident_ui;
 mod resume_recovery;
@@ -280,6 +281,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     std::process::exit(2);
                 }
             };
+            match gpu_power::request(enabled) {
+                Ok(()) => std::process::exit(0),
+                Err(error) => {
+                    eprintln!("{error}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        Some("--gpu-power-admin") => {
+            let enabled = match std::env::args().nth(2).as_deref() {
+                Some("on") => true,
+                Some("off") => false,
+                _ => {
+                    eprintln!("usage: ram-control-center --gpu-power-admin <on|off>");
+                    std::process::exit(2);
+                }
+            };
             std::process::exit(gpu_power::run_cli(enabled));
         }
         Some("--gpu-power-status") => std::process::exit(gpu_power::status()),
@@ -411,7 +429,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let ui = MainWindow::new()?;
     let osd = OsdWindow::new()?;
-    osd::install(osd.as_weak());
+    osd::install(osd.as_weak(), ui.as_weak());
     fn_owner::install_ui(ui.as_weak());
     if let Err(error) = slint::select_bundled_translation("zh-CN") {
         log_action(&format!("Chinese translation unavailable: {error}"));

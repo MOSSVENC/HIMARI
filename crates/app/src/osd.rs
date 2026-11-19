@@ -10,14 +10,19 @@ use slint::{ComponentHandle, Weak};
 use crate::OsdWindow;
 
 static WINDOW: OnceLock<Mutex<Option<Weak<OsdWindow>>>> = OnceLock::new();
+static MAIN_WINDOW: OnceLock<Mutex<Option<Weak<crate::MainWindow>>>> = OnceLock::new();
 static GENERATION: AtomicU64 = AtomicU64::new(0);
 
 const DISPLAY_TIME: Duration = Duration::from_millis(2_200);
 
-pub(crate) fn install(window: Weak<OsdWindow>) {
+pub(crate) fn install(window: Weak<OsdWindow>, main_window: Weak<crate::MainWindow>) {
     let slot = WINDOW.get_or_init(|| Mutex::new(None));
     if let Ok(mut slot) = slot.lock() {
         *slot = Some(window);
+    }
+    let main = MAIN_WINDOW.get_or_init(|| Mutex::new(None));
+    if let Ok(mut main) = main.lock() {
+        *main = Some(main_window);
     }
 }
 
@@ -40,14 +45,8 @@ pub(crate) fn show(title: &str, detail: &str, accent: slint::Color) {
         osd.set_osd_title(title.into());
         osd.set_osd_detail(detail.into());
         osd.set_osd_accent(accent);
-        position_bottom_center(&osd);
+        position_over_main_window(&osd);
         let _ = osd.show();
-        let shape_weak = weak.clone();
-        slint::Timer::single_shot(Duration::from_millis(40), move || {
-            if let Some(osd) = shape_weak.upgrade() {
-                apply_rounded_region(&osd);
-            }
-        });
         slint::Timer::single_shot(DISPLAY_TIME, move || {
             if GENERATION.load(Ordering::Acquire) == generation
                 && let Some(osd) = weak.upgrade()
@@ -64,51 +63,22 @@ pub(crate) fn show(title: &str, detail: &str, accent: slint::Color) {
     }
 }
 
-#[cfg(windows)]
-fn apply_rounded_region(window: &OsdWindow) {
-    use raw_window_handle::{HasWindowHandle, RawWindowHandle};
-    use windows_sys::Win32::Graphics::Gdi::{CreateRoundRectRgn, DeleteObject, SetWindowRgn};
-
-    let window_handle = window.window().window_handle();
-    let Ok(handle) = window_handle.window_handle() else {
-        crate::diagnostics::log_action("OSD native window handle is unavailable");
+fn position_over_main_window(window: &OsdWindow) {
+    let Some(main) = MAIN_WINDOW
+        .get()
+        .and_then(|slot| slot.lock().ok())
+        .and_then(|slot| slot.clone())
+        .and_then(|main| main.upgrade())
+    else {
         return;
     };
-    let RawWindowHandle::Win32(win32) = handle.as_raw() else {
-        return;
-    };
-    let hwnd = win32.hwnd.get() as windows_sys::Win32::Foundation::HWND;
-    // SAFETY: the rounded region is created from scalar dimensions. On a
-    // successful SetWindowRgn the system owns the region handle.
-    let region = unsafe { CreateRoundRectRgn(0, 0, 361, 97, 36, 36) };
-    if region.is_null() {
-        return;
-    }
-    // SAFETY: both handles are live; the region is transferred on success.
-    if unsafe { SetWindowRgn(hwnd, region, 1) } == 0 {
-        // SAFETY: SetWindowRgn did not take ownership on failure.
-        unsafe { DeleteObject(region) };
-    }
-}
-
-#[cfg(windows)]
-fn position_bottom_center(window: &OsdWindow) {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_CXSCREEN, SM_CYSCREEN};
-
-    // SAFETY: both metric indices are scalar values and require no pointers.
-    let physical_width = unsafe { GetSystemMetrics(SM_CXSCREEN) } as f32;
-    // SAFETY: SM_CYSCREEN is a scalar metric index with no pointer inputs.
-    let physical_height = unsafe { GetSystemMetrics(SM_CYSCREEN) } as f32;
+    let position = main.window().position();
+    let size = main.window().size();
     let scale = window.window().scale_factor();
-    let logical_width = physical_width / scale;
-    let logical_height = physical_height / scale;
-    const OSD_WIDTH: f32 = 360.0;
-    const OSD_HEIGHT: f32 = 96.0;
-    window.window().set_position(slint::LogicalPosition::new(
-        (logical_width - OSD_WIDTH) / 2.0,
-        logical_height - OSD_HEIGHT - 28.0,
+    let width = (360.0 * scale).round() as i32;
+    let height = (96.0 * scale).round() as i32;
+    window.window().set_position(slint::PhysicalPosition::new(
+        position.x + (i32::try_from(size.width).unwrap_or(0) - width) / 2,
+        position.y + i32::try_from(size.height).unwrap_or(0) - height - 28,
     ));
 }
-
-#[cfg(not(windows))]
-fn position_bottom_center(_window: &OsdWindow) {}

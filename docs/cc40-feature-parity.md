@@ -87,18 +87,17 @@ Actual boot-time CPU performance requires a separate measurement.
 
 ### Sleep/resume policy restore
 
-The interactive process owns a hidden top-level power-notification window on a
-dedicated thread. On `WM_POWERBROADCAST` with
-`PBT_APMRESUMEAUTOMATIC`, `PBT_APMRESUMESUSPEND` or
-`PBT_APMRESUMECRITICAL`, it reads the persisted power/fan policy, waits up to
-ten seconds for the signed ACPI transport, reapplies the power transition and
-reapplies a non-Auto fan policy. Duplicate resume notifications within five
-seconds are coalesced. The result is written to
-`C:\ProgramData\RAM Control Center\resume-recovery.log` and the boot-agent log.
+A dedicated background thread polls a five-second cadence and compares the
+wall-clock delta. A delta of twelve seconds or more indicates that the process
+was suspended by system sleep. On that transition it reads the persisted
+power/fan policy, waits up to ten seconds for the signed ACPI transport,
+reapplies the power transition and reapplies a non-Auto fan policy. The result
+is written to `C:\ProgramData\RAM Control Center\resume-recovery.log` and the
+boot-agent log.
 
-The listener owns no renderer resources and performs device I/O only on its
-own thread. A forced `WM_POWERBROADCAST` test restored `power=2 fan=0` on the
-reference machine.
+The watcher owns no renderer resources and performs device I/O only on its own
+thread. The earlier forced resume-broadcast validation was replaced by the
+wall-clock watcher; a real sleep/wake cycle remains the final acceptance step.
 
 ### Quiet mode GPU policy
 
@@ -420,8 +419,8 @@ Fn Lock, Noiseless fan toggle, power-profile cycling, camera state, touchpad
 toggle, and show/hide of RAM CONTROL CENTER. Other confirmed events provide OSD
 state feedback and preserve their raw notification in logs.
 
-The OSD is a separate always-on-top Slint window with a bottom-center rounded
-region, 2.2-second auto-hide and generation-based duplicate suppression.
+The OSD is a separate always-on-top Slint window with a bottom-center overlay,
+2.2-second auto-hide and generation-based duplicate suppression.
 `--osd-smoke` validates rendering and `--fn-event-smoke <code>` sends a synthetic
 notification through the production presentation/dispatch path.
 
