@@ -808,3 +808,11 @@ restored_fnk=1 restored_service=Running
 
 Therefore the four-byte parser fix is verified by unit tests, but the physical
 Fn action/OSD loop is still not accepted.
+
+### Legacy Control Center 3.0 retirement
+
+The separate `CLEVOCO.ControlCenter3.0` package was removed with
+`scripts/retire-vendor-console.ps1 -Execute`. The receipt confirms the package
+was removed while `CLEVOCO.FnhotkeysandOSD`, FnKey, CCDCHUService and the
+RAM CONTROL CENTER background process remained present. The package containing
+the CC4.0 console remains in place pending physical Fn acceptance.
