@@ -52,7 +52,37 @@ fn percent(used: u64, total: u64) -> u32 {
 }
 
 #[cfg(windows)]
+pub(crate) use windows_impl::CpuPerformanceSampler;
+#[cfg(windows)]
 pub use windows_impl::{SystemSampler, cpu_frequency_smoke};
+
+#[cfg(any(windows, test))]
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct CpuPerformanceReading {
+    pub load_percent: Option<f32>,
+    pub clock_mhz: Option<u32>,
+    pub nominal_mhz: Option<u32>,
+}
+
+#[cfg(any(windows, test))]
+#[derive(Clone, Copy)]
+struct CpuTimes {
+    idle: u64,
+    kernel: u64,
+    user: u64,
+}
+
+#[cfg(any(windows, test))]
+fn cpu_load_percent(previous: CpuTimes, current: CpuTimes) -> Option<f32> {
+    let kernel = current.kernel.checked_sub(previous.kernel)?;
+    let user = current.user.checked_sub(previous.user)?;
+    let idle = current.idle.checked_sub(previous.idle)?;
+    let total = kernel.checked_add(user)?;
+    if total == 0 || idle > total {
+        return None;
+    }
+    Some(((total - idle) as f64 / total as f64 * 100.0) as f32)
+}
 
 // PDH_FMT_NOCAP100 from the Windows SDK's Pdh.h. windows-sys does not
 // expose this flag; processor performance legitimately exceeds 100% in boost.
@@ -92,6 +122,60 @@ mod frequency_tests {
         }
         assert_eq!(performance_clock_mhz(Some(142.0), 0), 0);
     }
+
+    #[test]
+    fn cpu_load_distinguishes_idle_from_unavailable_intervals() {
+        let initial = CpuTimes {
+            idle: 10,
+            kernel: 20,
+            user: 30,
+        };
+        assert_eq!(
+            cpu_load_percent(
+                initial,
+                CpuTimes {
+                    idle: 30,
+                    kernel: 40,
+                    user: 50
+                }
+            ),
+            Some(50.0)
+        );
+        assert_eq!(
+            cpu_load_percent(
+                initial,
+                CpuTimes {
+                    idle: 30,
+                    kernel: 40,
+                    user: 30
+                }
+            ),
+            Some(0.0)
+        );
+        assert_eq!(cpu_load_percent(initial, initial), None);
+        assert_eq!(
+            cpu_load_percent(
+                initial,
+                CpuTimes {
+                    idle: 9,
+                    kernel: 40,
+                    user: 50
+                }
+            ),
+            None
+        );
+        assert_eq!(
+            cpu_load_percent(
+                initial,
+                CpuTimes {
+                    idle: 90,
+                    kernel: 40,
+                    user: 50
+                }
+            ),
+            None
+        );
+    }
 }
 
 #[cfg(not(windows))]
@@ -99,7 +183,7 @@ pub use demo_impl::SystemSampler;
 
 #[cfg(windows)]
 mod windows_impl {
-    use super::{BatterySnapshot, GpuSnapshot, SystemSnapshot};
+    use super::{BatterySnapshot, CpuPerformanceReading, CpuTimes, GpuSnapshot, SystemSnapshot};
     use std::ffi::c_void;
     use std::os::windows::ffi::OsStrExt;
     use std::path::Path;
@@ -121,51 +205,30 @@ mod windows_impl {
         ALL_PROCESSOR_GROUPS, GetActiveProcessorCount, GetSystemTimes,
     };
 
-    #[derive(Clone, Copy)]
-    struct CpuTimes {
-        idle: u64,
-        kernel: u64,
-        user: u64,
-    }
-
-    pub struct SystemSampler {
+    /// CPU-only sampling shared by the resident UI and headless boot service.
+    /// Opening this sampler does not initialize NVML, a window, or disk queries.
+    pub(crate) struct CpuPerformanceSampler {
         previous_cpu: Option<CpuTimes>,
         cpu_frequency: Option<CpuFrequencySampler>,
         next_frequency_retry: Instant,
-        nvml: Option<Nvml>,
     }
 
-    impl SystemSampler {
-        pub fn new() -> Self {
+    impl CpuPerformanceSampler {
+        pub(crate) fn new() -> Self {
             Self {
-                previous_cpu: None,
+                previous_cpu: read_cpu_times(),
                 cpu_frequency: CpuFrequencySampler::open(),
                 next_frequency_retry: Instant::now() + Duration::from_secs(5),
-                nvml: Nvml::open(),
             }
         }
 
-        pub fn sample(&mut self) -> SystemSnapshot {
+        pub(crate) fn sample(&mut self) -> CpuPerformanceReading {
             let cpu = read_cpu_times();
-            let cpu_load_percent = match (self.previous_cpu, cpu) {
-                (Some(previous), Some(current)) => {
-                    let idle = current.idle.saturating_sub(previous.idle);
-                    let kernel = current.kernel.saturating_sub(previous.kernel);
-                    let user = current.user.saturating_sub(previous.user);
-                    let total = kernel.saturating_add(user);
-                    if total == 0 {
-                        0.0
-                    } else {
-                        ((total.saturating_sub(idle)) as f64 / total as f64 * 100.0)
-                            .clamp(0.0, 100.0) as f32
-                    }
-                }
-                _ => 0.0,
-            };
+            let load_percent = self
+                .previous_cpu
+                .zip(cpu)
+                .and_then(|(previous, current)| super::cpu_load_percent(previous, current));
             self.previous_cpu = cpu;
-
-            let (memory_used_bytes, memory_total_bytes) = read_memory();
-            let (disk_used_bytes, disk_total_bytes) = read_disk();
             if self.cpu_frequency.is_none() && Instant::now() >= self.next_frequency_retry {
                 self.cpu_frequency = CpuFrequencySampler::open();
                 self.next_frequency_retry = Instant::now() + Duration::from_secs(5);
@@ -176,10 +239,36 @@ mod windows_impl {
                 .map(CpuFrequencySampler::sample)
                 .unwrap_or((0, 0));
 
+            CpuPerformanceReading {
+                load_percent,
+                clock_mhz: (cpu_clock_mhz > 0).then_some(cpu_clock_mhz),
+                nominal_mhz: (cpu_max_clock_mhz > 0).then_some(cpu_max_clock_mhz),
+            }
+        }
+    }
+
+    pub struct SystemSampler {
+        cpu: CpuPerformanceSampler,
+        nvml: Option<Nvml>,
+    }
+
+    impl SystemSampler {
+        pub fn new() -> Self {
+            Self {
+                cpu: CpuPerformanceSampler::new(),
+                nvml: Nvml::open(),
+            }
+        }
+
+        pub fn sample(&mut self) -> SystemSnapshot {
+            let cpu = self.cpu.sample();
+            let (memory_used_bytes, memory_total_bytes) = read_memory();
+            let (disk_used_bytes, disk_total_bytes) = read_disk();
+
             SystemSnapshot {
-                cpu_load_percent,
-                cpu_clock_mhz,
-                cpu_max_clock_mhz,
+                cpu_load_percent: cpu.load_percent.unwrap_or_default(),
+                cpu_clock_mhz: cpu.clock_mhz.unwrap_or_default(),
+                cpu_max_clock_mhz: cpu.nominal_mhz.unwrap_or_default(),
                 memory_used_bytes,
                 memory_total_bytes,
                 disk_used_bytes,

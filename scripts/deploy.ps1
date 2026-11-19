@@ -128,11 +128,13 @@ foreach ($migration in $taskMigrations) {
     }
 }
 Invoke-ProductCommand $taskExecutable '--install-boot-service'
-$taskDeadline = [DateTime]::UtcNow.AddSeconds(30)
+# The service permits 120 seconds for transport readiness, then observes the
+# CPU for 60 seconds. Leave 15 seconds for SCM status propagation.
+$taskDeadline = [DateTime]::UtcNow.AddSeconds(195)
 do {
     $service = Get-CimInstance Win32_Service -Filter "Name='RAMControlCenterBoot'"
     if ($service.State -eq 'Stopped') { break }
-    if ([DateTime]::UtcNow -ge $taskDeadline) { throw 'Boot policy replay did not finish within 30 seconds' }
+    if ([DateTime]::UtcNow -ge $taskDeadline) { throw 'Boot policy replay and CPU observation did not finish within 195 seconds' }
     Start-Sleep -Milliseconds 100
 } while ($true)
 if ($service.ExitCode -ne 0 -or $service.ServiceSpecificExitCode -ne 0) {

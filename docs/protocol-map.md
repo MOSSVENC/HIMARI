@@ -128,14 +128,16 @@ CC40 and the signed FnKey path use the following full transition:
 ```text
 WriteAppSettings(page=1, offset=16, length=1, mode)
 WriteAppSettings(page=1, offset=1, length=1, mode)
-SetDCHU_Data(121, [mode, 0, 0, 25], 4)
-SetDCHU_Data(79, [boost_mode, 0, 0, 0], 4)
+SetDCHU_Data(121, [hardware_mode, 0, 0, 25], 4)
+SetDCHU_Data(79, [energy_star_mode, 0, 0, 0], 4)
 ReadAppSettings(page=1, offset=1, length=1)
 ReadAppSettings(page=1, offset=16, length=1)
 ```
 
-The recovered FnKey transition includes the second command for processor boost
-policy. RAM CONTROL CENTER sends both commands. Settings-byte readback verifies
+The recovered FnKey transition identifies the second command as
+`SetEnergyStarMode`. RAM CONTROL CENTER sends both commands. The hardware mode
+retains the Turbo fan bit in Performance and maps Quiet+ to Quiet, while the
+settings retain the UI mode. Settings-byte readback verifies
 the stored selection; it does not measure actual CPU performance or establish
 that cold-boot throttling has ended. FnKey's mapping is:
 

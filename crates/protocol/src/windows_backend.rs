@@ -197,14 +197,31 @@ impl Dchu {
         // Match the vendor's power transition rather than treating one byte as
         // the whole operation. FnKey writes the platform policy at page 1/16,
         // persists the UI profile at page 1/1, sends 121/25, then commits the
-        // processor boost policy with command 79. The settings readback below
+        // Energy Star policy with command 79. The settings readback below
         // confirms the persisted profile; actual CPU performance needs its
         // own measurement.
+        let profile = PowerMode::from_u8(mode)
+            .ok_or_else(|| DchuError::InvalidArgument(format!("unsupported power mode {mode}")))?;
+        let turbo_fan = if profile == PowerMode::Performance {
+            self.read_byte(4, 8)
+                .ok_or_else(|| DchuError::ControlFailed {
+                    operation: "read Turbo fan state for power transition",
+                    detail: "settings page 4 offset 8 was unavailable".to_owned(),
+                })?
+                == 1
+        } else {
+            false
+        };
+        let command_value = profile.command_value(turbo_fan).ok_or_else(|| {
+            DchuError::InvalidArgument(
+                "composite Turbo profile requires its dedicated control".to_owned(),
+            )
+        })?;
         self.write_settings(1, 16, &[mode])?;
         self.write_settings(1, 1, &[mode])?;
-        self.set_data(121, &[mode, 0, 0, 25])?;
-        if let Some(boost_mode) = PowerMode::from_u8(mode).and_then(PowerMode::boost_mode) {
-            self.set_data(79, &[boost_mode, 0, 0, 0])?;
+        self.set_data(121, &[command_value, 0, 0, 25])?;
+        if let Some(energy_star_mode) = profile.energy_star_mode() {
+            self.set_data(79, &[energy_star_mode, 0, 0, 0])?;
         }
         Ok(())
     }

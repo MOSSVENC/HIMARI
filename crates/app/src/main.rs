@@ -3,6 +3,8 @@
 #[cfg(feature = "snapshot-tools")]
 mod bar_smoke;
 mod boot_agent;
+#[cfg(any(windows, test))]
+mod boot_observation;
 mod boot_service;
 mod control_sync;
 mod control_sync_smoke;

@@ -97,8 +97,10 @@ DCHU command 79  = success
 ```
 
 The boot-agent log contains `power reapplied and read back: Performance`.
-The same transition now sends the second-stage boost command required for the
-CPU/EC to leave its cold-boot low-power state.
+The same transition sends the vendor Energy Star command. This result proves
+command delivery and settings readback; it does not establish that cold-boot
+CPU throttling ended. The boot service now records bounded CPU observations
+after the policy replay; see [boot investigation](boot-performance-2026-11-19.md).
 
 ## CPU telemetry
 

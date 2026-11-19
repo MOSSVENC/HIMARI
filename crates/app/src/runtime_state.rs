@@ -37,8 +37,14 @@ pub(crate) fn persist_power_mode(mode: PowerMode) {
 }
 
 #[cfg(windows)]
-pub(crate) fn flexi_recovery_ready() -> bool {
+pub(crate) fn system_uptime() -> Duration {
     use windows_sys::Win32::System::SystemInformation::GetTickCount64;
+    // SAFETY: GetTickCount64 has no pointer preconditions or memory effects.
+    Duration::from_millis(unsafe { GetTickCount64() })
+}
+
+#[cfg(windows)]
+pub(crate) fn flexi_recovery_ready() -> bool {
     let root = product_data_dir();
     let marker = root.join("flexi-recovery.marker");
     let now = SystemTime::now();
@@ -50,11 +56,7 @@ pub(crate) fn flexi_recovery_ready() -> bool {
             return false;
         }
     };
-    // SAFETY: GetTickCount64 has no pointer preconditions or memory effects.
-    let uptime_ms = unsafe { GetTickCount64() };
-    let boot_time = now
-        .checked_sub(Duration::from_millis(uptime_ms))
-        .unwrap_or(now);
+    let boot_time = now.checked_sub(system_uptime()).unwrap_or(now);
     boot_time
         .duration_since(marker_time)
         .map(|elapsed| elapsed > Duration::from_secs(5))

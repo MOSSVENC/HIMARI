@@ -422,17 +422,28 @@ impl PowerMode {
         }
     }
 
-    /// The second-stage firmware boost mode used after command 121/25.
+    /// The vendor Energy Star policy sent through DCHU command 79.
     ///
     /// FnKey maps these UI profiles to DCHU command 79. Keeping the mapping in
     /// one typed place prevents the boot agent and the interactive UI from
     /// applying only half of the vendor power transition.
-    pub const fn boost_mode(self) -> Option<u8> {
+    pub const fn energy_star_mode(self) -> Option<u8> {
         match self {
             Self::Quiet | Self::Entertainment => Some(2),
             Self::PowerSaving | Self::QuietPlus => Some(1),
             Self::Performance => Some(0),
             Self::Turbo => None,
+        }
+    }
+
+    /// Command 121/25's hardware value differs from the persisted UI profile.
+    /// Performance retains the Turbo fan flag; Quiet+ uses the Quiet value.
+    pub const fn command_value(self, turbo_fan: bool) -> Option<u8> {
+        match self {
+            Self::Performance => Some(2 | if turbo_fan { 0x40 } else { 0 }),
+            Self::QuietPlus => Some(0),
+            Self::Turbo => None,
+            _ => Some(self.as_u8()),
         }
     }
 
@@ -1464,13 +1475,26 @@ mod tests {
     }
 
     #[test]
-    fn power_profiles_map_to_the_vendor_boost_command() {
-        assert_eq!(PowerMode::Performance.boost_mode(), Some(0));
-        assert_eq!(PowerMode::PowerSaving.boost_mode(), Some(1));
-        assert_eq!(PowerMode::QuietPlus.boost_mode(), Some(1));
-        assert_eq!(PowerMode::Quiet.boost_mode(), Some(2));
-        assert_eq!(PowerMode::Entertainment.boost_mode(), Some(2));
-        assert_eq!(PowerMode::Turbo.boost_mode(), None);
+    fn power_profiles_map_to_the_vendor_energy_star_command() {
+        assert_eq!(PowerMode::Performance.energy_star_mode(), Some(0));
+        assert_eq!(PowerMode::PowerSaving.energy_star_mode(), Some(1));
+        assert_eq!(PowerMode::QuietPlus.energy_star_mode(), Some(1));
+        assert_eq!(PowerMode::Quiet.energy_star_mode(), Some(2));
+        assert_eq!(PowerMode::Entertainment.energy_star_mode(), Some(2));
+        assert_eq!(PowerMode::Turbo.energy_star_mode(), None);
+    }
+
+    #[test]
+    fn hardware_power_value_preserves_turbo_only_in_performance() {
+        assert_eq!(PowerMode::Performance.command_value(false), Some(2));
+        assert_eq!(PowerMode::Performance.command_value(true), Some(0x42));
+        for turbo in [false, true] {
+            assert_eq!(PowerMode::Quiet.command_value(turbo), Some(0));
+            assert_eq!(PowerMode::PowerSaving.command_value(turbo), Some(1));
+            assert_eq!(PowerMode::Entertainment.command_value(turbo), Some(3));
+            assert_eq!(PowerMode::QuietPlus.command_value(turbo), Some(0));
+            assert_eq!(PowerMode::Turbo.command_value(turbo), None);
+        }
     }
 
     #[test]

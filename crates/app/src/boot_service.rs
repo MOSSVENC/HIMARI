@@ -3,7 +3,7 @@
 //! The interactive UI and the boot worker are the same executable. Windows
 //! starts this mode headless before the user shell appears, the worker applies
 //! the persisted power policy through the signed AcpiBridge transport, and the
-//! process exits after the readback completes.
+//! process records a bounded CPU observation after the readback completes.
 
 #[cfg(windows)]
 mod platform {

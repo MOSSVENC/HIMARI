@@ -2,6 +2,32 @@
 
 Target: Firebat/Clevo ZY-T6K, CC40 7.94/7.101 protocol family.
 
+## Acceptance status — 2026-11-19
+
+Complete replacement of the original control center is **not yet accepted**.
+The implemented control surfaces and their verification scopes are:
+
+| Area | Implementation | Evidence and remaining acceptance |
+|---|---|---|
+| Overview | CPU/GPU telemetry, memory, disk and battery | Changing CPU-frequency samples and short sensor runs verified; cold-boot behavior remains open |
+| Performance | Local Performance/Entertainment profiles and direct driver commands | Settings readback verified; startup CPU recovery has not been measured through the problem interval |
+| Cooling | Automatic, maximum, Turbo, Noiseless, offsets and ten-point RPM table | Direct reads and selected writes verified; complete physical behavior and sustained vendor coexistence remain open |
+| Keyboard lighting | Color, effects, brightness, sleep and boot effect | Direct read/write paths and UI preview checks exist; complete hardware interaction acceptance remains open |
+| Input settings | Preference toggles, camera, touchpad and related controls | Touchpad tested with FnKey running and stopped; all physical modifier-key interactions remain open |
+| GPU and system controls | Staged dGPU/MSHybrid selection, display brightness, audio and radio controls | Control paths exist; reboot-dependent GPU changes and complete physical acceptance remain open |
+| FlexiKey | Binding editor, text, keys, launch actions and mouse bindings | Hook lifecycle, callback/persistence and replay fault tests pass; physical input coexistence remains open |
+| Battery | Status and FlexiCharger thresholds | Selected same-value writes verified; complete charging-cycle acceptance remains open |
+| Display care | Taskbar, appearance, monitor timeout and screen saver | Selected Windows state transitions and readbacks verified |
+| Drivers and lifecycle | Driver detection/install entry, tray, startup, service and uninstaller | Selected deployment and lifecycle checks verified; complete uninstall acceptance remains open |
+| Physical Fn keys | Protocol decoding and diagnostic subscription | Resident ownership, action dispatch and physical combinations remain incomplete |
+| OSD | Vendor notification meanings documented | Independent OSD presentation and full action feedback remain incomplete |
+
+Animation smoothness is a separate acceptance item: native Vulkan submission
+is verified, but the latest measured maximum interval is 57.51 ms, exceeding
+the 16.67 ms budget. The test recorded one gap above 33 ms, with a 54.92 ms
+Vulkan Present call. It is not accepted as complete. Hardware capability exclusions below
+do not account for the outstanding Fn/OSD implementation work.
+
 Local capability evidence is read through the signed AcpiBridge transport:
 
 - feature page: AppSettings page 7, 256 bytes;
@@ -46,16 +72,18 @@ platform reports support.
 ```text
 WriteAppSettings(page 1, offset 16, mode)
 WriteAppSettings(page 1, offset 1, mode)
-SetDCHU_Data(121, [mode, 0, 0, 25])
-SetDCHU_Data(79, [boost_mode, 0, 0, 0])
+SetDCHU_Data(121, [hardware_mode, 0, 0, 25])
+SetDCHU_Data(79, [energy_star_mode, 0, 0, 0])
 ReadAppSettings(page 1, offset 1)
 ReadAppSettings(page 1, offset 16)
 ```
 
-`boost_mode` is `0` for Performance, `1` for Power saving/Quiet+, and `2`
-for Quiet/Entertainment, matching the FnKey transition. This second command is
-the processor-boost step in the recovered transition. Actual boot-time CPU
-performance requires a separate measurement.
+`hardware_mode` retains the Turbo fan bit (`0x40`) in Performance and maps
+Quiet+ to the firmware Quiet value (`0`). The persisted UI selection remains
+the original mode byte. `energy_star_mode` is `0` for Performance, `1` for
+Power saving/Quiet+, and `2` for Quiet/Entertainment. FnKey identifies command
+79 as `SetEnergyStarMode`; this is not evidence that it releases CPU throttling.
+Actual boot-time CPU performance requires a separate measurement.
 
 ### Panel low refresh rate
 

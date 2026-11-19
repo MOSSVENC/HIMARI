@@ -28,7 +28,8 @@ impl Default for BootProfile {
 /// It never constructs the Slint window. The signed AcpiBridge device is
 /// retried until its settings channel is ready, the full persisted power
 /// transition is reapplied, and a non-Auto fan policy is applied only after
-/// power succeeds. The process exits immediately after readback succeeds.
+/// power succeeds. A bounded read-only CPU observation then records actual
+/// performance independently of the settings acknowledgement.
 pub fn run() -> i32 {
     let started = Instant::now();
     let config_path = config_path();
@@ -36,10 +37,24 @@ pub fn run() -> i32 {
         .or_else(|| read_profile(&legacy_data_dir().join("boot-profile.ini")))
         .unwrap_or_default();
     let mut wait_ms = 45_000_u64;
+    let mut observe_ms = 60_000_u64;
+    let mut observe_only = false;
 
     let mut args = std::env::args().skip(2);
     while let Some(arg) = args.next() {
         match arg.as_str() {
+            "--observe-only" => observe_only = true,
+            "--observe-ms" => {
+                let Some(value) = args.next() else {
+                    log_line("missing value for --observe-ms");
+                    return 1;
+                };
+                let Ok(value) = value.parse::<u64>() else {
+                    log_line(&format!("invalid --observe-ms value {value:?}"));
+                    return 1;
+                };
+                observe_ms = value.min(60_000);
+            }
             "--power" => {
                 let Some(value) = args.next() else {
                     log_line("missing value for --power");
@@ -93,10 +108,25 @@ pub fn run() -> i32 {
     }
 
     log_line(&format!(
-        "agent start: target power={} fan={} wait_ms={wait_ms}",
+        "agent start: target power={} fan={} wait_ms={wait_ms} observe_ms={observe_ms} observe_only={observe_only}",
         profile.power.as_u8(),
         profile.fan.as_u8()
     ));
+
+    if observe_only {
+        return match Dchu::open() {
+            Ok(dchu) => {
+                observe_cpu(&dchu, observe_ms);
+                0
+            }
+            Err(error) => {
+                log_line(&format!(
+                    "CPU observation could not open the transport: {error}"
+                ));
+                1
+            }
+        };
+    }
 
     let deadline = started + Duration::from_millis(wait_ms);
     let mut last_error = None;
@@ -176,10 +206,11 @@ pub fn run() -> i32 {
 
                 if power_ok && fan_ok {
                     log_line(&format!(
-                        "agent complete in {} ms ({} attempts)",
+                        "policy replay complete in {} ms ({} attempts)",
                         started.elapsed().as_millis(),
                         attempt
                     ));
+                    observe_cpu(&dchu, observe_ms);
                     return 0;
                 }
                 if last_progress_log.elapsed() >= Duration::from_secs(5) {
@@ -290,7 +321,12 @@ fn read_profile(path: &Path) -> Option<BootProfile> {
     Some(result)
 }
 
-fn log_line(message: &str) {
+fn observe_cpu(_dchu: &Dchu, _observe_ms: u64) {
+    #[cfg(windows)]
+    crate::boot_observation::run(_dchu, Duration::from_millis(_observe_ms));
+}
+
+pub(crate) fn log_line(message: &str) {
     let root = product_data_dir();
     if std::fs::create_dir_all(&root).is_err() {
         return;
