@@ -4,7 +4,8 @@ param(
     [Parameter(Mandatory)] [string] $OutputDirectory,
     [ValidateRange(0, 1000)] [double] $MaximumFrameGapMs = 0,
     [switch] $RequireSnapshot,
-    [switch] $RequireContentUpdates
+    [switch] $RequireContentUpdates,
+    [switch] $RequireTextInvalidation
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,7 +18,13 @@ $snapshot = Join-Path $OutputDirectory 'overview.ppm'
 $clock = [Diagnostics.Stopwatch]::StartNew()
 if (Test-Path -LiteralPath $snapshot) { Remove-Item -LiteralPath $snapshot -Force }
 $oldSnapshotSetting = $env:RAM_GRAPHICS_SMOKE_SNAPSHOT
+$oldTextSetting = $env:RAM_GRAPHICS_SMOKE_TEXT_CHANGES
 $env:RAM_GRAPHICS_SMOKE_SNAPSHOT = $snapshot
+if ($RequireTextInvalidation) {
+    $env:RAM_GRAPHICS_SMOKE_TEXT_CHANGES = '1'
+} else {
+    Remove-Item Env:RAM_GRAPHICS_SMOKE_TEXT_CHANGES -ErrorAction SilentlyContinue
+}
 $process = Start-Process -FilePath $Executable -PassThru -NoNewWindow `
     -ArgumentList @('--graphics-smoke', '--renderer=vulkan') `
     -RedirectStandardOutput $stdout -RedirectStandardError $stderr
@@ -83,6 +90,7 @@ try {
         Performance = $performance
         SnapshotSource = if ($output -match 'snapshot=written source=vulkan-swapchain') { 'vulkan-swapchain' } else { $null }
         ContentUpdates = if ($output -match 'gpu_content_updates=passed restored_pixels=exact') { 'Passed' } else { 'NotMeasured' }
+        TextInvalidation = if ($output -match 'gpu_text_invalidation=passed telemetry=changed language=changed palette=changed restored_pixels=exact') { 'Passed' } else { 'NotMeasured' }
         Output = $output
         Errors = $errors
     }
@@ -112,11 +120,14 @@ try {
         $output -notmatch 'snapshot=written source=vulkan-swapchain') {
         throw 'The rendering snapshot did not come from the Vulkan swapchain'
     }
-    if ($performance.BudgetStatus -eq 'Exceeded') {
-        throw "Vulkan frame-gap budget exceeded: $($performance.MaximumSubmissionIntervalMs) ms > $MaximumFrameGapMs ms"
-    }
     if ($RequireContentUpdates -and $result.ContentUpdates -ne 'Passed') {
         throw 'Vulkan content updates and restoration did not pass'
+    }
+    if ($RequireTextInvalidation -and $result.TextInvalidation -ne 'Passed') {
+        throw 'Vulkan text, language or palette updates did not pass'
+    }
+    if ($performance.BudgetStatus -eq 'Exceeded') {
+        throw "Vulkan frame-gap budget exceeded: $($performance.MaximumSubmissionIntervalMs) ms > $MaximumFrameGapMs ms"
     }
 } finally {
     if (-not $process.HasExited) {
@@ -128,6 +139,11 @@ try {
         Remove-Item Env:RAM_GRAPHICS_SMOKE_SNAPSHOT -ErrorAction SilentlyContinue
     } else {
         $env:RAM_GRAPHICS_SMOKE_SNAPSHOT = $oldSnapshotSetting
+    }
+    if ($null -eq $oldTextSetting) {
+        Remove-Item Env:RAM_GRAPHICS_SMOKE_TEXT_CHANGES -ErrorAction SilentlyContinue
+    } else {
+        $env:RAM_GRAPHICS_SMOKE_TEXT_CHANGES = $oldTextSetting
     }
 }
 

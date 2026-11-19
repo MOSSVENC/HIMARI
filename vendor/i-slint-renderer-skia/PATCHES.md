@@ -14,6 +14,8 @@ vulkan_surface.rs, the vulkan_diagnostics.rs module and Cargo.toml:
 - Offer compile-time render-tracing of text measurement, text drawing, glyph
   drawing and font lookup. Timings stay in memory until the diagnostic finishes;
   default builds omit the text spans and counters.
+- Reuse base typefaces when deriving variable-font weights. Base and variation
+  faces share the existing 64-entry cache and retain their font-data blobs.
 - Enable Skia's reduced shader variations option to favor first-interaction
   latency for the control center's text, paths and gradients.
 - Match cached Vulkan layers to their parent target's attachment format.
@@ -38,5 +40,5 @@ vulkan_surface.rs, the vulkan_diagnostics.rs module and Cargo.toml:
   and acquisition timeouts during window state changes.
 
 The other files retain upstream source. The application pins the complete Slint
-family to 1.17.0. Review these five source files and the feature declaration
+family to 1.17.0. Review these patched modules and the feature declaration
 explicitly when updating the renderer.

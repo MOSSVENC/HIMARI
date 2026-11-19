@@ -336,3 +336,65 @@ Local evidence is in target/validation/vulkan-startup/: final-tray/results.json,
 release-1/results.json, release-2/results.json, native-results.json,
 deployment.json, host-verify.log and windows-clippy.log. The retained GPU image
 is release-2/overview.png.
+
+### Shared base typefaces and GPU text invalidation
+
+The renderer now derives variable-font faces from a cached base typeface. The
+previous path called FontMgr::new_from_data again for each uncached variation;
+that API builds a memory stream from the complete font data. Base and variation
+faces now share the existing 64-entry cache. Font-data identity, collection index
+and variation settings continue to determine the selected face.
+
+The graphics check accepts -RequireTextInvalidation. After the measured page
+transitions, it independently changes temperature text, switches Chinese to
+English, and changes the palette. Each change must modify the acquired Vulkan
+image; restoring each setting must reproduce the complete baseline image
+exactly. These readbacks happen outside cadence sampling. Functional failures
+are reported before the frame-budget gate.
+
+Two alternating default-feature Release comparisons used the installed 8a20079
+image as the baseline. Hardware workers were disabled in the graphics fixture.
+All four runs completed 22 transitions, window resize/minimize/restore,
+one-second idle with zero submissions, and temperature-pixel restoration.
+
+| Measurement | Baseline 1 | Shared base 1 | Baseline 2 | Shared base 2 |
+| --- | ---: | ---: | ---: | ---: |
+| Process CPU time | 2578.13 ms | 2531.25 ms | 2843.75 ms | 2453.13 ms |
+| First Cooling draw | 27.65 ms | 26.42 ms | 22.26 ms | 30.30 ms |
+| Submission interval P95 | 4.21 ms | 4.21 ms | 4.12 ms | 4.18 ms |
+| Maximum submission interval | 31.99 ms | 29.16 ms | 26.53 ms | 33.71 ms |
+| Peak private bytes | 262529024 | 255086592 | 262397952 | 259944448 |
+| 16.67 ms submission-gap budget | Exceeded | Exceeded | Exceeded | Exceeded |
+
+CPU time and peak private bytes were lower in these two comparisons; background
+load and driver caches were uncontrolled. First-visit latency did not improve
+consistently. The 16.67 ms gate remains failed. These measurements establish
+neither smooth animation nor cold-boot CPU recovery.
+
+A separate run passed telemetry/language/palette pixel invalidation and exact
+restoration. Its maximum submission gap was 30.20 ms, also exceeding the gate.
+The candidate Overview images matched the baseline byte-for-byte. The inspected
+GPU image is final-text-invalidation/overview.png.
+
+Validation passed 89 host tests, 92 native Windows tests and strict Windows
+all-target/all-feature Clippy. Both foreground and background tray checks passed
+three close/restore and three minimize/restore cycles per launch. The application
+and protocol unsafe ceiling remains 100. The Windows normal dependency graph
+contains Skia, Vulkano and ash; the submitted-frame report identifies Skia/Vulkan
+on the AMD Radeon 610M.
+
+The 19075072-byte default Release was installed at
+C:\ProgramData\RAM Control Center\ram-control-center.exe, with SHA-256
+2AFDFA45505DFD1124F7EFCB313FBE498E7D5B6E324736E309D382E302BCFB6F.
+Installed validation passed hidden startup, single-instance activation and
+close-to-tray. A final background relaunch restored default diagnostic logging.
+One recovery image retains the preceding installed build.
+
+Local evidence is in target/validation/text-blob/: final-comparison.json,
+final-text-invalidation/results.json, final-tray/results.json,
+native-results.json, windows-clippy.log, host-verify.log and deployment.json.
+The local Windows CPU recording was reduced to application-only stack data and
+module-level sample counts; those samples cover the complete fixture and do not
+identify one specific cold-draw function. Full-system trace files and duplicate
+PPMs were removed after extraction; cleanup.json records the removed paths and
+sizes.

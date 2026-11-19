@@ -53,7 +53,21 @@ impl FontCache {
             return cached.clone();
         }
 
-        let mut typeface = self.load_typeface_internal(font);
+        // Variation faces share their immutable font data with the base face.
+        // Retain that base in the same bounded cache so a newly requested weight
+        // does not reload and copy the complete font collection into Skia.
+        let mut typeface = if variation_settings.is_empty() {
+            self.load_typeface_internal(font)
+        } else {
+            let base_key = (font.data.clone().into(), font.index, 0);
+            if let Some(base) = self.fonts.get(&base_key) {
+                base.clone()
+            } else {
+                let base = self.load_typeface_internal(font);
+                self.fonts.put(base_key, base.clone());
+                base
+            }
+        };
 
         if !variation_settings.is_empty() {
             typeface = typeface.and_then(|base| {

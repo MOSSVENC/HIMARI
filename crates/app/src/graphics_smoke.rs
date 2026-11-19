@@ -1,7 +1,7 @@
 //! Native Vulkan submission cadence during production page transitions.
 
-use crate::MainWindow;
 use crate::graphics::{self, FrameEvent, FrameTimings};
+use crate::{MainWindow, Palette};
 use slint::ComponentHandle;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -281,7 +281,21 @@ fn capture_content_update(
         let _ = slint::quit_event_loop();
         return;
     };
+    let check_text = std::env::var_os("RAM_GRAPHICS_SMOKE_TEXT_CHANGES").is_some();
     window.set_cpu_temp(if step == 1 { "88°C" } else { "--°C" }.into());
+    if check_text {
+        let english = step == 3;
+        if let Err(error) = slint::select_bundled_translation(if english { "en" } else { "zh-CN" })
+        {
+            measurements.borrow_mut().failure = Some(format!("Vulkan text fixture: {error}"));
+            let _ = slint::quit_event_loop();
+            return;
+        }
+        window.set_language_zh(!english);
+        window
+            .global::<Palette>()
+            .set_blend(if step == 5 { 1.0 } else { 0.0 });
+    }
     let result = Rc::clone(&measurements);
     if !graphics::request_snapshot(move |pixels| {
         let pixels = match pixels {
@@ -306,7 +320,7 @@ fn capture_content_update(
             && baseline.height() == pixels.height()
             && match step {
                 0 => true,
-                1 => changed >= 32,
+                1 | 3 | 5 => changed >= 32,
                 _ => changed == 0,
             };
         if !valid {
@@ -314,8 +328,13 @@ fn capture_content_update(
                 "Vulkan content update failed at step {step}: changed_bytes={changed}"
             ));
             let _ = slint::quit_event_loop();
-        } else if step == 2 {
+        } else if step == if check_text { 6 } else { 2 } {
             println!("gpu_content_updates=passed restored_pixels=exact");
+            if check_text {
+                println!(
+                    "gpu_text_invalidation=passed telemetry=changed language=changed palette=changed restored_pixels=exact"
+                );
+            }
             result.borrow_mut().snapshot = Some(Ok(pixels));
             let _ = slint::quit_event_loop();
         } else {
