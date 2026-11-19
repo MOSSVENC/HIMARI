@@ -39,21 +39,37 @@ fn guard_loop() {
         match reconcile_once() {
             Ok(()) => {
                 if !applied || last_error.is_some() {
-                    crate::diagnostics::log_action(
-                        "input filter guard: keyboard interception disabled; USB keyboard bypass active",
-                    );
+                    log_guard("keyboard interception disabled; USB keyboard bypass active");
                 }
                 applied = true;
                 last_error = None;
             }
             Err(error) => {
                 if last_error.as_deref() != Some(error.as_str()) {
-                    crate::diagnostics::log_action(&format!("input filter guard: {error}"));
+                    log_guard(&error);
                 }
                 last_error = Some(error);
             }
         }
         std::thread::sleep(RECONCILE_INTERVAL);
+    }
+}
+
+#[cfg(windows)]
+fn log_guard(message: &str) {
+    use std::io::Write as _;
+
+    crate::diagnostics::log_action(&format!("input filter guard: {message}"));
+    let root = crate::product::product_data_dir();
+    if std::fs::create_dir_all(&root).is_err() {
+        return;
+    }
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(root.join("input-guard.log"))
+    {
+        let _ = writeln!(file, "{message}");
     }
 }
 

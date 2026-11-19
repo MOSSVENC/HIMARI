@@ -92,13 +92,13 @@ HKKbdFltr 0xBA41C(false)  USB keyboard bypass
 HKKbdFltr 0xBA400(false)  interception disabled
 ```
 
-守护只发送运行期控制码，不卸载驱动、不改注册表、不改固件，也不删除原厂服务。控制码执行回执记录在本机忽略目录 `target/validation/input-incident/filter-reenable.txt`。
+守护只发送运行期控制码，不卸载驱动、不改注册表、不改固件，也不删除原厂服务。正常启动时的守护回执固定写入 `C:\ProgramData\RAM Control Center\input-guard.log`，开发期控制码扫描记录在本机忽略目录 `target/validation/input-incident/filter-reenable.txt`。
 
 这一定位解释了故障的场景边界：外接 USB 键鼠在启动后失效，而碰触内置键盘可使输入链重新同步；它不把当前桌面状态或一次成功控制码调用当作冷启动验收。下一次重启后仍需检查外接键鼠在 Explorer 出现后的连续输入，以及 Ctrl/Win 的组合键状态。
 
 ## 本机构建与部署回执
 
-Windows Release 构建后的安装版 SHA-256 为 `49454897cbfd61ee852cbbe60afdbbe1f7096ac8874077ead4a437a3c0d8513a`，大小 19,088,384 字节。部署回执显示 `RAMControlCenterBoot` 启动模式为自动、本次退出码 0，启动项仍为 `--background`。安装版以 `--boot-agent --observe-only --observe-ms 6000` 运行时输出：
+Windows Release 构建后的安装版 SHA-256 为 `985b5c5dfea78ae56c00d1e1bfcb9f9565ab82d1e467b07316fc915410aa380f`，大小 19,088,384 字节。部署回执显示 `RAMControlCenterBoot` 启动模式为自动、本次退出码 0，启动项仍为 `--background`。安装版以 `--boot-agent --observe-only --observe-ms 6000` 运行时输出：
 
 ```text
 input filter guard: keyboard interception disabled; USB keyboard bypass active
@@ -106,4 +106,4 @@ observer_exit=0
 live_processes=1
 ```
 
-Windows 原生测试共 106 项通过，严格 Clippy 通过。上述回执证明守护可在安装版中执行并保持单实例；它不证明下一次冷启动后的物理输入已恢复。最终验收必须在重启后、未触碰内置键盘的情况下使用外接键鼠完成连续输入和 Ctrl/Win 组合键测试。
+后台进程路径另行实测，`input-guard.log` 在启动服务与 `--background` 进程各产生一条执行回执。Windows 原生测试共 106 项通过，严格 Clippy 通过。上述回执证明两条进程路径都能执行守护并保持单实例；它不证明下一次冷启动后的物理输入已恢复。最终验收必须在重启后、未触碰内置键盘的情况下使用外接键鼠完成连续输入和 Ctrl/Win 组合键测试。
