@@ -23,6 +23,38 @@ impl Default for BootProfile {
     }
 }
 
+/// Reapply the persisted runtime policy after a sleep/resume transition.
+pub(crate) fn reapply_saved_policy() -> Result<(), String> {
+    let profile = read_profile(&config_path())
+        .or_else(|| read_profile(&legacy_data_dir().join("boot-profile.ini")))
+        .unwrap_or_default();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        match Dchu::open() {
+            Ok(dchu) => {
+                dchu.set_power_mode(profile.power)
+                    .map_err(|error| format!("power restore failed: {error}"))?;
+                if profile.fan != FanMode::Auto {
+                    dchu.set_fan_mode(profile.fan)
+                        .map_err(|error| format!("fan restore failed: {error}"))?;
+                }
+                log_line(&format!(
+                    "resume policy restored: power={} fan={}",
+                    profile.power.as_u8(),
+                    profile.fan.as_u8()
+                ));
+                return Ok(());
+            }
+            Err(error) => {
+                if Instant::now() >= deadline {
+                    return Err(format!("DCHU was not ready after resume: {error}"));
+                }
+            }
+        }
+        thread::sleep(Duration::from_millis(250));
+    }
+}
+
 /// Headless boot path used by the single `ram-control-center.exe` binary.
 ///
 /// It never constructs the Slint window. The signed AcpiBridge device is
@@ -130,8 +162,8 @@ pub fn run() -> i32 {
     }
 
     let deadline = started + Duration::from_millis(wait_ms);
-    let mut last_error = None;
     let mut attempt = 0_u32;
+    let mut last_error = None;
     let mut service_checked = false;
     // `Instant` is boot-relative on Windows. Avoid subtracting five seconds
     // when the service starts very early in boot; use the start marker instead.

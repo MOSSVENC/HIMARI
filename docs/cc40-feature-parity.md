@@ -10,7 +10,7 @@ The implemented control surfaces and their verification scopes are:
 | Area | Implementation | Evidence and remaining acceptance |
 |---|---|---|
 | Overview | CPU/GPU telemetry, memory, disk and battery | Changing CPU-frequency samples and short sensor runs verified; cold-boot behavior remains open |
-| Performance | Local Performance/Entertainment profiles and direct driver commands | Settings readback verified; startup CPU recovery has not been measured through the problem interval |
+| Performance | Local Performance/Entertainment profiles, direct driver commands and sleep/resume policy restore | Settings readback and forced resume reapplication verified; startup CPU recovery has not been measured through the problem interval |
 | Cooling | Automatic, maximum, Turbo, Noiseless, offsets and ten-point RPM table | Direct reads and selected writes verified; complete physical behavior and sustained vendor coexistence remain open |
 | Keyboard lighting | Color, effects, brightness, sleep and boot effect | Direct read/write paths and UI preview checks exist; complete hardware interaction acceptance remains open |
 | Input settings | Preference toggles, camera, touchpad and related controls | Touchpad tested with FnKey running and stopped; all physical modifier-key interactions remain open |
@@ -84,6 +84,21 @@ the original mode byte. `energy_star_mode` is `0` for Performance, `1` for
 Power saving/Quiet+, and `2` for Quiet/Entertainment. FnKey identifies command
 79 as `SetEnergyStarMode`; this is not evidence that it releases CPU throttling.
 Actual boot-time CPU performance requires a separate measurement.
+
+### Sleep/resume policy restore
+
+The interactive process owns a hidden top-level power-notification window on a
+dedicated thread. On `WM_POWERBROADCAST` with
+`PBT_APMRESUMEAUTOMATIC`, `PBT_APMRESUMESUSPEND` or
+`PBT_APMRESUMECRITICAL`, it reads the persisted power/fan policy, waits up to
+ten seconds for the signed ACPI transport, reapplies the power transition and
+reapplies a non-Auto fan policy. Duplicate resume notifications within five
+seconds are coalesced. The result is written to
+`C:\ProgramData\RAM Control Center\resume-recovery.log` and the boot-agent log.
+
+The listener owns no renderer resources and performs device I/O only on its
+own thread. A forced `WM_POWERBROADCAST` test restored `power=2 fan=0` on the
+reference machine.
 
 ### Quiet mode GPU policy
 

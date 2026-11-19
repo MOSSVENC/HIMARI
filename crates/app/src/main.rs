@@ -34,6 +34,7 @@ mod localization;
 #[allow(dead_code)]
 mod product;
 mod resident_ui;
+mod resume_recovery;
 mod runtime_state;
 #[cfg(windows)]
 mod service_lifecycle;
@@ -389,6 +390,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     input_recovery::start_filter_guard();
+    resume_recovery::start();
 
     let ui = MainWindow::new()?;
     if let Err(error) = slint::select_bundled_translation("zh-CN") {

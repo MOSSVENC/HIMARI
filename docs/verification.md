@@ -711,3 +711,23 @@ The helper log records both `disabling device node and NVPCF` and
 runtime GPU power path and its immediate restore. It does not validate a reboot
 into a different MUX mode. Windows native tests passed 74 application tests,
 3 uninstaller tests and 34 protocol tests; strict Clippy passed.
+
+## 2026-11-19 Sleep/resume policy restore verification
+
+Windows Release SHA-256:
+`a5503cbcbdaab91bc5c15edd29b8f436d06dd48496cf27af6f86242d4216a173`
+(19,102,208 bytes). The installed background process remained a single
+instance after deployment.
+
+The hidden power listener was located by its window class and sent a real
+`WM_POWERBROADCAST` resume event (`PBT_APMRESUMEAUTOMATIC`). Results:
+
+```text
+resume recovery listener ready
+resume policy restore completed
+resume policy restored: power=2 fan=0
+```
+
+This proves the callback, transport wait, persisted-policy read, power write
+and fan write complete on the installed build. It does not replace a physical
+sleep/wake cycle or a cold boot; those remain separate acceptance items.
