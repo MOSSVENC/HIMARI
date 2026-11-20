@@ -909,3 +909,37 @@ animation timing. Submission intervals are also not scanout timing.
 Windows native tests: 73 application, 4 uninstaller, 35 protocol. Host
 `scripts/verify.sh` passed and the unsafe ratchet stayed at
 `unsafe total: 100 (ceiling 100)` because the theme work added no FFI.
+
+## 2026-11-20 input-guard cadence and dependency hygiene
+
+Windows Release SHA-256:
+`b29d38705f3f5bce939699bdba833e6716d54640f99092b048ad076106abe645`
+(19,147,776 bytes).
+
+The OEM keyboard/mouse class filter is a machine-wide device shared with the
+vendor stack, and it has no read-back path: every correction is a blind write
+of `IOCTL_ENABLE_USB_DEVICE(0)` and `IOCTL_ENABLE_FILTER(0)`. The guard used to
+repeat that pair every five seconds for the whole session lifetime, which is
+twelve shared-device writes per minute forever and an unnecessary opportunity
+to desynchronise the vendor's own filter state.
+
+The cadence is now time-bounded:
+
+```text
+0..180 s after guard start   5 s    boot protection kept
+after 180 s                 60 s    steady state
+```
+
+Verified on the installed build: `input-guard.log` recorded
+`input filter guard settled to the steady-state cadence` at 11:32:40, exactly
+180 seconds after the deployed start, and the process stayed single-instance.
+
+This reduces the write rate, it does not prove the input failure is fixed. The
+remaining acceptance is still whether external USB input survives a real
+reboot, which requires a user-arranged restart.
+
+Dependency hygiene: `windows-sys` was declared unconditionally in both
+crates while every use sits behind `cfg(windows)`, which produced
+`warning: unused dependency` on host builds. It moved to
+`[target.'cfg(windows)'.dependencies]` in both manifests and the host build is
+warning-free. `Cargo.lock` is unchanged.
