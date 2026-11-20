@@ -4,7 +4,9 @@ use std::sync::Mutex;
 use std::sync::OnceLock;
 use std::time::Duration;
 
-use ram_control_center_protocol::{Adjustment, Dchu, FnEvent, FnNotification, PowerMode};
+use ram_control_center_protocol::{
+    Adjustment, Dchu, FanNotice, FnEvent, FnNotification, PowerMode,
+};
 use slint::{ComponentHandle, Weak};
 
 use crate::{MainWindow, localization::tr, osd};
@@ -78,95 +80,141 @@ fn dispatch_notification(notification: FnNotification) {
         ));
         return;
     };
-    let (title, detail, accent) = presentation(event);
-    osd::show(&title, &detail, accent);
-    match execute(event) {
-        Ok(Some(result)) => osd::show(&title, &result, accent),
-        Ok(None) => {}
+    let view = match execute(event) {
+        Ok(Some(view)) => view,
+        Ok(None) => return,
         Err(error) => {
-            let detail = format!("{}: {error}", tr("Action failed"));
             log_line(&format!("Fn action failed event={event:?}: {error}"));
-            osd::show(&title, &detail, slint::Color::from_rgb_u8(255, 91, 104));
+            OsdView {
+                title: event_title(event).to_owned(),
+                detail: format!("{}: {error}", tr("Action failed")),
+                accent: ACCENT_ERROR,
+            }
+        }
+    };
+    osd::show(&view.title, &view.detail, view.accent);
+}
+
+/// Text presented by the OSD for one Fn event.
+struct OsdView {
+    title: String,
+    detail: String,
+    accent: slint::Color,
+}
+
+const ACCENT_INFO: slint::Color = slint::Color::from_rgb_u8(66, 211, 255);
+const ACCENT_ERROR: slint::Color = slint::Color::from_rgb_u8(255, 91, 104);
+
+impl OsdView {
+    fn new(title: String, detail: String) -> Self {
+        Self {
+            title,
+            detail,
+            accent: ACCENT_INFO,
         }
     }
 }
 
-fn presentation(event: FnEvent) -> (String, String, slint::Color) {
-    let accent = slint::Color::from_rgb_u8(66, 211, 255);
-    let (title, detail) = match event {
-        FnEvent::BacklightStep(Adjustment::Down) => {
-            (tr("Keyboard backlight"), tr("Brightness down"))
-        }
-        FnEvent::BacklightStep(Adjustment::Up) => (tr("Keyboard backlight"), tr("Brightness up")),
-        FnEvent::BacklightToggle => (tr("Keyboard backlight"), tr("Toggle")),
-        FnEvent::BacklightCycle => (tr("Keyboard backlight"), tr("Cycle brightness")),
-        FnEvent::FnLockToggle => (tr("Fn Lock"), tr("Toggle")),
-        FnEvent::FanNotice(notice) => (
-            tr("Cooling"),
+fn on_off(enabled: bool) -> String {
+    if enabled { tr("On") } else { tr("Off") }.to_owned()
+}
+
+/// Percentage of the keyboard backlight range. The transport exposes five
+/// levels (0 means off) and the vendor OSD shows the same five stops.
+fn backlight_text(level: u8) -> String {
+    if level == 0 {
+        tr("Off").to_owned()
+    } else {
+        format!("{} {level}/4", tr("Brightness"))
+    }
+}
+
+/// State-only events: firmware already performed the change, so there is
+/// nothing to execute and only the resulting condition is reported.
+fn state_view(event: FnEvent) -> Option<OsdView> {
+    let view = match event {
+        FnEvent::FanNotice(notice) => OsdView::new(
+            tr("Cooling").to_owned(),
             match notice {
-                ram_control_center_protocol::FanNotice::AntiDustRunning => tr("Anti-dust running"),
-                ram_control_center_protocol::FanNotice::Turbo => tr("Turbo fan"),
-                ram_control_center_protocol::FanNotice::MaxQ => tr("MaxQ fan profile"),
-                ram_control_center_protocol::FanNotice::Custom => tr("Custom fan profile"),
-                ram_control_center_protocol::FanNotice::Maximum => tr("Maximum fan"),
-            },
+                FanNotice::AntiDustRunning => tr("Anti-dust running"),
+                FanNotice::Turbo => tr("Turbo fan"),
+                FanNotice::MaxQ => tr("MaxQ fan profile"),
+                FanNotice::Custom => tr("Custom fan profile"),
+                FanNotice::Maximum => tr("Maximum fan"),
+            }
+            .to_owned(),
         ),
-        FnEvent::NoiselessFanToggle => (tr("Cooling"), tr("Noiseless fan toggle")),
-        FnEvent::PowerModeCycle => (tr("Power mode"), tr("Switch profile")),
-        FnEvent::ControlCenterToggle => (tr("RAM CONTROL CENTER"), tr("Toggle window")),
-        FnEvent::Docking(connected) => (
-            tr("Docking"),
+        FnEvent::SilentMode(enabled) => OsdView::new(tr("Silent mode").to_owned(), on_off(enabled)),
+        FnEvent::MobileRadio(enabled) => {
+            OsdView::new(tr("Mobile radio").to_owned(), on_off(enabled))
+        }
+        FnEvent::CapsLock(enabled) => OsdView::new(tr("Caps Lock").to_owned(), on_off(enabled)),
+        FnEvent::NumLock(enabled) => OsdView::new(tr("Num Lock").to_owned(), on_off(enabled)),
+        FnEvent::ScrollLock(enabled) => OsdView::new(tr("Scroll Lock").to_owned(), on_off(enabled)),
+        FnEvent::Docking(connected) => OsdView::new(
+            tr("Docking").to_owned(),
             if connected {
                 tr("Connected")
             } else {
                 tr("Disconnected")
-            },
+            }
+            .to_owned(),
         ),
-        FnEvent::NumLock(enabled) => (tr("Num Lock"), if enabled { tr("On") } else { tr("Off") }),
-        FnEvent::CapsLock(enabled) => (tr("Caps Lock"), if enabled { tr("On") } else { tr("Off") }),
-        FnEvent::ScrollLock(enabled) => (
-            tr("Scroll Lock"),
-            if enabled { tr("On") } else { tr("Off") },
-        ),
-        FnEvent::SilentMode(enabled) => (
-            tr("Silent mode"),
-            if enabled { tr("On") } else { tr("Off") },
-        ),
-        FnEvent::MobileRadio(enabled) => (
-            tr("Mobile radio"),
-            if enabled { tr("On") } else { tr("Off") },
-        ),
-        FnEvent::Camera(enabled) => (tr("Camera"), if enabled { tr("On") } else { tr("Off") }),
-        FnEvent::CameraMicrophone(enabled) => (
-            tr("Camera and microphone"),
-            if enabled { tr("On") } else { tr("Off") },
-        ),
-        FnEvent::TouchpadToggle { .. } => (tr("Touchpad"), tr("Toggle")),
+        _ => return None,
     };
-    (title.to_owned(), detail.to_owned(), accent)
+    Some(view)
 }
 
-fn execute(event: FnEvent) -> Result<Option<String>, String> {
+/// Title used both for the normal OSD and the failure OSD.
+fn event_title(event: FnEvent) -> &'static str {
     match event {
-        FnEvent::BacklightStep(direction) => adjust_backlight(direction).map(Some),
-        FnEvent::BacklightToggle => toggle_backlight().map(Some),
-        FnEvent::BacklightCycle => cycle_backlight().map(Some),
-        FnEvent::FnLockToggle => toggle_fn_lock().map(Some),
-        FnEvent::NoiselessFanToggle => toggle_noiseless_fan().map(Some),
-        FnEvent::PowerModeCycle => cycle_power_mode().map(Some),
-        FnEvent::ControlCenterToggle => toggle_control_center().map(|()| None),
+        FnEvent::BacklightStep(_) | FnEvent::BacklightToggle | FnEvent::BacklightCycle => {
+            tr("Keyboard backlight")
+        }
+        FnEvent::FnLockToggle => tr("Fn Lock"),
+        FnEvent::FanNotice(_) | FnEvent::NoiselessFanToggle => tr("Cooling"),
+        FnEvent::PowerModeCycle => tr("Power mode"),
+        FnEvent::ControlCenterToggle => tr("RAM CONTROL CENTER"),
+        FnEvent::Docking(_) => tr("Docking"),
+        FnEvent::NumLock(_) => tr("Num Lock"),
+        FnEvent::CapsLock(_) => tr("Caps Lock"),
+        FnEvent::ScrollLock(_) => tr("Scroll Lock"),
+        FnEvent::SilentMode(_) => tr("Silent mode"),
+        FnEvent::MobileRadio(_) => tr("Mobile radio"),
+        FnEvent::Camera(_) => tr("Camera"),
+        FnEvent::CameraMicrophone(_) => tr("Camera and microphone"),
+        FnEvent::TouchpadToggle { .. } => tr("Touchpad"),
+    }
+}
+
+/// Execute one Fn action. `Ok(None)` means the event has no user-visible
+/// result, so nothing is presented.
+fn execute(event: FnEvent) -> Result<Option<OsdView>, String> {
+    if let Some(view) = state_view(event) {
+        return Ok(Some(view));
+    }
+    let title = event_title(event).to_owned();
+    match event {
+        FnEvent::BacklightStep(direction) => {
+            Ok(Some(OsdView::new(title, adjust_backlight(direction)?)))
+        }
+        FnEvent::BacklightToggle => Ok(Some(OsdView::new(title, toggle_backlight()?))),
+        FnEvent::BacklightCycle => Ok(Some(OsdView::new(title, cycle_backlight()?))),
+        FnEvent::FnLockToggle => Ok(Some(OsdView::new(title, toggle_fn_lock()?))),
+        FnEvent::NoiselessFanToggle => Ok(Some(OsdView::new(title, toggle_noiseless_fan()?))),
+        FnEvent::PowerModeCycle => Ok(Some(OsdView::new(title, cycle_power_mode()?))),
+        FnEvent::ControlCenterToggle => {
+            toggle_control_center()?;
+            Ok(None)
+        }
         FnEvent::Camera(enabled) => {
             let device = open_dchu()?;
             device
                 .set_camera_enabled(enabled)
                 .map_err(|error| error.to_string())?;
-            Ok(Some(if enabled {
-                tr("Camera on").to_owned()
-            } else {
-                tr("Camera off").to_owned()
-            }))
+            Ok(Some(OsdView::new(title, on_off(enabled))))
         }
-        FnEvent::TouchpadToggle { .. } => toggle_touchpad().map(Some),
+        FnEvent::TouchpadToggle { .. } => Ok(Some(OsdView::new(title, toggle_touchpad()?))),
         _ => Ok(None),
     }
 }
@@ -183,7 +231,7 @@ fn adjust_backlight(direction: Adjustment) -> Result<String, String> {
     device
         .set_rgb_keyboard_brightness(target)
         .map_err(|error| error.to_string())?;
-    Ok(format!("{} {target}/4", tr("Brightness")))
+    Ok(backlight_text(target))
 }
 
 fn toggle_backlight() -> Result<String, String> {
@@ -199,11 +247,7 @@ fn toggle_backlight() -> Result<String, String> {
     device
         .set_rgb_keyboard_brightness(target)
         .map_err(|error| error.to_string())?;
-    Ok(if target == 0 {
-        tr("Off").to_owned()
-    } else {
-        format!("{} {target}/4", tr("Brightness"))
-    })
+    Ok(backlight_text(target))
 }
 
 fn cycle_backlight() -> Result<String, String> {
@@ -219,11 +263,7 @@ fn cycle_backlight() -> Result<String, String> {
     device
         .set_rgb_keyboard_brightness(target)
         .map_err(|error| error.to_string())?;
-    Ok(if target == 0 {
-        tr("Off").to_owned()
-    } else {
-        format!("{} {target}/4", tr("Brightness"))
-    })
+    Ok(backlight_text(target))
 }
 
 fn toggle_fn_lock() -> Result<String, String> {
@@ -379,4 +419,105 @@ pub(crate) fn event_smoke(code: u8) -> Result<(), Box<dyn std::error::Error>> {
     slint::run_event_loop()?;
     drop(osd);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every decoded event must have a title, otherwise the failure OSD would
+    /// present an empty first line.
+    #[test]
+    fn every_decoded_event_has_a_title() {
+        let events = [
+            FnEvent::BacklightStep(Adjustment::Down),
+            FnEvent::BacklightStep(Adjustment::Up),
+            FnEvent::BacklightToggle,
+            FnEvent::BacklightCycle,
+            FnEvent::FnLockToggle,
+            FnEvent::FanNotice(FanNotice::AntiDustRunning),
+            FnEvent::FanNotice(FanNotice::Turbo),
+            FnEvent::FanNotice(FanNotice::MaxQ),
+            FnEvent::FanNotice(FanNotice::Custom),
+            FnEvent::FanNotice(FanNotice::Maximum),
+            FnEvent::NoiselessFanToggle,
+            FnEvent::PowerModeCycle,
+            FnEvent::ControlCenterToggle,
+            FnEvent::Docking(true),
+            FnEvent::Docking(false),
+            FnEvent::NumLock(true),
+            FnEvent::NumLock(false),
+            FnEvent::CapsLock(true),
+            FnEvent::CapsLock(false),
+            FnEvent::ScrollLock(true),
+            FnEvent::ScrollLock(false),
+            FnEvent::SilentMode(true),
+            FnEvent::SilentMode(false),
+            FnEvent::MobileRadio(true),
+            FnEvent::MobileRadio(false),
+            FnEvent::Camera(true),
+            FnEvent::Camera(false),
+            FnEvent::CameraMicrophone(true),
+            FnEvent::CameraMicrophone(false),
+            FnEvent::TouchpadToggle {
+                legacy_enabled: true,
+            },
+            FnEvent::TouchpadToggle {
+                legacy_enabled: false,
+            },
+        ];
+        for event in events {
+            assert!(!event_title(event).is_empty(), "missing title: {event:?}");
+        }
+    }
+
+    /// Firmware-driven notifications must paint without touching hardware, and
+    /// they must carry an explicit condition rather than a generic toggle.
+    #[test]
+    fn state_only_events_report_a_condition() {
+        for event in [
+            FnEvent::CapsLock(true),
+            FnEvent::NumLock(false),
+            FnEvent::ScrollLock(true),
+            FnEvent::SilentMode(false),
+            FnEvent::MobileRadio(true),
+            FnEvent::Docking(true),
+            FnEvent::Docking(false),
+            FnEvent::FanNotice(FanNotice::Turbo),
+        ] {
+            let view = state_view(event).expect("state event must present");
+            assert!(!view.detail.is_empty(), "missing detail: {event:?}");
+            assert!(!view.title.is_empty(), "missing title: {event:?}");
+        }
+    }
+
+    /// Action events are executed instead of being rendered from state.
+    #[test]
+    fn action_events_are_not_state_only() {
+        for event in [
+            FnEvent::BacklightToggle,
+            FnEvent::BacklightCycle,
+            FnEvent::FnLockToggle,
+            FnEvent::PowerModeCycle,
+            FnEvent::TouchpadToggle {
+                legacy_enabled: true,
+            },
+        ] {
+            assert!(
+                state_view(event).is_none(),
+                "unexpected state view: {event:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn backlight_text_covers_off_and_every_level() {
+        assert_eq!(backlight_text(0), tr("Off"));
+        for level in 1..=4 {
+            assert_eq!(
+                backlight_text(level),
+                format!("{} {level}/4", tr("Brightness"))
+            );
+        }
+    }
 }
