@@ -75,11 +75,11 @@ pub(crate) fn show(title: &str, detail: &str, accent: slint::Color) {
             }
         });
         slint::Timer::single_shot(DISPLAY_TIME, move || {
-            if GENERATION.load(Ordering::Acquire) == generation
-                && let Some(osd) = weak.upgrade()
-            {
-                osd.set_osd_reveal(0.0);
-                slint::Timer::single_shot(Duration::from_millis(260), move || {
+            if GENERATION.load(Ordering::Acquire) == generation && weak.upgrade().is_some() {
+                // A colour-keyed window cannot fade: a blended pixel stops
+                // matching the key and survives as a tinted smear. Withdraw
+                // the overlay after a short settle instead.
+                slint::Timer::single_shot(Duration::from_millis(180), move || {
                     if GENERATION.load(Ordering::Acquire) == generation
                         && let Some(osd) = weak.upgrade()
                     {
@@ -109,8 +109,8 @@ fn position_over_main_window(window: &OsdWindow) {
     let position = main.window().position();
     let size = main.window().size();
     let scale = window.window().scale_factor();
-    let width = (360.0 * scale).round() as i32;
-    let height = (96.0 * scale).round() as i32;
+    let width = (320.0 * scale).round() as i32;
+    let height = (84.0 * scale).round() as i32;
     window.window().set_position(slint::PhysicalPosition::new(
         position.x + (i32::try_from(size.width).unwrap_or(0) - width) / 2,
         position.y + i32::try_from(size.height).unwrap_or(0) - height - 28,

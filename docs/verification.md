@@ -943,3 +943,59 @@ crates while every use sits behind `cfg(windows)`, which produced
 `warning: unused dependency` on host builds. It moved to
 `[target.'cfg(windows)'.dependencies]` in both manifests and the host build is
 warning-free. `Cargo.lock` is unchanged.
+
+## 2026-11-20 OSD transparency: attempted, measured, withdrawn
+
+The vendor overlay is a WinForms `OsdForm` window carrying `WS_EX_LAYERED`
+(observed `exstyle=0x90008`) and composited through
+`UpdateLayeredWindow` with a 32-bit premultiplied ARGB bitmap. Its art is
+alpha-bearing PNG line work, so soft edges, translucent panels and shadows are
+free. It never presents through a GPU swapchain.
+
+RAM CONTROL CENTER presents the overlay through Slint -> Skia -> Vulkan. A
+DXGI flip-model swapchain surface carries `DXGI_ALPHA_MODE_IGNORE`, so the
+compositor receives an opaque surface. Setting the Slint window `background`
+transparent therefore renders nothing, which is why the earlier attempt
+produced an invisible window.
+
+A layered-window colour key was implemented and measured instead:
+
+```text
+SetWindowLongPtrW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED | WS_EX_NOACTIVATE)
+SetLayeredWindowAttributes(hwnd, 0x00FF00FF, alpha, LWA_COLORKEY [| LWA_ALPHA])
+```
+
+The window accepted the style: enumeration reported
+`ex=0x80C0118`, i.e. `WS_EX_LAYERED | WS_EX_NOACTIVATE | WS_EX_TOPMOST`.
+
+Pixel probes of the captured 320x84 overlay:
+
+```text
+key-only   (alpha 0)   outside the card: (251,0,251) (200,0,200) (208,0,208)
+key+alpha  (alpha 0xE0) outside the card: (231,13,238) (199,10,204)
+card interior:                            (36,43,59)
+```
+
+Reading those numbers:
+
+- the colour key was **never applied**: pixels outside the card still carry the
+  key colour, at varying blends produced by the card shadow;
+- the constant alpha **was** applied: the key colour is blended with the
+  desktop instead of removed.
+
+So on this renderer path one can obtain a uniformly translucent rectangle
+whose surroundings remain visible, but not a transparent window. A blended
+pixel also stops matching the key, which rules out fading the overlay.
+
+The implementation was withdrawn rather than shipped as an ineffective Win32
+boundary; `unsafe total` returned to `100 (ceiling 100)` and the overlay is
+once again an opaque card, which is the honest current capability.
+
+### What real parity would require
+
+`UpdateLayeredWindow` with a premultiplied ARGB device-independent bitmap,
+i.e. rendering the overlay into a CPU-visible bitmap each frame instead of
+presenting a swapchain surface. That is the vendor's approach and the only way
+to obtain per-pixel alpha here. It is a second renderer for the overlay
+(GDI or D2D text plus our own glyphs), not a parameter change, and it replaces
+Slint's animation path for that window.
