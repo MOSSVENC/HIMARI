@@ -15,6 +15,22 @@ static GENERATION: AtomicU64 = AtomicU64::new(0);
 
 const DISPLAY_TIME: Duration = Duration::from_millis(2_200);
 
+pub(crate) fn set_theme(dark: bool, blend: f32) {
+    let Some(window) = WINDOW
+        .get()
+        .and_then(|slot| slot.lock().ok())
+        .and_then(|slot| slot.clone())
+    else {
+        return;
+    };
+    let _ = slint::invoke_from_event_loop(move || {
+        if let Some(osd) = window.upgrade() {
+            osd.global::<crate::Palette>().set_dark(dark);
+            osd.global::<crate::Palette>().set_blend(blend);
+        }
+    });
+}
+
 pub(crate) fn install(window: Weak<OsdWindow>, main_window: Weak<crate::MainWindow>) {
     let slot = WINDOW.get_or_init(|| Mutex::new(None));
     if let Ok(mut slot) = slot.lock() {
@@ -45,13 +61,31 @@ pub(crate) fn show(title: &str, detail: &str, accent: slint::Color) {
         osd.set_osd_title(title.into());
         osd.set_osd_detail(detail.into());
         osd.set_osd_accent(accent);
+        osd.set_osd_reveal(0.0);
         position_over_main_window(&osd);
         let _ = osd.show();
+        slint::Timer::single_shot(Duration::from_millis(1), {
+            let weak = weak.clone();
+            move || {
+                if GENERATION.load(Ordering::Acquire) == generation
+                    && let Some(osd) = weak.upgrade()
+                {
+                    osd.set_osd_reveal(1.0);
+                }
+            }
+        });
         slint::Timer::single_shot(DISPLAY_TIME, move || {
             if GENERATION.load(Ordering::Acquire) == generation
                 && let Some(osd) = weak.upgrade()
             {
-                osd.hide().ok();
+                osd.set_osd_reveal(0.0);
+                slint::Timer::single_shot(Duration::from_millis(260), move || {
+                    if GENERATION.load(Ordering::Acquire) == generation
+                        && let Some(osd) = weak.upgrade()
+                    {
+                        osd.hide().ok();
+                    }
+                });
             }
         });
     })

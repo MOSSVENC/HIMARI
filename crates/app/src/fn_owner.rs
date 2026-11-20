@@ -348,6 +348,7 @@ pub(crate) fn osd_smoke() -> Result<(), Box<dyn std::error::Error>> {
     let ui = MainWindow::new()?;
     let osd = crate::OsdWindow::new()?;
     osd::install(osd.as_weak(), ui.as_weak());
+    crate::ui_callbacks::apply_persisted_theme(&ui);
     install_ui(ui.as_weak());
     dispatch_notification(FnNotification::from_payload(
         &i64::from(0xcau8).to_le_bytes(),
@@ -367,6 +368,7 @@ pub(crate) fn event_smoke(code: u8) -> Result<(), Box<dyn std::error::Error>> {
     let ui = MainWindow::new()?;
     let osd = crate::OsdWindow::new()?;
     osd::install(osd.as_weak(), ui.as_weak());
+    crate::ui_callbacks::apply_persisted_theme(&ui);
     install_ui(ui.as_weak());
     dispatch_notification(FnNotification::from_payload(
         &i64::from(code).to_le_bytes(),

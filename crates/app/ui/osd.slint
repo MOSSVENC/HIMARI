@@ -4,6 +4,7 @@ export component OsdWindow inherits Window {
     in property <string> osd-title: "";
     in property <string> osd-detail: "";
     in property <color> osd-accent: Palette.cyan;
+    in-out property <float> osd-reveal: 0.0;
 
     width: 360px;
     height: 96px;
@@ -13,14 +14,21 @@ export component OsdWindow inherits Window {
     always-on-top: true;
 
     Rectangle {
-        width: parent.width;
-        height: parent.height;
+        x: 6px;
+        y: 6px + (1.0 - root.osd-reveal) * 12px;
+        width: parent.width - 12px;
+        height: parent.height - 12px;
         border-radius: 18px;
         background: Palette.surface-gradient;
         border-width: 1px;
         border-color: root.osd-accent.with-alpha(0.72);
-        drop-shadow-blur: 24px;
-        drop-shadow-color: #00000099;
+        opacity: root.osd-reveal;
+        transform-scale-x: 0.96 + 0.04 * root.osd-reveal;
+        transform-scale-y: 0.96 + 0.04 * root.osd-reveal;
+        animate y { duration: 240ms; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+        animate opacity { duration: 220ms; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+        animate transform-scale-x { duration: 240ms; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+        animate transform-scale-y { duration: 240ms; easing: cubic-bezier(0.22, 1, 0.36, 1); }
 
         HorizontalLayout {
             padding-left: 18px;

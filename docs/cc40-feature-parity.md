@@ -20,13 +20,16 @@ The implemented control surfaces and their verification scopes are:
 | Display care | Taskbar, appearance, monitor timeout and screen saver | Selected Windows state transitions and readbacks verified |
 | Drivers and lifecycle | Driver detection/install entry, tray, startup, service and uninstaller plus vendor-console retirement tooling | Selected deployment and lifecycle checks verified; physical Fn gate still protects FnKey package removal |
 | Physical Fn keys | Resident ownership arbitration, mapped action dispatch and independent OSD | Direct channel acquisition and restoration verified; physical Fn combinations and full branch hardware acceptance remain open |
-| OSD | Independent Slint overlay, state text and action errors | Visual smoke and synthetic Caps Lock event verified; physical Fn event feedback remains open |
+| OSD | Independent Slint overlay, state text and action errors, palette synced from the panel theme | Dark and light captures of the installed build verified the palette, text and reveal animation; physical Fn event feedback remains open |
 
 Animation smoothness is a separate acceptance item: native Vulkan submission
-is verified, but the latest measured maximum interval is 57.51 ms, exceeding
-the 16.67 ms budget. The test recorded one gap above 33 ms, with a 54.92 ms
-Vulkan Present call. It is not accepted as complete. Hardware capability exclusions below
-do not account for the outstanding Fn/OSD implementation work.
+is verified, but the latest measured maximum interval is 55.52 ms, exceeding
+the 16.67 ms budget. The test recorded two gaps above 33 ms. Both rounds show
+the same shape: every outlier sits in the first visit of a page (a 50.72 ms
+draw on page 2, a 25.09 ms acquire on page 1, a 31.98 ms present on page 4),
+while every second-round transition stays below 10 ms. The remaining cost is
+cold page construction, so it is not accepted as complete. Hardware capability
+exclusions below do not account for the outstanding Fn/OSD implementation work.
 
 Local capability evidence is read through the signed AcpiBridge transport:
 

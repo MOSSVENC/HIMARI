@@ -170,14 +170,16 @@ fn schedule(ui: slint::Weak<MainWindow>, measurements: Rc<RefCell<Measurements>>
                         && window.get_navigation_page() == page
                         && window.get_page_cache_ready()
                         && !window.get_page_transitioning()
-                        && (window.get_page_opacity() - 1.0).abs() < 0.001;
+                        && (window.get_page_opacity() - 1.0).abs() < 0.001
+                        && window.get_page_offset().abs() < 0.001;
                     if !valid {
                         eprintln!(
-                            "page={page} selected={} navigation={} transitioning={} opacity={} cache_ready={}",
+                            "page={page} selected={} navigation={} transitioning={} opacity={} offset={} cache_ready={}",
                             window.get_selected_page(),
                             window.get_navigation_page(),
                             window.get_page_transitioning(),
                             window.get_page_opacity(),
+                            window.get_page_offset(),
                             window.get_page_cache_ready()
                         );
                     }

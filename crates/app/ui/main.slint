@@ -55,6 +55,7 @@ export component MainWindow inherits Window {
     in property <bool> busy: false;
     in-out property <bool> language-zh: true;
     in-out property <float> page-opacity: 1.0;
+    in-out property <float> page-offset: 0.0;
     in-out property <duration> page-fade-duration: 150ms;
     in-out property <bool> page-transitioning: false;
     in-out property <bool> page-cache-ready: false;
@@ -429,8 +430,12 @@ export component MainWindow inherits Window {
                     vertical-stretch: 1;
                     clip: true;
                     page-surface := Rectangle {
+                        x: root.page-offset * 1px;
                         width: parent.width;
                         height: parent.height;
+                        opacity: root.page-opacity;
+                        animate x { duration: root.page-fade-duration; easing: cubic-bezier(0.22, 1, 0.36, 1); }
+                        animate opacity { duration: root.page-fade-duration; easing: cubic-bezier(0.22, 1, 0.36, 1); }
                         page-scroll := Flickable {
                             // Reuse page pixels while the navigation and overlay animate.
                             cache-rendering-hint: root.page-cache-ready && (Palette.blend == 0 || Palette.blend == 1);
@@ -789,16 +794,6 @@ export component MainWindow inherits Window {
 
                         Rectangle { vertical-stretch: 1; }
                                 }
-                            }
-                            // Fade toward the workspace background with one
-                            // blended rectangle; keep the page in its render target.
-                            Rectangle {
-                                x: 0;
-                                y: 0;
-                                width: parent.width;
-                                height: parent.height;
-                                background: Palette.base.with-alpha(1.0 - root.page-opacity);
-                                animate background { duration: root.page-fade-duration; easing: cubic-bezier(0.2, 0, 0, 1); }
                             }
                         }
                     }

@@ -838,3 +838,74 @@ Implemented/verified in this build:
 Still open: physical Fn action capture after the 4-byte payload fix, physical
 sleep/wake validation, and the guarded removal of the FnKey package containing
 the CC4.0 console.
+
+## 2026-11-20 OSD theme following and directional page transitions
+
+Windows Release SHA-256:
+`298a65f45b6b9f5ce0985993acdec2216f29a2ab598d5b167a64a0a3bd9aa7e6`
+(19,147,264 bytes).
+
+The panel theme is now a single persisted state instead of a per-window
+default. `theme.ini` stores `dark=0|1`; the parser rejects unknown keys and
+unrecognised values so a truncated file cannot leave the UI undefined. The
+main window and the OSD overlay each receive the same palette state because
+Slint instantiates a `global` once per window.
+
+Verified on the installed build:
+
+- `theme.ini dark=1` -> OSD centre pixel `R28 G32 B44` (dark surface `#1C202C`),
+  with the light-on-dark text and cyan accent rendered.
+- `theme.ini dark=0` -> OSD centre pixel in the light surface family, with
+  dark text, light `#F7F9FD` card and cyan accent border.
+- A capture taken 600 ms into the display window shows the card still
+  contracted and offset upward; a capture at 1600 ms shows it settled. The
+  reveal animation therefore runs on the real path rather than being a static
+  layout property.
+- `--osd-smoke` returned 0 for both themes.
+
+Evidence:
+
+```text
+target/validation/osd-theme/seq-dark-600.png
+target/validation/osd-theme/seq-dark-1600.png
+target/validation/osd-theme/seq-light-600.png
+target/validation/osd-theme/seq-light-1600.png
+target/validation/osd-theme/capture-osd.ps1
+target/validation/osd-theme/capture-seq.ps1
+```
+
+Page navigation no longer fades through a full-surface scrim rectangle. The
+page surface animates `x` by 18 px in the navigation direction together with
+`opacity`, so the outgoing and incoming pages move apart instead of the whole
+workspace flashing to the background colour. The graphics harness now also
+asserts `page-offset == 0` at settle, which previously could have stayed
+shifted without failing.
+
+### Animation budget: still not accepted
+
+`--graphics-smoke` on the installed build:
+
+```text
+renderer=backend=Vulkan renderer=Skia adapter=AMD Radeon(TM) 610M
+transitions=22 final_ui_state=passed submitted_frames=2416
+submission_interval_p50_ms=3.53 submission_interval_p95_ms=6.19
+submission_interval_max_ms=55.52 gaps_over_33ms=2
+```
+
+The measurement isolates first-visit page construction rather than per-frame
+animation cost. Round one contains every outlier:
+
+```text
+round=1 page=1 max_acquire_ms=25.09
+round=1 page=2 max_draw_ms=50.72
+round=1 page=4 max_present_ms=31.98
+```
+
+Every round-two transition stays below 10 ms worst case
+(`max_total_ms` between 4.33 and 9.60). The 16.67 ms budget therefore still
+fails on a cold navigation, and the remaining work is page warm-up, not
+animation timing. Submission intervals are also not scanout timing.
+
+Windows native tests: 73 application, 4 uninstaller, 35 protocol. Host
+`scripts/verify.sh` passed and the unsafe ratchet stayed at
+`unsafe total: 100 (ceiling 100)` because the theme work added no FFI.

@@ -13,6 +13,7 @@ use crate::driver_manager::{self, InstallLaunchError};
 use crate::fan_curve_ui::{curve_nodes, quick_toggle_from_index};
 use crate::flexikey_ui::{FlexiKeyViewState, render_flexikey};
 use crate::localization::{is_zh, localized_fan_label, localized_power_label, set_zh, tr};
+use crate::runtime_state;
 use crate::tray;
 use crate::worker::{CommandSender, WorkerCommand};
 use crate::{MainWindow, Palette};
@@ -20,17 +21,34 @@ use crate::{MainWindow, Palette};
 static PAGE_EPOCH: AtomicU64 = AtomicU64::new(0);
 static THEME_EPOCH: AtomicU64 = AtomicU64::new(0);
 
-const PAGE_DIM_MS: u64 = 90;
-const PAGE_SWAP_SETTLE_MS: u64 = 2;
+const PAGE_EXIT_MS: u64 = 130;
+const PAGE_SWAP_SETTLE_MS: u64 = 1;
 const PAGE_CACHE_DELAY_MS: u64 = 50;
-const PAGE_ENTER_FADE_MS: u64 = 170;
-const PAGE_DIM_OPACITY: f32 = 0.74;
+const PAGE_ENTER_FADE_MS: u64 = 240;
+const PAGE_SHIFT_PX: f32 = 18.0;
 const THEME_ANIMATION_MS: u64 = 260;
 const THEME_FRAME_MS: u64 = 16;
 
 fn ease_out_cubic(progress: f32) -> f32 {
     let inverse = 1.0 - progress;
     1.0 - inverse * inverse * inverse
+}
+
+/// Publish one palette state to the main window and to the OSD overlay.
+///
+/// Slint instantiates each `global` once per window, so the overlay needs an
+/// explicit copy; without it the OSD keeps the startup palette and never
+/// follows a light/dark switch.
+fn publish_theme(ui: &MainWindow, dark: bool, blend: f32) {
+    ui.global::<Palette>().set_dark(dark);
+    ui.global::<Palette>().set_blend(blend);
+    crate::osd::set_theme(dark, blend);
+}
+
+/// Apply the persisted theme before the first frame, and seed the overlay.
+pub(crate) fn apply_persisted_theme(ui: &MainWindow) {
+    let dark = runtime_state::theme_dark();
+    publish_theme(ui, dark, if dark { 1.0 } else { 0.0 });
 }
 
 fn schedule_theme_frame(
@@ -50,35 +68,40 @@ fn schedule_theme_frame(
         let progress =
             (started.elapsed().as_secs_f32() * 1000.0 / THEME_ANIMATION_MS as f32).clamp(0.0, 1.0);
         let value = start + (target - start) * ease_out_cubic(progress);
-        ui.global::<Palette>().set_blend(value);
+        publish_theme(&ui, ui.global::<Palette>().get_dark(), value);
         if progress < 1.0 {
             schedule_theme_frame(ui.as_weak(), start, target, started, epoch);
         } else {
-            ui.global::<Palette>().set_blend(target);
+            publish_theme(&ui, ui.global::<Palette>().get_dark(), target);
         }
     });
 }
 
 fn begin_page_switch(ui: &MainWindow, page: i32, epoch: u64) {
+    let current = ui.get_selected_page();
+    let direction = if page >= current { 1.0 } else { -1.0 };
+
     ui.set_page_transitioning(true);
-    ui.set_page_fade_duration(PAGE_DIM_MS as i64);
-    ui.set_page_opacity(PAGE_DIM_OPACITY);
+    ui.set_page_fade_duration(PAGE_EXIT_MS as i64);
+    ui.set_page_offset(-direction * PAGE_SHIFT_PX);
+    ui.set_page_opacity(0.0);
 
     let weak = ui.as_weak();
-    slint::Timer::single_shot(Duration::from_millis(PAGE_DIM_MS), move || {
+    slint::Timer::single_shot(Duration::from_millis(PAGE_EXIT_MS), move || {
         if PAGE_EPOCH.load(Ordering::Relaxed) != epoch {
             return;
         }
         let Some(ui) = weak.upgrade() else {
             return;
         };
+        // Swap while the old page is fully faded, then start the new page just
+        // outside the viewport and ease it into place.
         ui.set_page_fade_duration(0);
-        ui.set_page_opacity(PAGE_DIM_OPACITY);
+        ui.set_page_offset(direction * PAGE_SHIFT_PX);
+        ui.set_page_opacity(0.0);
         ui.set_page_cache_ready(false);
         ui.set_selected_page(page);
 
-        // Defer GPU layer creation away from the page selection callback.
-        // A newer navigation request owns its own cache activation.
         let cache_weak = ui.as_weak();
         slint::Timer::single_shot(Duration::from_millis(PAGE_CACHE_DELAY_MS), move || {
             if PAGE_EPOCH.load(Ordering::Relaxed) == epoch
@@ -97,6 +120,7 @@ fn begin_page_switch(ui: &MainWindow, page: i32, epoch: u64) {
                 return;
             };
             ui.set_page_fade_duration(PAGE_ENTER_FADE_MS as i64);
+            ui.set_page_offset(0.0);
             ui.set_page_opacity(1.0);
 
             let weak = ui.as_weak();
@@ -171,11 +195,14 @@ pub(crate) fn wire_ui(
             return;
         }
         ui.global::<Palette>().set_dark(dark);
+        runtime_state::persist_theme_dark(dark);
         let epoch = THEME_EPOCH.fetch_add(1, Ordering::Relaxed) + 1;
+        let target = if dark { 1.0 } else { 0.0 };
+        publish_theme(&ui, dark, ui.global::<Palette>().get_blend());
         schedule_theme_frame(
             ui.as_weak(),
             ui.global::<Palette>().get_blend(),
-            if dark { 1.0 } else { 0.0 },
+            target,
             Instant::now(),
             epoch,
         );
