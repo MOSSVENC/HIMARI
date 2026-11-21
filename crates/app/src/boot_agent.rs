@@ -32,6 +32,12 @@ pub(crate) fn reapply_saved_policy() -> Result<(), String> {
     loop {
         match Dchu::open() {
             Ok(dchu) => {
+                match dchu.release_proc_hot() {
+                    Ok(()) => log_line("processor-hot limit released after resume"),
+                    Err(error) => log_line(&format!(
+                        "processor-hot release after resume failed: {error}"
+                    )),
+                }
                 dchu.set_power_mode(profile.power)
                     .map_err(|error| format!("power restore failed: {error}"))?;
                 if profile.fan != FanMode::Auto {
@@ -193,6 +199,13 @@ pub fn run() -> i32 {
 
         match opened {
             Ok(dchu) => {
+                // The vendor power handler opens by releasing the latched
+                // processor-hot limit; without it the package stays capped even
+                // in the Performance profile.
+                match dchu.release_proc_hot() {
+                    Ok(()) => log_line("processor-hot limit released"),
+                    Err(error) => log_line(&format!("processor-hot release failed: {error}")),
+                }
                 let power_ok = match dchu.set_power_mode(profile.power) {
                     Ok(()) => {
                         log_line(&format!(

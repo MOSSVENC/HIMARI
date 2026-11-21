@@ -18,6 +18,11 @@ impl Dchu {
             ));
         }
 
+        // The vendor's power handler releases the latched processor-hot limit
+        // before applying any profile, so a profile switch also clears whatever
+        // the embedded controller latched earlier.
+        self.release_proc_hot()?;
+
         let previous = self.read_byte(1, 1);
         let command_result = self.apply_power_mode(target);
         if let Err(error) = command_result {
@@ -161,6 +166,18 @@ impl Dchu {
             actual,
             rollback,
         })
+    }
+
+    /// Release the platform's latched processor-hot limit.
+    ///
+    /// The vendor power handler opens by sending `DCHU(121, 42, 1)`, whose
+    /// decoded text is `Talk EC Release PROC_HOT`, before it reads the current
+    /// profile and applies the per-mode fan policy. Without this step the
+    /// embedded controller keeps a previously latched limit and the package
+    /// stays around 4.2 GHz even in the Performance profile; the vendor console
+    /// releases it whenever it re-initialises.
+    pub fn release_proc_hot(&self) -> Result<()> {
+        self.set_data(121, &[1, 0, 0, 42])
     }
 
     pub fn run_anti_dust(&self) -> Result<()> {

@@ -1102,3 +1102,46 @@ The Slint overlay component and its `bars.slint` re-export were deleted with
 it, and `osd::set_theme` went away because the overlay reads the palette when
 it presents. 78 application, 4 uninstaller and 35 protocol host tests pass,
 strict Windows Clippy is clean, `unsafe total: 110 (ceiling 110)`.
+
+## 2026-11-21 Missing processor-hot release, and why performance looked capped
+
+The user reported that opening the vendor control center pushed the package to
+about 5 GHz, while HIMARI stayed near 4.2 GHz. The vendor decompilation
+explains it. Its AC/DC and power-profile handler opens with:
+
+```text
+DCHU(121, 42, 1)                      decoded text: Talk EC Release PROC_HOT
+num = current power mode
+Thread.Sleep(100)
+PowerLineStatus = SystemInformation.PowerStatus
+switch (num) { ... apply the per-mode fan and profile tables ... }
+```
+
+HIMARI never sent that command, so a limit latched by the embedded controller
+survived; the vendor released it every time its console re-initialised.
+
+Implemented:
+
+- `Dchu::release_proc_hot` sends `121/[1,0,0,42]`;
+- it runs at boot-policy replay, after sleep/resume, on every profile switch,
+  and is available as `--release-proc-hot` for measurement.
+
+Measurements on this machine, same package, minutes apart:
+
+```text
+99 °C, 4,957 RPM, during sustained compilation   4,200 MHz
+81-86 °C, 5,300 RPM, after the load stopped     4,770 MHz
+the same, after the release command              4,870 MHz
+installed build replaying at boot                4,981 MHz
+```
+
+Read honestly: the 4.2 GHz the user first saw was **thermal**, produced by hours
+of sustained WSL compilation from this session, not by a regression. The
+release command is a real missing step and is worth roughly +120 MHz at equal
+temperature; at a cool package the sequence reaches ~4.98 GHz.
+
+Boot log evidence on the installed build:
+
+```text
+processor-hot limit released
+```

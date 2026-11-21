@@ -1248,6 +1248,10 @@ impl Dchu {
         Err(DchuError::UnsupportedPlatform)
     }
 
+    pub fn release_proc_hot(&self) -> Result<()> {
+        Err(DchuError::UnsupportedPlatform)
+    }
+
     pub fn set_fan_mode(&self, _mode: FanMode) -> Result<()> {
         Err(DchuError::UnsupportedPlatform)
     }

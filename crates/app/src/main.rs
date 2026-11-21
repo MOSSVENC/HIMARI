@@ -269,6 +269,26 @@ fn run_transition_snapshot(
     Ok(())
 }
 
+/// Release the platform's latched processor-hot limit once and report it.
+fn release_proc_hot() -> i32 {
+    match himari_protocol::Dchu::open() {
+        Ok(dchu) => match dchu.release_proc_hot() {
+            Ok(()) => {
+                println!("processor-hot limit released");
+                0
+            }
+            Err(error) => {
+                eprintln!("release failed: {error}");
+                1
+            }
+        },
+        Err(error) => {
+            eprintln!("transport: {error}");
+            1
+        }
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     match std::env::args().nth(1).as_deref() {
         Some("--boot-agent") => std::process::exit(boot_agent::run()),
@@ -329,6 +349,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::process::exit(1);
             }
         },
+        Some("--release-proc-hot") => std::process::exit(release_proc_hot()),
         Some("--thermal-smoke") => std::process::exit(smoke::thermal_smoke()),
         #[cfg(windows)]
         Some("--cpu-frequency-smoke") => std::process::exit(telemetry::cpu_frequency_smoke()),
