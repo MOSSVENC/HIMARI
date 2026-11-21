@@ -144,3 +144,5 @@ reading the plugin source. Return the effective allowlist (or at least
   Rust workspace.
 
 Quoted tool output above is kept verbatim from before the project was renamed to `HIMARI`; the paths and the crates it mentions are historical.
+
+The parent directory was later renamed to `/home/mossvenc/Projects`, with `/home/mossvenc/Project` kept as a symlink so recorded workspace paths still resolve. The quoted paths above are left as the plugin printed them.
