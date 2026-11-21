@@ -1033,3 +1033,39 @@ changes:
    into a CPU buffer instead of a swapchain.
 3. Changing the whole application renderer to `femtovg`/OpenGL, which accepts
    alpha on Windows but discards the verified Vulkan path.
+
+## 2026-11-21 Native layered OSD with real per-pixel alpha
+
+The Vulkan surface cannot be translucent here, so the overlay was rebuilt as a
+Win32 layered window that presents a premultiplied ARGB bitmap, which is the
+mechanism the vendor overlay uses.
+
+Implementation in `crates/app/src/osd_layer.rs`:
+
+- a top-down 32bpp DIB section per surface, selected into a memory DC, so the
+  pixels can be composed directly in Rust and handed to `UpdateLayeredWindow`;
+- the rounded panel, its one-pixel antialiased edge, the accent bar and the
+  text are composited per pixel with premultiplied colours; text coverage comes
+  from GDI rasterising the glyphs into a second mask bitmap, so font
+  antialiasing is the engine's rather than a hand-rolled approximation;
+- a single presentation path keeps the window at the stored origin, which is
+  what put the first working build in the corner: `render` re-presented at
+  `(0,0)` and dragged the window back after `move_to` had positioned it;
+- the window is a `STATIC` popup carrying
+  `WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW`, so it
+  never takes focus from the foreground application.
+
+Verified on this machine with `--osd-layer-smoke` and a full-screen capture:
+
+```text
+target/validation/osd-theme/layer3-full.png
+```
+
+The card renders at the requested origin, the game behind it is visible
+through the panel and the rounded corners are fully transparent. Earlier
+attempts recorded in this file — colour key, constant alpha, swapchain
+composite mode — were all dead ends on the same surface.
+
+FFI is confined to this module: `unsafe total: 110 (ceiling 110)`, ten
+boundaries, each with a safety comment. The overlay is not yet wired into the
+Fn dispatch; this commit adds the verified primitive and a smoke entry point.

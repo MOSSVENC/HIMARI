@@ -33,6 +33,7 @@ mod input_recovery;
 mod input_replay;
 mod localization;
 mod osd;
+mod osd_layer;
 #[allow(dead_code)]
 mod process_query;
 #[allow(dead_code)]
@@ -336,6 +337,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("--io-smoke") => std::process::exit(io_smoke()),
         Some("--touchpad-smoke") => std::process::exit(smoke::touchpad_smoke()),
         Some("--fn-events-smoke") => std::process::exit(fn_diagnostics::smoke()),
+        Some("--osd-layer-smoke") => return osd_layer::smoke(),
         Some("--osd-smoke") => return fn_owner::osd_smoke(),
         Some("--fn-event-smoke") => {
             let code = std::env::args()
