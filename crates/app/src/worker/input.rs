@@ -1,4 +1,4 @@
-use ram_control_center_protocol::{Dchu, QuickToggle};
+use himari_protocol::{Dchu, QuickToggle};
 
 use super::CommandOutcome;
 use crate::input::send_virtual_key;

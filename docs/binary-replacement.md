@@ -1,6 +1,6 @@
 # User-mode binary replacement
 
-RAM CONTROL CENTER replaces the vendor user-mode control path while keeping the
+HIMARI replaces the vendor user-mode control path while keeping the
 signed hardware boundary intact. The replacement is statically linked into one
 deployment binary, so there is no separate codec DLL to load, initialize,
 discover or version during startup.
@@ -9,10 +9,10 @@ discover or version during startup.
 
 | Vendor component | Replacement | State |
 |---|---|---|
-| `CC40.exe` | Slint UI in `ram-control-center.exe` | Core controls implemented; Fn/OSD parity remains open |
-| `InsydeDCHU.dll` | `ram-control-center-protocol` direct AcpiBridge transport | All five exports have a direct equivalent |
-| `HKFltrLib.dll` | `ram-control-center-protocol` direct `HKKbdFltr.sys` transport | Protocol is implemented; the current FlexiKey engine uses a user-mode hook and does not require this driver |
-| vendor boot-policy delivery | `RAMControlCenterBoot` service mode plus interactive `ram-control-center.exe` | Power replay starts before the user shell; the vendor hotkey application remains independently installed |
+| `CC40.exe` | Slint UI in `himari.exe` | Core controls implemented; Fn/OSD parity remains open |
+| `InsydeDCHU.dll` | `himari-protocol` direct AcpiBridge transport | All five exports have a direct equivalent |
+| `HKFltrLib.dll` | `himari-protocol` direct `HKKbdFltr.sys` transport | Protocol is implemented; the current FlexiKey engine uses a user-mode hook and does not require this driver |
+| vendor boot-policy delivery | `HimariBoot` service mode plus interactive `himari.exe` | Power replay starts before the user shell; the vendor hotkey application remains independently installed |
 
 The signed `AcpiBridge.sys` and `HKKbdFltr.sys` drivers are not replaced,
 patched, re-signed or wrapped by a custom kernel component. `AcpiBridge.sys` is
@@ -39,7 +39,7 @@ operations. The deployed executable import table contains neither
 ## HKFltrLib.dll exports
 
 The direct keyboard-filter transport covers the control messages used by the
-RAM CONTROL CENTER feature set:
+HIMARI feature set:
 
 ```text
 0xBA400  filter enable/disable
@@ -52,13 +52,13 @@ RAM CONTROL CENTER feature set:
 Open, filter enable/disable, clear and USB enable are live-verified. Macro add
 uses the vendor 16-byte key-collection format. Selective `0xBA408` removal is
 not used because the vendor wrapper clears the complete macro set first and
-discards the actual remove result. RAM CONTROL CENTER replaces the complete set with a
+discards the actual remove result. HIMARI replaces the complete set with a
 validated clear-and-reapply transaction instead.
 
 ## Boot service
 
-`ram-control-center.exe --boot-service` is a one-shot Windows service entry point.
-The installed service is named `RAMControlCenterBoot`, starts automatically as
+`himari.exe --boot-service` is a one-shot Windows service entry point.
+The installed service is named `HimariBoot`, starts automatically as
 `LocalSystem`, and depends on the signed `AcpiBridge` driver. It runs the same
 headless worker as `--boot-agent`, applies the persisted power transition,
 verifies the readback and exits without creating a window.
@@ -66,7 +66,7 @@ verifies the readback and exits without creating a window.
 ## Driver-only installation
 
 The signed OEM driver is a deployment dependency, not a component linked into
-`ram-control-center.exe`. The application looks for a local payload beside the
+`himari.exe`. The application looks for a local payload beside the
 executable:
 
 ```text

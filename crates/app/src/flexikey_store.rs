@@ -3,7 +3,7 @@
 use crate::diagnostics::log_action;
 use crate::flexikey_engine::EngineReport;
 use crate::localization::tr;
-use ram_control_center_protocol::{FlexiKeyProfile, FlexiKeyStore};
+use himari_protocol::{FlexiKeyProfile, FlexiKeyStore};
 use std::path::{Path, PathBuf};
 
 #[derive(Clone)]

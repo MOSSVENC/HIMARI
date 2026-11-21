@@ -1,6 +1,6 @@
 //! Executes one macro action and releases the inputs it successfully pressed.
 
-use ram_control_center_protocol::{FlexiKeyAction, MacroStep, MacroStepKind};
+use himari_protocol::{FlexiKeyAction, MacroStep, MacroStepKind};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ReplayKey {

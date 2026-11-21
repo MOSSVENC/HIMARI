@@ -1,6 +1,6 @@
 //! Input ownership and trigger capture, independent of the Windows hook transport.
 
-use ram_control_center_protocol::FlexiKeyAction;
+use himari_protocol::FlexiKeyAction;
 use std::collections::HashMap;
 
 pub(crate) type Actions = HashMap<u16, FlexiKeyAction>;

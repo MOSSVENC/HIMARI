@@ -2,7 +2,7 @@ use std::process::ExitCode;
 use std::thread;
 use std::time::Duration;
 
-use ram_control_center_protocol::{
+use himari_protocol::{
     CustomFanCurve, Dchu, FanCurveNodes, FanMode, FlexiChargerMode, PowerMode, QuickToggle,
 };
 
@@ -33,6 +33,28 @@ fn main() -> ExitCode {
         "low_refresh_status: {low_refresh_status}, value: {}",
         low_refresh.first().copied().unwrap_or_default()
     );
+    // Vendor power-mode packet reads these two flags before building 121/25.
+    let (boost_flag_status, boost_flag) = dchu.raw_read_settings(1, 32, 1);
+    println!(
+        "power_boost_page1_off32_status: {boost_flag_status}, value: {}",
+        boost_flag.first().copied().unwrap_or_default()
+    );
+    let (turbo_fan_status, turbo_fan) = dchu.raw_read_settings(4, 8, 1);
+    println!(
+        "turbo_fan_page4_off8_status: {turbo_fan_status}, value: {}",
+        turbo_fan.first().copied().unwrap_or_default()
+    );
+    let (power_mode_status, power_mode) = dchu.raw_read_settings(1, 1, 1);
+    println!(
+        "power_mode_page1_off1_status: {power_mode_status}, value: {}",
+        power_mode.first().copied().unwrap_or_default()
+    );
+    let (policy_status, policy) = dchu.raw_read_settings(1, 16, 1);
+    println!(
+        "power_policy_page1_off16_status: {policy_status}, value: {}",
+        policy.first().copied().unwrap_or_default()
+    );
+
     let (gpu13_status, gpu13) = dchu.raw_read_buffer(13);
     println!("gpu13_status: {gpu13_status}");
     println!("gpu13[0..64]: {}", hex_bytes(&gpu13[..64]));
@@ -425,7 +447,7 @@ fn main() -> ExitCode {
             eprintln!("rgb-set-color: expected exactly three channels");
             return ExitCode::FAILURE;
         }
-        let color = ram_control_center_protocol::RgbColor {
+        let color = himari_protocol::RgbColor {
             red: channels[0],
             green: channels[1],
             blue: channels[2],
@@ -572,7 +594,7 @@ fn rgb_sleep_stability_smoke(dchu: &Dchu) -> ExitCode {
     }
 }
 
-fn write_smoke(dchu: &Dchu, state: ram_control_center_protocol::PlatformState) -> ExitCode {
+fn write_smoke(dchu: &Dchu, state: himari_protocol::PlatformState) -> ExitCode {
     let Some(power) = state.power_mode.and_then(PowerMode::from_u8) else {
         eprintln!("write-smoke: current power mode is not recognized; no write attempted");
         return ExitCode::FAILURE;

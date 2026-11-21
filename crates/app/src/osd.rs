@@ -14,6 +14,12 @@ use crate::osd_layer::{self, Presentation};
 
 static MAIN_WINDOW: OnceLock<Mutex<Option<Weak<crate::MainWindow>>>> = OnceLock::new();
 
+/// Logical overlay size before display scaling.
+const BASE_WIDTH: f32 = 320.0;
+const BASE_HEIGHT: f32 = 84.0;
+/// Gap between the card and the bottom of the work area.
+const BASE_MARGIN: f32 = 24.0;
+
 pub(crate) fn install(main_window: Weak<crate::MainWindow>) {
     let main = MAIN_WINDOW.get_or_init(|| Mutex::new(None));
     if let Ok(mut main) = main.lock() {
@@ -61,16 +67,29 @@ pub(crate) fn show(title: &str, detail: &str, accent: slint::Color) {
             f32::from(accent.green()) / 255.0,
             f32::from(accent.blue()) / 255.0,
         ];
-        let position = ui.window().position();
-        let size = ui.window().size();
-        let width = i32::try_from(size.width).unwrap_or(0);
-        let height = i32::try_from(size.height).unwrap_or(0);
-        // A hidden or unplaced main window yields an off-screen anchor; clamp
-        // so the card always lands inside the desktop.
-        let origin = (
-            (position.x + (width - 320) / 2).max(0),
-            (position.y + height - 84 - 28).max(0),
-        );
+        // Size the card from the display scale so it keeps the same apparent
+        // size at 125 % / 150 %, like the vendor overlay does.
+        let scale = ui.window().scale_factor();
+        let width = (BASE_WIDTH * scale).round() as i32;
+        let height = (BASE_HEIGHT * scale).round() as i32;
+        let margin = (BASE_MARGIN * scale).round() as i32;
+        // Anchor to the primary work area, which is what the vendor overlay
+        // does: bottom centre of the desktop, above the taskbar.
+        let origin = match osd_layer::work_area() {
+            Some((left, _top, right, bottom)) => {
+                (left + (right - left - width) / 2, bottom - height - margin)
+            }
+            None => {
+                let position = ui.window().position();
+                let size = ui.window().size();
+                let anchor_width = i32::try_from(size.width).unwrap_or(0);
+                let anchor_height = i32::try_from(size.height).unwrap_or(0);
+                (
+                    (position.x + (anchor_width - width) / 2).max(0),
+                    (position.y + anchor_height - height - margin).max(0),
+                )
+            }
+        };
         osd_layer::show(Presentation {
             title,
             detail,
@@ -79,6 +98,9 @@ pub(crate) fn show(title: &str, detail: &str, accent: slint::Color) {
             title_colour,
             detail_colour,
             origin,
+            width,
+            height,
+            scale,
         });
     })
     .is_err()

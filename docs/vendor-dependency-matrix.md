@@ -15,18 +15,18 @@ UEFI/ACPI 固件
             └─ 自定义设备接口 {86994c74-ad43-4812-b7e7-0c420b5c5fd7}
                  ├─ InsydeDCHU.dll（厂商用户态包装层，可替换）
                  ├─ FnKey.exe / CC40.exe（厂商用户态应用，可替换）
-                 └─ RAM CONTROL CENTER（直接 CreateFileW + DeviceIoControl）
+                 └─ HIMARI（直接 CreateFileW + DeviceIoControl）
 ```
 
 因此：
 
 - `InsydeDCHU.dll` 不是平台；它只是 `AcpiBridge.sys` 的用户态包装层。
-- RAM CONTROL CENTER 已经自行实现该包装层对应的协议，不加载、不转发、不启动任何厂商用户态组件。
+- HIMARI 已经自行实现该包装层对应的协议，不加载、不转发、不启动任何厂商用户态组件。
 - `AcpiBridge.sys` 及其 PnP 设备是整个私有控制协议真正不可跳过的边界。
 - 没有这个已签名内核驱动，普通用户态程序不能直接执行厂商的 ACPI `_DSM` 控制方法。
 - 本机虽然存在 Microsoft 的 `ACPI\PNP0C14` WMI 设备，但厂商 `CLEVO_GET`/`CLEVO_EVENT` WMI 类没有注册成功，不能作为当前可用的驱动替代路径。
 
-## RAM CONTROL CENTER 的实际依赖
+## HIMARI 的实际依赖
 
 ### 必须保留
 
@@ -114,12 +114,12 @@ Clevo_ANX.zip        299558bf87ac0b222e7225199de1e547b0057c9444390ebea77a04f7b32
 Clevo_USB3.zip       24b73f2427364a6773872dffbdfe642916bc5f4d5e6422192263dd3ee778c7bf
 ```
 
-## 为什么 RAM CONTROL CENTER 不是命令转发器
+## 为什么 HIMARI 不是命令转发器
 
 对部署的 `C:\ProgramData\NeoControl\neo-control.exe` 做 PE 和进程检查：
 
 - 导入表没有 `InsydeDCHU.dll`、`HKFltrLib.dll`、`CC40.exe`、`FnKey.exe`；
-- 运行中的 RAM CONTROL CENTER 模块列表没有加载任何厂商控制 DLL；
+- 运行中的 HIMARI 模块列表没有加载任何厂商控制 DLL；
 - 二进制直接包含设备路径和 IOCTL 常量；
 - Rust 代码自行构造 `_DSM` 请求，解析 `AeoB` 描述符响应，自行编码 AppSettings 和键盘过滤帧；
 - 不启动 `DCHUService`、`CCDCHUService`、`FnKey.exe` 或 `CC40.exe`。
@@ -134,7 +134,7 @@ command=12 returned=272
 
 `AeoB` 响应和 272 字节有效载荷证明 Rust 进程可以直接访问 `AcpiBridge` 设备。
 
-RAM CONTROL CENTER 自己唯一主动启动的服务是 `AcpiBridge`。`NeoControlBoot` 的服务依赖也是 `AcpiBridge`，这是为了在用户 shell 之前恢复平台功耗状态。
+HIMARI 自己唯一主动启动的服务是 `AcpiBridge`。`NeoControlBoot` 的服务依赖也是 `AcpiBridge`，这是为了在用户 shell 之前恢复平台功耗状态。
 
 ## 如果清理所有厂商用户态
 
@@ -147,7 +147,7 @@ RAM CONTROL CENTER 自己唯一主动启动的服务是 `AcpiBridge`。`NeoContr
 
 需要明确的功能缺口：
 
-- RAM CONTROL CENTER 已实现独立的 `0x322404` 单次事件注册、限时等待与 `0x322408` 8 字节通知读取。已确认 Arg001 的低字节编号、有符号参数和部分静态分支，见 [Fn 事件协议](fn-event-protocol.md)。`AppSettings(1, 12)` 是服务转发归属标记：DCHUService 在事件循环启动/停止时写入 1/0；FnKey 据此选择服务转发或直接监听。诊断订阅前检查服务状态与标记，调用方还须协调 FnKey。已实测服务运行时拒绝注册，服务及 FnKey 停止后注册与释放成功，最后恢复两者。常规启动沿用现有厂商通知路径；物理 Fn 组合、动作闭环和 OSD 仍待验收。
+- HIMARI 已实现独立的 `0x322404` 单次事件注册、限时等待与 `0x322408` 8 字节通知读取。已确认 Arg001 的低字节编号、有符号参数和部分静态分支，见 [Fn 事件协议](fn-event-protocol.md)。`AppSettings(1, 12)` 是服务转发归属标记：DCHUService 在事件循环启动/停止时写入 1/0；FnKey 据此选择服务转发或直接监听。诊断订阅前检查服务状态与标记，调用方还须协调 FnKey。已实测服务运行时拒绝注册，服务及 FnKey 停止后注册与释放成功，最后恢复两者。常规启动沿用现有厂商通知路径；物理 Fn 组合、动作闭环和 OSD 仍待验收。
 - `HKClipSvc` 是厂商键盘过滤器的剪贴板共享服务。Neo 当前不打开 `HKClipPipe`，也不使用它的共享内存，因此自己的用户态宏路径不依赖它。
 
 ## DCHUService 的安全与侵入性问题

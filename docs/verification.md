@@ -127,7 +127,7 @@ The same executable is registered as the native Windows service
 
 Verified service configuration:
 
-- display name: `RAM CONTROL CENTER Boot Agent`;
+- display name: `HIMARI Boot Agent`;
 - account: `LocalSystem`;
 - start mode: automatic;
 - dependency: signed `AcpiBridge` driver;
@@ -669,7 +669,7 @@ samples remain unavailable in the Overview.
 
 Run the read-only diagnostic on Windows:
 
-    ram-control-center.exe --cpu-frequency-smoke
+    himari.exe --cpu-frequency-smoke
 
 It collects twelve samples, 250 ms apart. Each record includes both PDH format
 variants read from the same collected sample, the reference frequency, and the
@@ -742,8 +742,8 @@ Fn ownership deferred: FnKey.exe is running
 Installed-release smoke commands completed with exit code 0:
 
 ```text
-ram-control-center.exe --osd-smoke
-ram-control-center.exe --fn-event-smoke 0xca
+himari.exe --osd-smoke
+himari.exe --fn-event-smoke 0xca
 ```
 
 The OSD visual capture is
@@ -759,7 +759,7 @@ items.
 ### Fn channel ownership transition
 
 A controlled ownership test stopped the original `FnKey.exe` and
-`CCDCHUService`, started RAM CONTROL CENTER, and observed:
+`CCDCHUService`, started HIMARI, and observed:
 
 ```text
 takeover_app_processes=1
@@ -767,7 +767,7 @@ Fn notification channel acquired
 ```
 
 The test then stopped the owned listener, restarted `CCDCHUService` and
-`FnKey.exe`, and relaunched RAM CONTROL CENTER:
+`FnKey.exe`, and relaunched HIMARI:
 
 ```text
 restored_app_processes=1
@@ -806,7 +806,7 @@ Fn action/OSD loop is still not accepted.
 The locally installed legacy `CLEVOCO.ControlCenter3.0` package was removed with
 `scripts/retire-vendor-console.ps1 -Execute`. The receipt confirms the package
 was removed while `CLEVOCO.FnhotkeysandOSD`, FnKey, CCDCHUService and the
-RAM CONTROL CENTER background process remained present. The package containing
+HIMARI background process remained present. The package containing
 the CC4.0 console remains in place pending physical Fn acceptance.
 
 ## 2026-11-19 final safe-boundary refactor
@@ -952,7 +952,7 @@ The vendor overlay is a WinForms `OsdForm` window carrying `WS_EX_LAYERED`
 alpha-bearing PNG line work, so soft edges, translucent panels and shadows are
 free. It never presents through a GPU swapchain.
 
-RAM CONTROL CENTER presents the overlay through Slint -> Skia -> Vulkan. A
+HIMARI presents the overlay through Slint -> Skia -> Vulkan. A
 DXGI flip-model swapchain surface carries `DXGI_ALPHA_MODE_IGNORE`, so the
 compositor receives an opaque surface. Setting the Slint window `background`
 transparent therefore renders nothing, which is why the earlier attempt

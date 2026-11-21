@@ -25,7 +25,7 @@ Two unrelated roots with no policy file both report the same digest:
 
 ```text
 /tmp/lgprobe/empty/layout.policy.yml   sha256 42faa9206bef6e7d6c73b207ae52f28cf160afe481bcb822503c022115328cf7
-/home/mossvenc/Project/RAM-CONTROL-CENTER/layout.policy.yml
+/home/mossvenc/Project/HIMARI/layout.policy.yml
                                        sha256 42faa920…28cf7
 ```
 
@@ -49,7 +49,7 @@ cd /tmp/lgprobe && mkdir -p poc4 && cd poc4 && echo x > f.txt
 
 ```text
 Error: layout policy: "poc4" is not a declared top-level entry of
-/home/mossvenc/Project/RAM-CONTROL-CENTER, and it does not exist yet.
+/home/mossvenc/Project/HIMARI, and it does not exist yet.
 ```
 
 The same chain without the trailing relative `cd` passes:

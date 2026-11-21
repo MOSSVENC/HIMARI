@@ -44,7 +44,7 @@
 
 ## 输入修复轮次的部署记录
 
-正式副本为 C:\ProgramData\RAM Control Center\ram-control-center.exe，以 --background 启动。安装与构建哈希核对一致，实际提交帧报告 Vulkan / Skia / AMD Radeon 610M。
+正式副本为 C:\ProgramData\Himari\himari.exe，以 --background 启动。安装与构建哈希核对一致，实际提交帧报告 Vulkan / Skia / AMD Radeon 610M。
 
 - EXE：19,065,856 字节。
 - SHA-256：c25a3799bfd13b78d943f977c2ba121b9ec1a1938536f15652fad71003b0fa1f。
@@ -85,9 +85,9 @@ input_replay.rs 负责单次按键或文本动作的校验、按键归属与释�
 
 已安装的 `HKKbdFltr` 和 `HKMouFltr` 位于键盘、鼠标类的 `UpperFilters` 首位。原厂键盘过滤器的 `0xBA400` 控制拦截是否启用，`0xBA41C` 控制 USB 键盘是否进入该过滤链。实机扫描同时确认：鼠标过滤器接口不接受这两个键盘控制码，返回 `ERROR_INVALID_FUNCTION`。
 
-原厂 `CC40/kb.dll` 静态导入 `HKFltrLib`，并调用 `HKFltrLib_OpenDevice`、`HKFltrLib_EnableFilter` 和宏注册接口。过滤器设备及其开关是机器级共享状态，不携带客户端所有权；RAM CONTROL CENTER 又会在原实现里通过打开设备探测驱动健康。两套客户端同时运行时，最后写入者决定共享状态，启动先后和设备枚举快慢会改变结果，因此共存时故障呈时序性、偶发性，而非每次稳定复现。
+原厂 `CC40/kb.dll` 静态导入 `HKFltrLib`，并调用 `HKFltrLib_OpenDevice`、`HKFltrLib_EnableFilter` 和宏注册接口。过滤器设备及其开关是机器级共享状态，不携带客户端所有权；HIMARI 又会在原实现里通过打开设备探测驱动健康。两套客户端同时运行时，最后写入者决定共享状态，启动先后和设备枚举快慢会改变结果，因此共存时故障呈时序性、偶发性，而非每次稳定复现。
 
-RAM CONTROL CENTER 的 FlexiKey 使用自有的低级键盘/鼠标钩子，不需要原厂过滤器的宏拦截。当前行为是：
+HIMARI 的 FlexiKey 使用自有的低级键盘/鼠标钩子，不需要原厂过滤器的宏拦截。当前行为是：
 
 - 驱动健康检查读取服务状态，不再周期性打开过滤器设备；
 - 检测到原厂 `CC40.exe`、`ControlCenter30.exe`、`COUWP.exe` 或 `ControlCenter.exe` 运行时，本程序让出输入过滤所有权，不与其争写；
@@ -101,13 +101,13 @@ HKKbdFltr 0xBA41C(false)  USB keyboard bypass
 HKKbdFltr 0xBA400(false)  interception disabled
 ```
 
-守护只发送运行期控制码，不卸载驱动、不改注册表、不改固件，也不删除原厂服务。正常启动时的守护回执固定写入 `C:\ProgramData\RAM Control Center\input-guard.log`，开发期控制码扫描记录在本机忽略目录 `target/validation/input-incident/filter-reenable.txt`。
+守护只发送运行期控制码，不卸载驱动、不改注册表、不改固件，也不删除原厂服务。正常启动时的守护回执固定写入 `C:\ProgramData\Himari\input-guard.log`，开发期控制码扫描记录在本机忽略目录 `target/validation/input-incident/filter-reenable.txt`。
 
 这一定位解释了故障的场景边界：外接 USB 键鼠在启动后失效，而碰触内置键盘可使输入链重新同步；它不把当前桌面状态或一次成功控制码调用当作冷启动验收。下一次重启后仍需检查外接键鼠在 Explorer 出现后的连续输入，以及 Ctrl/Win 的组合键状态。
 
 ## 本机构建与部署回执
 
-Windows Release 构建后的安装版 SHA-256 为 `1d325c11a7cc3efe9280370c2cbc7e9a5cc5d3d71fdef821a0ad5ef3733d5c05`，大小 19,089,408 字节。部署回执显示 `RAMControlCenterBoot` 启动模式为自动、本次退出码 0，启动项仍为 `--background`。安装版以 `--boot-agent --observe-only --observe-ms 6000` 运行时输出：
+Windows Release 构建后的安装版 SHA-256 为 `1d325c11a7cc3efe9280370c2cbc7e9a5cc5d3d71fdef821a0ad5ef3733d5c05`，大小 19,089,408 字节。部署回执显示 `HimariBoot` 启动模式为自动、本次退出码 0，启动项仍为 `--background`。安装版以 `--boot-agent --observe-only --observe-ms 6000` 运行时输出：
 
 ```text
 input filter guard: keyboard interception disabled; USB keyboard bypass active

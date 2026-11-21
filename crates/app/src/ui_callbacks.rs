@@ -3,7 +3,7 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
-use ram_control_center_protocol::{
+use himari_protocol::{
     AntiDustSchedule, CustomFanCurve, FanMode, GpuSwitchMode, PowerMode, QuickToggle, RgbColor,
 };
 use slint::ComponentHandle;

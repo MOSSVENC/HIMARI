@@ -98,9 +98,9 @@ RVA `0xdd10` 将这两个参数调度到 UI 线程；嵌套回调 RVA `0x133b0` 
 ## 常驻接管实测
 
 2026-11-19 进行了可逆所有权切换：停止原厂 `FnKey.exe` 与
-`CCDCHUService`，启动 RAM CONTROL CENTER，常驻 owner 成功输出
+`CCDCHUService`，启动 HIMARI，常驻 owner 成功输出
 `Fn notification channel acquired`。随后停止测试进程，恢复服务和 FnKey，
-再启动 RAM CONTROL CENTER；恢复结果为服务 Running、FnKey 进程存在、后台单实例。
+再启动 HIMARI；恢复结果为服务 Running、FnKey 进程存在、后台单实例。
 该测试证明通知通道可由独立实现获取和释放，但不等于已经完成物理 Fn 组合逐项验收。
 
 2026-11-19 的物理接管日志还发现驱动可能返回 4 字节通知。协议层现在同时接受

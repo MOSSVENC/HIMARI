@@ -1,4 +1,4 @@
-use ram_control_center_protocol::Dchu;
+use himari_protocol::Dchu;
 
 #[cfg(windows)]
 pub fn touchpad_enabled() -> Result<bool, String> {

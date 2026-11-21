@@ -4,7 +4,7 @@ use crate::MainWindow;
 use crate::control_sync::{Control, ControlSync, Controls};
 use crate::system_controls::{AudioState, DisplayCareState};
 use crate::ui_update::{UiUpdate, apply_update};
-use ram_control_center_protocol::{
+use himari_protocol::{
     FanChannel, FlexiChargerState, GpuSwitchState, PlatformState, PowerMode, QuickToggleState,
     RgbColor, RgbKeyboardState, ThermalSample,
 };

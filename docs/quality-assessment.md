@@ -1,4 +1,4 @@
-# RAM CONTROL CENTER quality assessment
+# HIMARI quality assessment
 
 This is a historical assessment. The input and installation defects found on
 November 14–16 invalidate its broad readiness claims. Use the
@@ -121,16 +121,16 @@ directory, so imported Slint files trigger rebuilds.
 The crate graph remains deliberately small and acyclic:
 
 ```text
-ram-control-center
-  -> ram-control-center-protocol
+himari
+  -> himari-protocol
   -> slint / raw-window-handle / windows-sys / windows
   -> windows-registry / windows-service
 
-ram-control-center-protocol
+himari-protocol
   -> roxmltree / windows-sys
 ```
 
-`ram-control-center-protocol` is independent of the app and UI. Hardware access is
+`himari-protocol` is independent of the app and UI. Hardware access is
 confined to direct `CreateFileW` / `DeviceIoControl` code and typed domain
 modules behind the signed device interfaces.
 
@@ -234,7 +234,7 @@ HKFltrLib.dll               457,600 bytes
 CC40 plus two DLLs       33,246,592 bytes
 ```
 
-Current RAM CONTROL CENTER:
+Current HIMARI:
 
 ```text
 neo-control.exe          11,046,912 bytes

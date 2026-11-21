@@ -1,4 +1,4 @@
-# RAM CONTROL CENTER architecture
+# HIMARI architecture
 
 ## Stack
 
@@ -7,7 +7,7 @@ Slint UI (Rust, GPU-rendered)
         │
         │ typed commands on one worker thread
         ▼
-ram-control-center-protocol
+himari-protocol
         │ CreateFileW + DeviceIoControl
         ▼
 signed AcpiBridge device          signed HKKbdFltr device
@@ -70,7 +70,7 @@ the `build.rs` rebuild watch.
 
 ## Deployment naming
 
-The installed executable has one canonical name: `ram-control-center.exe`. Source
+The installed executable has one canonical name: `himari.exe`. Source
 versions are represented by Git commits; build output is never deployed as
 `-final`, `-preview` or numbered side-by-side executables. Replacing the running
 app is a stop, atomic file replacement and restart operation against the single
@@ -149,10 +149,10 @@ modifiers released in reverse order.
 The same binary exposes a native Windows service mode:
 
 ```text
-"C:\ProgramData\RAM Control Center\ram-control-center.exe" --boot-service --wait-ms 120000
+"C:\ProgramData\Himari\himari.exe" --boot-service --wait-ms 120000
 ```
 
-The installed `RAMControlCenterBoot` service is automatic, runs as `LocalSystem`,
+The installed `HimariBoot` service is automatic, runs as `LocalSystem`,
 and declares a dependency on the signed `AcpiBridge` driver. The Service
 Control Manager schedules it during automatic service startup. This registration
 does not enforce an ordering dependency with the user shell. It creates no UI, opens
@@ -166,8 +166,8 @@ after 1, 2 and 5 seconds and are enabled for non-crash service failures.
 The service command is installed and removed by the same executable:
 
 ```text
-ram-control-center.exe --install-boot-service
-ram-control-center.exe --uninstall-boot-service
+himari.exe --install-boot-service
+himari.exe --uninstall-boot-service
 ```
 
 `--boot-agent` remains available as a direct diagnostic invocation of the
@@ -190,7 +190,7 @@ tags and dependencies in [Automatically Starting Services](https://learn.microso
 
 The interactive process has three Windows responsibilities:
 
-- a hidden tray window with the embedded RAM CONTROL CENTER icon;
+- a hidden tray window with the embedded HIMARI icon;
 - `WH_KEYBOARD_LL` and `WH_MOUSE_LL` FlexiKey hooks plus an action worker;
 - a single-instance mutex that restores the existing window and prevents a
   second hook from starting.

@@ -1,7 +1,7 @@
 fn main() {
     println!("cargo:rerun-if-changed=ui");
-    println!("cargo:rerun-if-changed=../../assets/ram_control_center_logo.svg");
-    println!("cargo:rerun-if-changed=../../assets/ram_control_center_logo.ico");
+    println!("cargo:rerun-if-changed=../../assets/himari_logo.svg");
+    println!("cargo:rerun-if-changed=../../assets/himari_logo.ico");
     println!("cargo:rerun-if-changed=app.rc");
     println!("cargo:rerun-if-changed=ui/translations");
 
@@ -43,7 +43,7 @@ fn compile_icon() {
 }
 
 fn compile_runtime_catalog() {
-    let path = "ui/translations/zh-CN/LC_MESSAGES/ram-control-center.po";
+    let path = "ui/translations/zh-CN/LC_MESSAGES/himari.po";
     let source = std::fs::read_to_string(path).expect("failed to read Chinese translation catalog");
     let mut entries = Vec::new();
     let mut msgid = None;

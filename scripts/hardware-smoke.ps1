@@ -1,10 +1,10 @@
 param(
-    [string]$Executable = 'C:\ProgramData\RAM Control Center\ram-control-center.exe'
+    [string]$Executable = 'C:\ProgramData\Himari\himari.exe'
 )
 
 $ErrorActionPreference = 'Stop'
 if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) {
-    throw "RAM CONTROL CENTER executable not found: $Executable"
+    throw "HIMARI executable not found: $Executable"
 }
 
 $modes = @('--control-sync-smoke', '--input-hooks-smoke', '--settings-smoke', '--system-smoke', '--io-smoke', '--display-care-smoke')

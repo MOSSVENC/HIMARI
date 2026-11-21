@@ -1,8 +1,6 @@
 use crate::MainWindow;
 use crate::localization::tr;
-use ram_control_center_protocol::{
-    FanCurveNodes, FanCurveState, QuickToggle, QuickToggleState, RpmFanLevel,
-};
+use himari_protocol::{FanCurveNodes, FanCurveState, QuickToggle, QuickToggleState, RpmFanLevel};
 
 pub(crate) fn apply_rpm_edit_point(level: &mut RpmFanLevel, temperature: u8, rpm: u16) {
     level.temp_up_c = temperature;
@@ -45,7 +43,7 @@ pub(crate) fn set_fan_curve_properties(ui: &MainWindow, curve: Option<&FanCurveS
 fn apply_curve_channel(
     ui: &MainWindow,
     index: usize,
-    channel: &ram_control_center_protocol::FanCurveChannel,
+    channel: &himari_protocol::FanCurveChannel,
     sync_requested: bool,
 ) {
     if channel.is_unused() {
@@ -80,7 +78,7 @@ fn apply_curve_channel(
     }
 }
 
-fn curve_profile_text(channel: &ram_control_center_protocol::FanCurveChannel) -> String {
+fn curve_profile_text(channel: &himari_protocol::FanCurveChannel) -> String {
     if channel.is_unused() {
         return tr("unused").to_owned();
     }

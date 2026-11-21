@@ -14,7 +14,7 @@ use crate::{
     system_controls::{AudioState, DisplayCareState},
     telemetry::SystemSnapshot,
 };
-use ram_control_center_protocol::{
+use himari_protocol::{
     AntiDustSchedule, FanCurveState, FanMode, FlexiChargerState, GpuSwitchState,
     PlatformCapabilities, PlatformState, PowerMode, QuickToggleState, RgbKeyboardState,
     RpmFanTable, ThermalSample,

@@ -24,7 +24,7 @@ Cargo. SKIA_BINARIES_URL can override this location for a prepared cache.
 
 Then run the bounded test with Windows PowerShell 7:
 
-    pwsh -File scripts/test-graphics.ps1 -Executable '<release directory>\ram-control-center.exe' -OutputDirectory '<measurement directory>'
+    pwsh -File scripts/test-graphics.ps1 -Executable '<release directory>\himari.exe' -OutputDirectory '<measurement directory>'
 
 Add -RequireContentUpdates to require a GPU readback check of Overview content
 invalidation: changing its temperature text must change the rendered pixels,
@@ -216,7 +216,7 @@ release-2/results.json, native-results.json, final-verify.log and
 final-windows-clippy.log. The inspected final GPU image is release-2/overview.png.
 
 The 19,074,048-byte Release was deployed to
-C:\ProgramData\RAM Control Center\ram-control-center.exe and launched with
+C:\ProgramData\Himari\himari.exe and launched with
 --background. The installed file matched Release SHA-256
 4C9722E6FA76AC58EE090BCF253741F0FFA0568FB872F7B75D7F3593C14ABAA3. Its first
 submitted frame reported Vulkan / Skia / AMD Radeon 610M. Only the canonical
@@ -324,7 +324,7 @@ keyword ceiling from 102 to 100.
 
 The default Release is 19,073,536 bytes with SHA-256
 29E96FD64A15B97ED527E6A7B1488BF9D599877190526EF07EA220E531E28640.
-It replaced the canonical C:\ProgramData\RAM Control Center executable.
+It replaced the canonical C:\ProgramData\Himari executable.
 The installed process stayed hidden for 6.5 seconds with zero main-window
 submissions, then a second invocation activated the existing process. Its
 first frame reported Vulkan / Skia / AMD Radeon 610M. Closing returned it to
@@ -384,7 +384,7 @@ contains Skia, Vulkano and ash; the submitted-frame report identifies Skia/Vulka
 on the AMD Radeon 610M.
 
 The 19075072-byte default Release was installed at
-C:\ProgramData\RAM Control Center\ram-control-center.exe, with SHA-256
+C:\ProgramData\Himari\himari.exe, with SHA-256
 2AFDFA45505DFD1124F7EFCB313FBE498E7D5B6E324736E309D382E302BCFB6F.
 Installed validation passed hidden startup, single-instance activation and
 close-to-tray. A final background relaunch restored default diagnostic logging.

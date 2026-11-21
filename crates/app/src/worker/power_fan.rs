@@ -1,4 +1,4 @@
-use ram_control_center_protocol::{
+use himari_protocol::{
     AntiDustSchedule, CustomFanCurve, Dchu, FanMode, FlexiChargerMode, GpuSwitchMode, PowerMode,
 };
 

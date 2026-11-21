@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use ram_control_center_protocol::{Dchu, FanMode, PowerMode};
+use himari_protocol::{Dchu, FanMode, PowerMode};
 
 use crate::product::{legacy_data_dir, product_data_dir};
 
@@ -55,7 +55,7 @@ pub(crate) fn reapply_saved_policy() -> Result<(), String> {
     }
 }
 
-/// Headless boot path used by the single `ram-control-center.exe` binary.
+/// Headless boot path used by the single `himari.exe` binary.
 ///
 /// It never constructs the Slint window. The signed AcpiBridge device is
 /// retried until its settings channel is ready, the full persisted power

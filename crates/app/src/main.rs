@@ -156,7 +156,7 @@ fn run_snapshot(page: usize, path: std::path::PathBuf) -> Result<(), Box<dyn std
         log_action(&format!("snapshot translation unavailable: {error}"));
     }
     ui.set_language_zh(true);
-    let dchu = ram_control_center_protocol::Dchu::open();
+    let dchu = himari_protocol::Dchu::open();
     ui.set_transport_ready(dchu.is_ok());
     ui.set_transport_detail(
         dchu.as_ref()
@@ -278,7 +278,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some("on") => true,
                 Some("off") => false,
                 _ => {
-                    eprintln!("usage: ram-control-center --gpu-power <on|off>");
+                    eprintln!("usage: himari --gpu-power <on|off>");
                     std::process::exit(2);
                 }
             };
@@ -295,7 +295,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 Some("on") => true,
                 Some("off") => false,
                 _ => {
-                    eprintln!("usage: ram-control-center --gpu-power-admin <on|off>");
+                    eprintln!("usage: himari --gpu-power-admin <on|off>");
                     std::process::exit(2);
                 }
             };

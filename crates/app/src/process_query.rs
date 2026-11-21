@@ -31,6 +31,6 @@ mod tests {
     fn process_names_are_case_insensitive() {
         assert!(matches_name("CC40.EXE", &["cc40.exe"]));
         assert!(matches_name("FnKey.exe", &["FnKey.exe"]));
-        assert!(!matches_name("ram-control-center.exe", &["FnKey.exe"]));
+        assert!(!matches_name("himari.exe", &["FnKey.exe"]));
     }
 }

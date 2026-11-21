@@ -1,6 +1,6 @@
 # Driver detection and installation
 
-RAM CONTROL CENTER treats the signed OEM driver as a separate deployment dependency.
+HIMARI treats the signed OEM driver as a separate deployment dependency.
 It never installs a driver at startup and never embeds a `.sys` file inside the
 GUI executable.
 
@@ -21,8 +21,8 @@ device.
 
 ## Local payload layout
 
-The deployed app looks beside `ram-control-center.exe` first, then in
-`%ProgramData%\RAM Control Center\drivers`:
+The deployed app looks beside `himari.exe` first, then in
+`%ProgramData%\Himari\drivers`:
 
 ```text
 drivers/
@@ -57,7 +57,7 @@ No driver is launched or installed merely by opening the application.
 
 ## One-click installation
 
-The install button starts the same `ram-control-center.exe` with:
+The install button starts the same `himari.exe` with:
 
 ```text
 --install-drivers
@@ -98,7 +98,7 @@ The exact exit codes are:
 The Windows Release build was checked with:
 
 ```text
-ram-control-center.exe --driver-smoke
+himari.exe --driver-smoke
 ```
 
 Current host result:
@@ -116,7 +116,7 @@ payload_path=C:\ProgramData\NeoControl\drivers
 The idempotent helper path was also checked without changing the system:
 
 ```text
-ram-control-center.exe --install-drivers
+himari.exe --install-drivers
 exit=0
 installer: start
 installer: AcpiBridge already responding; nothing to install

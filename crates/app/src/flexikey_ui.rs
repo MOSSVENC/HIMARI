@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use ram_control_center_protocol::{
+use himari_protocol::{
     FlexiKeyAction, FlexiKeyBinding, FlexiKeyDevice, FlexiKeyProfile, FlexiKeyStore,
 };
 use slint::{ComponentHandle, VecModel, Weak};
@@ -813,9 +813,9 @@ mod flexikey_tests {
 
     #[test]
     fn editing_text_preserves_start_and_send_keys() {
-        let step = |key_code| ram_control_center_protocol::MacroStep {
+        let step = |key_code| himari_protocol::MacroStep {
             key_code,
-            kind: ram_control_center_protocol::MacroStepKind::Make,
+            kind: himari_protocol::MacroStepKind::Make,
             delay_ms: 5,
             group: 0,
             display: String::new(),

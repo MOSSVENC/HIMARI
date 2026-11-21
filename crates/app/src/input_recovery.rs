@@ -1,6 +1,6 @@
 //! Early reconciliation for the OEM keyboard class filter.
 //!
-//! The signed filter remains installed and loaded. RAM CONTROL CENTER does
+//! The signed filter remains installed and loaded. HIMARI does
 //! not use its macro interception path, so the guard keeps the filter in
 //! pass-through mode and excludes USB keyboards from it. The boot service and
 //! the interactive process both invoke the guard; it also repairs the state if
@@ -131,7 +131,7 @@ fn log_guard(message: &str) {
 
 #[cfg(windows)]
 fn reconcile_once() -> Result<(), String> {
-    use ram_control_center_protocol::KeyboardFilter;
+    use himari_protocol::KeyboardFilter;
 
     let filter = KeyboardFilter::open()
         .map_err(|error| format!("could not open the keyboard filter device: {error}"))?;

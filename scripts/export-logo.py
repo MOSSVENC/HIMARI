@@ -11,7 +11,7 @@ import subprocess
 
 def main():
     assets = Path(__file__).resolve().parent.parent / "assets"
-    source = assets / "ram_control_center_logo.svg"
+    source = assets / "himari_logo.svg"
     sizes = (16, 20, 24, 32, 40, 48, 64, 128, 256)
     images = []
     for size in (*sizes, 512):
@@ -19,7 +19,7 @@ def main():
             ["rsvg-convert", "-w", str(size), "-h", str(size), str(source)]
         )
         if size == 512:
-            (assets / "ram_control_center_logo.png").write_bytes(png)
+            (assets / "himari_logo.png").write_bytes(png)
         else:
             images.append((size, png))
     directory = bytearray(struct.pack("<HHH", 0, 1, len(images)))
@@ -27,7 +27,7 @@ def main():
     for size, png in images:
         directory += struct.pack("<BBBBHHII", size % 256, size % 256, 0, 0, 1, 32, len(png), offset)
         offset += len(png)
-    (assets / "ram_control_center_logo.ico").write_bytes(
+    (assets / "himari_logo.ico").write_bytes(
         directory + b"".join(png for _, png in images)
     )
 

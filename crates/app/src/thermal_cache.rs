@@ -1,6 +1,6 @@
 //! Retains independent sensor samples through brief mailbox read failures.
 
-use ram_control_center_protocol::{FanChannel, ThermalSample, is_plausible_temperature};
+use himari_protocol::{FanChannel, ThermalSample, is_plausible_temperature};
 use std::time::{Duration, Instant};
 
 const MAX_AGE: Duration = Duration::from_secs(15);

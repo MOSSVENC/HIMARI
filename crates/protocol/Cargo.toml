@@ -1,5 +1,5 @@
 [package]
-name = "ram-control-center-protocol"
+name = "himari-protocol"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

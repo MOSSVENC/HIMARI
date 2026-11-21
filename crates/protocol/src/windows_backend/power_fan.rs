@@ -14,8 +14,7 @@ impl Dchu {
         let target = mode.as_u8();
         if target == PowerMode::Turbo.as_u8() {
             return Err(DchuError::InvalidArgument(
-                "Turbo is a composite platform mode and is not exposed by RAM CONTROL CENTER"
-                    .to_owned(),
+                "Turbo is a composite platform mode and is not exposed by HIMARI".to_owned(),
             ));
         }
 

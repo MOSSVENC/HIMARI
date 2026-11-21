@@ -1,4 +1,4 @@
-use ram_control_center_protocol::Dchu;
+use himari_protocol::Dchu;
 
 use crate::system_controls;
 
@@ -153,7 +153,7 @@ pub(crate) fn system_smoke() -> i32 {
             .copied()
             .unwrap_or(0);
         system_controls::set_blue_light_filter(level).map_err(|error| {
-            ram_control_center_protocol::DchuError::ControlFailed {
+            himari_protocol::DchuError::ControlFailed {
                 operation: "system smoke blue light",
                 detail: error,
             }

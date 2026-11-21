@@ -1,12 +1,12 @@
-# RAM CONTROL CENTER
+# HIMARI
 
-<img src="assets/ram_control_center_logo.png" width="96" alt="RAM character portrait">
+<img src="assets/himari_logo.png" width="96" alt="RAM character portrait">
 
-RAM is the girl's name behind the project. The original character portrait is
+Himari is the girl behind the project; the name follows the sunflower in her portrait. The original character portrait is
 available under [CC0-1.0](assets/LICENSE.md); its editable SVG and Windows icon
 exports are in `assets/`.
 
-RAM CONTROL CENTER is a native Windows control center for compatible CC4.0/DCHU
+HIMARI is a native Windows control center for compatible CC4.0/DCHU
 platforms. It is built with Rust and Slint and communicates with the platform
 through the signed AcpiBridge device interface.
 
@@ -18,8 +18,8 @@ ZY-T6K is the current hardware validation reference. Other CC4.0 models can use
 the same project after the compatibility checks below.
 
 ```bash
-git clone https://github.com/MOSSVENC/RAM-CONTROL-CENTER.git
-cd RAM-CONTROL-CENTER
+git clone https://github.com/MOSSVENC/HIMARI.git
+cd HIMARI
 ```
 
 ## Highlights
@@ -37,11 +37,11 @@ cd RAM-CONTROL-CENTER
 ## Architecture
 
 ```text
-ram-control-center
-  -> ram-control-center-protocol
+himari
+  -> himari-protocol
   -> Slint / Win32
 
-ram-control-center-protocol
+himari-protocol
   -> signed AcpiBridge device interface (required)
   -> signed HKKbdFltr device interface (optional protocol path)
 ```
@@ -98,7 +98,7 @@ no driver is installed at startup.
 The Release executable is written to:
 
 ```text
-target/x86_64-pc-windows-msvc/release/ram-control-center.exe
+target/x86_64-pc-windows-msvc/release/himari.exe
 ```
 
 The Windows UI uses Slint's Skia renderer on its native Vulkan surface and reports the physical adapter after a successful queue submission. See the [rendering check](docs/rendering.md) for validation scope and measurements.

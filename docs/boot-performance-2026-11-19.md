@@ -69,7 +69,7 @@ Windows 启动其他服务或打开应用界面。
 手动诊断使用现有 EXE：
 
 ```powershell
-& 'C:\ProgramData\RAM Control Center\ram-control-center.exe' --boot-agent --observe-only --observe-ms 5000
+& 'C:\ProgramData\Himari\himari.exe' --boot-agent --observe-only --observe-ms 5000
 ```
 
 `--observe-only` 跳过模式、风扇写入和驱动服务启动；`--observe-ms`
@@ -88,7 +88,7 @@ Windows 启动其他服务或打开应用界面。
 - 5 秒只读启动观察取得 5/5 个有效频率与负载样本，频率范围
   4814–4897 MHz，标称 3601 MHz，负载 5.47–11.55%。该测试前后
   启动策略文件哈希相同，日志确认未执行电源或风扇回放。
-- 已部署到 `C:\ProgramData\RAM Control Center\ram-control-center.exe`，
+- 已部署到 `C:\ProgramData\Himari\himari.exe`，
   19,084,800 字节，SHA-256：
 
   `7c8148a1b5cc1f06790ce6b5244b2ea89cee51a0931a97d307cf287748863bcd`

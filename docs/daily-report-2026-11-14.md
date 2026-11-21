@@ -8,7 +8,7 @@
 - 确认 `FnKey.exe` 与 `neo-control.exe` 的并行输入处理风险。
 - 清理历史幽灵 USB 设备实例并验证当前 Hub/xHCI/Type-C 控制器正常。
 - 完成调查报告和维护者复现步骤。
-- `cargo check -p ram-control-center` 通过。
+- `cargo check -p himari` 通过。
 
 未完成：
 

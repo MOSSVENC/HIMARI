@@ -25,20 +25,20 @@
 ## 当前产品位置
 
 ```text
-C:\ProgramData\RAM Control Center\ram-control-center.exe
-C:\ProgramData\RAM Control Center\ram-control-center-uninstaller.exe
+C:\ProgramData\Himari\himari.exe
+C:\ProgramData\Himari\himari-uninstaller.exe
 ```
 
 注册项：
 
 ```text
-服务：RAMControlCenterBoot
-HKCU\Software\Microsoft\Windows\CurrentVersion\Run → RAMControlCenter
-HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\RAMControlCenter
-HKLM\Software\Microsoft\Windows\CurrentVersion\App Paths\ram-control-center.exe
+服务：HimariBoot
+HKCU\Software\Microsoft\Windows\CurrentVersion\Run → Himari
+HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\Himari
+HKLM\Software\Microsoft\Windows\CurrentVersion\App Paths\himari.exe
 ```
 
-恢复备份随部署迁到 `C:\ProgramData\RAM Control Center\repair-backup`；历史启动日志迁到 `migration`。卸载器默认输出 `--plan`，`--remove` 执行清理。卸载前需从托盘退出应用；运行中的卸载器本身在重启后删除。卸载范围为当前用户和本机注册项、两个固定产品目录中的明确归属文件。其他用户离线注册表、未知快捷方式和 OEM 驱动的卸载不属于本轮自动清理范围。
+恢复备份随部署迁到 `C:\ProgramData\Himari\repair-backup`；历史启动日志迁到 `migration`。卸载器默认输出 `--plan`，`--remove` 执行清理。卸载前需从托盘退出应用；运行中的卸载器本身在重启后删除。卸载范围为当前用户和本机注册项、两个固定产品目录中的明确归属文件。其他用户离线注册表、未知快捷方式和 OEM 驱动的卸载不属于本轮自动清理范围。
 
 ## 验收标准
 
@@ -103,7 +103,7 @@ HKLM\Software\Microsoft\Windows\CurrentVersion\App Paths\ram-control-center.exe
 
 `snapshot-tools` 构建提供 `--bars-smoke=<目录>`，直接使用生产控件建立独立测试窗口，执行 10 组数值像素检查，以及三个 RGB 通道共 30 次正向、反向、越界指针移动。拖动后立即检查数值、填充起点和滑块边缘。测试只向 Slint 窗口分发指针事件，不向系统注入键鼠，也不连接硬件写入。
 
-复现方法：在 WSL 构建 `cargo build --release --target x86_64-pc-windows-gnu -p ram-control-center --bin ram-control-center --features snapshot-tools`，然后在 Windows PowerShell 7 执行 `scripts/test-bars.ps1 -Executable <exe路径> -OutputDirectory <截图目录>`。正式交付使用默认 feature 的 Release。
+复现方法：在 WSL 构建 `cargo build --release --target x86_64-pc-windows-gnu -p himari --bin himari --features snapshot-tools`，然后在 Windows PowerShell 7 执行 `scripts/test-bars.ps1 -Executable <exe路径> -OutputDirectory <截图目录>`。正式交付使用默认 feature 的 Release。
 
 本机 `windows-bars.log` 全部检查通过，渲染报告为 `GraphicsAPI::NativeOpenGL`。检查了 0%、25%、50%、100% 的截图；0% 无监视条填充，其余比例的起点始终位于轨道左端，RGB 填充终点跟随滑块中心。截图保存在本地忽略目录 `target/validation/bars/`。`windows-bars-final.log` 记录默认 Release 的状态同步、GPU 后端初始化和输入钩子生命周期检查。
 

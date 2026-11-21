@@ -29,7 +29,7 @@ pub(crate) fn spawn_trace() {
     });
 }
 
-fn require_direct_mode(flag: Option<u8>) -> ram_control_center_protocol::Result<()> {
+fn require_direct_mode(flag: Option<u8>) -> himari_protocol::Result<()> {
     match flag {
         Some(0) => Ok(()),
         Some(1) => Err(ownership_error("DCHUService advertises Arg001 forwarding")),
@@ -39,15 +39,15 @@ fn require_direct_mode(flag: Option<u8>) -> ram_control_center_protocol::Result<
     }
 }
 
-fn ownership_error(detail: impl Into<String>) -> ram_control_center_protocol::DchuError {
-    ram_control_center_protocol::DchuError::ControlFailed {
+fn ownership_error(detail: impl Into<String>) -> himari_protocol::DchuError {
+    himari_protocol::DchuError::ControlFailed {
         operation: "coordinate Fn notification ownership",
         detail: detail.into(),
     }
 }
 
 #[cfg(windows)]
-fn require_services_stopped() -> ram_control_center_protocol::Result<()> {
+fn require_services_stopped() -> himari_protocol::Result<()> {
     use windows_service::service::{ServiceAccess, ServiceState};
     use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
 
@@ -74,9 +74,9 @@ fn require_services_stopped() -> ram_control_center_protocol::Result<()> {
 
 /// The diagnostic caller also coordinates the resident FnKey process. The
 /// forwarding flag and service status are checked before driver registration.
-pub(crate) fn open_listener()
--> ram_control_center_protocol::Result<ram_control_center_protocol::AcpiNotificationListener> {
-    use ram_control_center_protocol::{AcpiNotificationListener, Dchu};
+pub(crate) fn open_listener() -> himari_protocol::Result<himari_protocol::AcpiNotificationListener>
+{
+    use himari_protocol::{AcpiNotificationListener, Dchu};
 
     let device = Dchu::open()?;
     let flag = device.read_setting_byte(1, 12);
@@ -86,7 +86,7 @@ pub(crate) fn open_listener()
     AcpiNotificationListener::open(device.path())
 }
 
-fn describe(value: ram_control_center_protocol::FnNotification) -> String {
+fn describe(value: himari_protocol::FnNotification) -> String {
     format!(
         "ACPI Fn notification: raw={:#018x} message={:?} event={:?}",
         value.raw(),
@@ -115,7 +115,7 @@ pub(crate) fn smoke() -> i32 {
         }
         drop(listener);
         println!("Fn notifications: subscription closed");
-        Ok::<(), ram_control_center_protocol::DchuError>(())
+        Ok::<(), himari_protocol::DchuError>(())
     })();
     match result {
         Ok(()) => 0,

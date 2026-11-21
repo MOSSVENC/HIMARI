@@ -95,7 +95,7 @@ wall-clock delta. A delta of twelve seconds or more indicates that the process
 was suspended by system sleep. On that transition it reads the persisted
 power/fan policy, waits up to ten seconds for the signed ACPI transport,
 reapplies the power transition and reapplies a non-Auto fan policy. The result
-is written to `C:\ProgramData\RAM Control Center\resume-recovery.log` and the
+is written to `C:\ProgramData\Himari\resume-recovery.log` and the
 boot-agent log.
 
 The watcher owns no renderer resources and performs device I/O only on its own
@@ -105,7 +105,7 @@ wall-clock watcher; a real sleep/wake cycle remains the final acceptance step.
 ### Quiet mode GPU policy
 
 CC4.0's worker command `0x0013` controls the runtime NVIDIA platform
-controller, not the next-boot MUX selection. RAM CONTROL CENTER now implements
+controller, not the next-boot MUX selection. HIMARI now implements
 the recovered sequence directly:
 
 ```text
@@ -173,7 +173,7 @@ Modes:
   0 none, 1 3D Text, 2 Blank, 3 Bubbles, 4 Mystify, 5 Photos, 6 Ribbons
 ```
 
-The RAM CONTROL CENTER implementation applies the Windows state first, writes the
+The HIMARI implementation applies the Windows state first, writes the
 vendor mirror byte, verifies both, and restores the previous Windows state when
 either side fails. The page remains available on LCD systems because taskbar,
 dark-mode, timeout and screen-saver controls are Windows features; panel-only
@@ -183,7 +183,7 @@ pixel shifting/refresh is not exposed.
 
 The FnKey implementation reads `HKCU\Software\Microsoft\Windows\CurrentVersion\PrecisionTouchPad\Status\Enabled`
 before sending Ctrl+Win+F24. It updates AppSettings page 1 offset 10 as a
-settings mirror after the Windows transition. RAM CONTROL CENTER uses the
+settings mirror after the Windows transition. HIMARI uses the
 Windows value for live readback, skips repeated targets, confirms the
 transition with bounded polling, and restores the previous Windows state if
 persisting the mirror fails. Injected events share the FlexiKey marker; keys
@@ -307,7 +307,7 @@ Vendor profile path:
 C:\ComboKey\profile.xml
 ```
 
-RAM CONTROL CENTER parses and writes the same XML schema:
+HIMARI parses and writes the same XML schema:
 
 ```text
 Profile_N
@@ -356,7 +356,7 @@ Supported actions:
 - text: optional start keys, Unicode text, then optional send keys;
 - disable: swallow the trigger key.
 
-Injected events created by RAM CONTROL CENTER carry a private `dwExtraInfo` marker and
+Injected events created by HIMARI carry a private `dwExtraInfo` marker and
 are ignored by the hook to prevent macro loops. The interactive process is
 single-instance, remains resident in the tray after its window closes, and uses
 the current-user Run key to start in the background at logon. Mouse bindings
@@ -419,7 +419,7 @@ state remain mandatory ownership gates.
 Mapped Fn events dispatch through the same DCHU and Windows-control paths used
 by the UI. Implemented actions include keyboard backlight stepping/toggle/cycle,
 Fn Lock, Noiseless fan toggle, power-profile cycling, camera state, touchpad
-toggle, and show/hide of RAM CONTROL CENTER. Other confirmed events provide OSD
+toggle, and show/hide of HIMARI. Other confirmed events provide OSD
 state feedback and preserve their raw notification in logs.
 
 The OSD is a separate always-on-top Slint window with a bottom-center overlay,

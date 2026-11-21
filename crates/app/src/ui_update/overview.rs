@@ -7,7 +7,7 @@ use crate::{
     localization::tr,
     telemetry::SystemSnapshot,
 };
-use ram_control_center_protocol::{FanChannel, ThermalSample, is_plausible_temperature};
+use himari_protocol::{FanChannel, ThermalSample, is_plausible_temperature};
 
 pub(super) fn apply(ui: &MainWindow, system: &SystemSnapshot, thermal: Option<ThermalSample>) {
     ui.set_cpu_load(system.cpu_load_percent.round().clamp(0.0, 100.0) as i32);

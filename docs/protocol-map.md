@@ -3,7 +3,7 @@
 This document records evidence recovered from the installed Control Center
 applications and from live transport instrumentation.
 
-RAM CONTROL CENTER's implemented path is the direct `CreateFileW` / `DeviceIoControl`
+HIMARI's implemented path is the direct `CreateFileW` / `DeviceIoControl`
 branch below. The vendor UI/DLL call graph is retained as protocol provenance,
 not as a runtime dependency.
 
@@ -17,7 +17,7 @@ not as a runtime dependency.
 ## Transport stack
 
 ```text
-RAM CONTROL CENTER                              Vendor reference
+HIMARI                              Vendor reference
      │                                        │
      │ CreateFileW + DeviceIoControl          ├─ InsydeDCHU.dll
      │                                        │      ├─ GetDCHU_Data_*
@@ -135,7 +135,7 @@ ReadAppSettings(page=1, offset=16, length=1)
 ```
 
 The recovered FnKey transition identifies the second command as
-`SetEnergyStarMode`. RAM CONTROL CENTER sends both commands. The hardware mode
+`SetEnergyStarMode`. HIMARI sends both commands. The hardware mode
 retains the Turbo fan bit in Performance and maps Quiet+ to Quiet, while the
 settings retain the UI mode. Settings-byte readback verifies
 the stored selection; it does not measure actual CPU performance or establish
@@ -275,7 +275,7 @@ ReadAppSettings(page=519, offset=1, length=1)
 before the Control Center initialization sequence. `InsydeDCHU.dll` raised an
 access violation at `InsydeDCHU.dll+0x190d1f` and terminated the probe process.
 
-RAM CONTROL CENTER uses the recovered page 2 keyboard state layout and the initialized
+HIMARI uses the recovered page 2 keyboard state layout and the initialized
 `SetDCHU_DataEx(4, [63], ...)` / `SetDCHU_Data(103, ...)` paths.
 - RGB brightness, color, effects, sleep timer and boot effect have been
   exercised through the direct transport.
@@ -325,7 +325,7 @@ The implemented IOCTLs and 16-byte collection frames are documented in
 ## ACPI notifications
 
 The vendor service registers an event handle once through `0x322404` and reads
-an eight-byte notification through `0x322408`. RAM CONTROL CENTER preserves the
+an eight-byte notification through `0x322408`. HIMARI preserves the
 full i64 payload and decodes FnKey's Arg001 low-byte event ID and signed argument.
 Static dispatch evidence and verified events are in [Fn event protocol](fn-event-protocol.md).
 

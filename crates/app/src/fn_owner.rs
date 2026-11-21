@@ -4,9 +4,7 @@ use std::sync::Mutex;
 use std::sync::OnceLock;
 use std::time::Duration;
 
-use ram_control_center_protocol::{
-    Adjustment, Dchu, FanNotice, FnEvent, FnNotification, PowerMode,
-};
+use himari_protocol::{Adjustment, Dchu, FanNotice, FnEvent, FnNotification, PowerMode};
 use slint::{ComponentHandle, Weak};
 
 use crate::{MainWindow, localization::tr, osd};
@@ -174,7 +172,7 @@ fn event_title(event: FnEvent) -> &'static str {
         FnEvent::FnLockToggle => tr("Fn Lock"),
         FnEvent::FanNotice(_) | FnEvent::NoiselessFanToggle => tr("Cooling"),
         FnEvent::PowerModeCycle => tr("Power mode"),
-        FnEvent::ControlCenterToggle => tr("RAM CONTROL CENTER"),
+        FnEvent::ControlCenterToggle => tr("HIMARI"),
         FnEvent::Docking(_) => tr("Docking"),
         FnEvent::NumLock(_) => tr("Num Lock"),
         FnEvent::CapsLock(_) => tr("Caps Lock"),
@@ -273,7 +271,7 @@ fn toggle_fn_lock() -> Result<String, String> {
         .fn_lock
         .ok_or_else(|| tr("Fn Lock state is unavailable").to_owned())?;
     device
-        .set_quick_toggle(ram_control_center_protocol::QuickToggle::FnLock, !current)
+        .set_quick_toggle(himari_protocol::QuickToggle::FnLock, !current)
         .map_err(|error| error.to_string())?;
     Ok(if current {
         tr("Off").to_owned()

@@ -101,7 +101,7 @@ removes it unless all of the following are supplied:
 ```text
 -IncludeFnKey
 -AcknowledgeFnAcceptance
-C:\ProgramData\RAM Control Center\fn-owner-acceptance.json
+C:\ProgramData\Himari\fn-owner-acceptance.json
   { "physicalFnAccepted": true }
 ```
 

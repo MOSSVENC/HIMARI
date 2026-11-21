@@ -38,9 +38,7 @@ mod windows_uninstall {
             [] => "--plan",
             [mode] if matches!(mode.as_str(), "--plan" | "--remove") => mode,
             _ => {
-                return Err(
-                    "usage: ram-control-center-uninstaller.exe [--plan|--remove]".to_owned(),
-                );
+                return Err("usage: himari-uninstaller.exe [--plan|--remove]".to_owned());
             }
         };
         let roots = installation_roots()?;
@@ -88,10 +86,7 @@ mod windows_uninstall {
                 }
             }
         }
-        let log = std::env::temp_dir().join(format!(
-            "ram-control-center-uninstall-{}.log",
-            std::process::id()
-        ));
+        let log = std::env::temp_dir().join(format!("himari-uninstall-{}.log", std::process::id()));
         report.extend(failures.iter().cloned());
         std::fs::write(&log, report.join("\n"))
             .map_err(|error| format!("write uninstall report: {error}"))?;
@@ -124,10 +119,7 @@ mod windows_uninstall {
                 let handle = OpenMutexW(0x0010_0000, 0, name.as_ptr());
                 if !handle.is_null() {
                     let _owner = OwnedHandle::from_raw_handle(handle);
-                    return Err(
-                        "Exit RAM CONTROL CENTER from its tray menu before uninstalling."
-                            .to_owned(),
-                    );
+                    return Err("Exit HIMARI from its tray menu before uninstalling.".to_owned());
                 }
                 let error = std::io::Error::last_os_error();
                 if error.raw_os_error() != Some(2) {
@@ -236,9 +228,9 @@ mod windows_uninstall {
 
     fn remove_application_registry(report: &mut Vec<String>) -> Result<(), String> {
         let subkeys = [
-            r"Software\Microsoft\Windows\CurrentVersion\Uninstall\RAMControlCenter",
+            r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Himari",
             r"Software\Microsoft\Windows\CurrentVersion\Uninstall\NeoControl",
-            r"Software\Microsoft\Windows\CurrentVersion\App Paths\ram-control-center.exe",
+            r"Software\Microsoft\Windows\CurrentVersion\App Paths\himari.exe",
             r"Software\Microsoft\Windows\CurrentVersion\App Paths\neo-control.exe",
         ];
         for root in [CURRENT_USER, LOCAL_MACHINE] {
@@ -291,7 +283,7 @@ fn main() {
             std::process::exit(0);
         }
         Err(error) => {
-            eprintln!("RAM CONTROL CENTER uninstall failed: {error}");
+            eprintln!("HIMARI uninstall failed: {error}");
             std::process::exit(1);
         }
     }

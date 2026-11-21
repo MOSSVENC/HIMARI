@@ -15,7 +15,7 @@ fix(flexikey): defer global input hooks until profile use
 验证：
 
 ```text
-cargo check -p ram-control-center
+cargo check -p himari
 ```
 
 结果：通过（Linux 目标）。Windows 目标和重启后的输入回归仍需维护者完成。

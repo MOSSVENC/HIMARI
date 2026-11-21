@@ -44,7 +44,7 @@ mod platform {
     const MENU_OPEN: usize = 1;
     const MENU_EXIT: usize = 2;
     const WINDOW_TITLE: &str = PRODUCT_NAME;
-    const ICON_BYTES: &[u8] = include_bytes!("../../../assets/ram_control_center_logo.ico");
+    const ICON_BYTES: &[u8] = include_bytes!("../../../assets/himari_logo.ico");
 
     struct TrayContext {
         window: usize,
@@ -363,7 +363,7 @@ mod platform {
     }
 
     fn show_menu(hwnd: HWND) {
-        let open = wide(tr("Open RAM CONTROL CENTER"));
+        let open = wide(tr("Open HIMARI"));
         let exit = wide(tr("Exit"));
         // SAFETY: `hwnd` is the live tray window. The menu and both menu labels
         // stay alive until after TrackPopupMenu and DestroyMenu complete.

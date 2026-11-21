@@ -1,7 +1,7 @@
 //! Typed control requests and their ordering metadata.
 
 use crate::control_sync::{Control, ControlSync, Controls, WriteTicket};
-use ram_control_center_protocol::{
+use himari_protocol::{
     AntiDustSchedule, CustomFanCurve, FanMode, GpuSwitchMode, PowerMode, QuickToggle, RgbColor,
 };
 use std::sync::mpsc::{self, Receiver, SendError, Sender};

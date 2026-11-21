@@ -11,9 +11,9 @@ Windows：10.0.26100.9457
 
 - `HKKbdFltr.sys`（HotKey Keyboard Class Filter Driver）处于 `Running`，并位于键盘类 `UpperFilters` 的第一位：`HKKbdFltr, kbdclass`。
 - `HKMouFltr.sys`（HotKey Mouse Class Filter Driver）处于 `Running`，并位于鼠标类 `UpperFilters` 的第一位：`HKMouFltr, mouclass`。
-- 厂商 `FnKey.exe` 与改名后的 RAM CONTROL CENTER 可执行文件 `C:\ProgramData\NeoControl\neo-control.exe` 曾同时运行。
+- 厂商 `FnKey.exe` 与改名后的 HIMARI 可执行文件 `C:\ProgramData\NeoControl\neo-control.exe` 曾同时运行。
 - `C:\ComboKey\profile.xml` 当前配置为 `Active="0"`、`IsKbEnable="0"`、`IsMouseEnable="0"`，没有绑定；因此没有证据表明当前配置主动映射 Ctrl/Win。
-- RAM CONTROL CENTER 源码仍会在启动时无条件安装 `WH_KEYBOARD_LL` 和 `WH_MOUSE_LL` 全局钩子。即使配置为空，这仍会增加输入处理链的竞争面，是项目应修复的确定性问题。
+- HIMARI 源码仍会在启动时无条件安装 `WH_KEYBOARD_LL` 和 `WH_MOUSE_LL` 全局钩子。即使配置为空，这仍会增加输入处理链的竞争面，是项目应修复的确定性问题。
 
 设备管理器里的未知 USB 项目不是当前插入的 Hub：
 
@@ -61,7 +61,7 @@ USB\VID_0000&PID_0007\...  Status=Unknown  Problem=CM_PROB_PHANTOM
 
 ### 中高可信度：软件叠加放大问题
 
-`FnKey.exe` 使用厂商键盘/鼠标过滤能力，RAM CONTROL CENTER 又启动低级键盘/鼠标钩子。两套输入处理链同时运行时，即使 RAM CONTROL CENTER 没有绑定，也可能造成时序竞争或重复处理。当前没有证据证明 RAM CONTROL CENTER 单独完成了 Ctrl/Win 映射，因此不能把它直接定罪为唯一根因。
+`FnKey.exe` 使用厂商键盘/鼠标过滤能力，HIMARI 又启动低级键盘/鼠标钩子。两套输入处理链同时运行时，即使 HIMARI 没有绑定，也可能造成时序竞争或重复处理。当前没有证据证明 HIMARI 单独完成了 Ctrl/Win 映射，因此不能把它直接定罪为唯一根因。
 
 ### 低可信度：USB Hub 是根因
 
@@ -73,7 +73,7 @@ USB\VID_0000&PID_0007\...  Status=Unknown  Problem=CM_PROB_PHANTOM
 - 清理了四个 `CM_PROB_PHANTOM` 的历史 USB 设备实例。
 - 做过一次可逆隔离测试：停止 `FnKey`、`HKClipSvc`、`neo-control` 用户态进程。
 - 为输入过滤器和登录启动项创建了备份，随后已恢复到修改前状态；没有留下待重启的系统配置改动。
-- Linux 目标构建已通过：`cargo check -p ram-control-center`。
+- Linux 目标构建已通过：`cargo check -p himari`。
 
 ## 项目需要修复的代码问题
 
@@ -84,16 +84,16 @@ USB\VID_0000&PID_0007\...  Status=Unknown  Problem=CM_PROB_PHANTOM
 3. 钩子安装失败时只影响 FlexiKey，不得阻塞主 UI 或改变普通输入链。
 4. 在诊断页显示“钩子未启用/已启用/安装失败”，并记录进程名、profile、绑定数量。
 5. 增加 Windows 集成测试：空 profile 启动后不应出现低级钩子；启用绑定后才安装一次。
-6. 文档和可执行文件的产品名统一使用当前改名后的名称，避免把旧的 `NeoControl`、`RAM CONTROL CENTER` 和厂商 `ControlCenter` 混为一谈。
+6. 文档和可执行文件的产品名统一使用当前改名后的名称，避免把旧的 `NeoControl`、`HIMARI` 和厂商 `ControlCenter` 混为一谈。
 
 本分支只保留了上述延迟安装方向的候选代码改动，尚未在 Windows 上编译和运行验证，不应直接发布为正式修复。
 
 ## 维护者复现顺序
 
-1. 重启前先关闭 `FnKey.exe`、`HKClipSvc.exe` 和 RAM CONTROL CENTER。
+1. 重启前先关闭 `FnKey.exe`、`HKClipSvc.exe` 和 HIMARI。
 2. 在设备管理器确认键盘/鼠标类仍有 `HKKbdFltr`、`HKMouFltr` UpperFilters。
 3. 只启动厂商 FnKey，测试内置键盘、外接键盘和鼠标。
-4. 只启动 RAM CONTROL CENTER，保持空 profile，测试输入。
+4. 只启动 HIMARI，保持空 profile，测试输入。
 5. 两者同时启动，测试输入。
 6. 在可回滚备份后移除两个 ClassFilter 并重启；若异常消失，根因即得到确认。
 

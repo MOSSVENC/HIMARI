@@ -105,7 +105,7 @@ that the exact 7.68.1.0 package was restored.
 
 ## What can be rewritten
 
-RAM CONTROL CENTER already talks directly to the signed AcpiBridge device and
+HIMARI already talks directly to the signed AcpiBridge device and
 implements the user-mode DCHU, RGB, fan, power, GPU, input and OSD behavior.
 The vendor control-center UI is therefore replaceable.
 
@@ -117,6 +117,6 @@ silently mixed into the application rewrite.
 ## Safe cleanup rule
 
 Do not remove `C:\Program Files (x86)\ControlCenter`, `AcpiBridge`, or the
-keyboard/mouse filter payload while FnKey/CC40 or the current RAM CONTROL CENTER
+keyboard/mouse filter payload while FnKey/CC40 or the current HIMARI
 still uses them. Retire the AppX UI modules only after functional and physical
 validation; keep the driver boundary until a signed replacement exists.

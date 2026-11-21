@@ -8,8 +8,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$app = Join-Path $env:ProgramData 'RAM Control Center\ram-control-center.exe'
-$data = Join-Path $env:ProgramData 'RAM Control Center'
+$app = Join-Path $env:ProgramData 'Himari\himari.exe'
+$data = Join-Path $env:ProgramData 'Himari'
 $acceptance = Join-Path $data 'fn-owner-acceptance.json'
 $receipt = Join-Path $data 'vendor-console-retirement.json'
 $cc3 = @(Get-AppxPackage -Name 'CLEVOCO.ControlCenter3.0*')
@@ -44,7 +44,7 @@ if (-not $Execute) {
     exit 0
 }
 if (-not (Test-Path -LiteralPath $app -PathType Leaf)) {
-    throw "Installed RAM CONTROL CENTER executable is missing: $app"
+    throw "Installed HIMARI executable is missing: $app"
 }
 if ($IncludeFnKey -and (-not $AcknowledgeFnAcceptance -or -not $fnAccepted)) {
     throw 'FnKey removal requires physical Fn acceptance marker and -AcknowledgeFnAcceptance.'
@@ -64,7 +64,7 @@ try {
         Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop
         Wait-Process -Id $process.ProcessId -Timeout 10 -ErrorAction SilentlyContinue
     }
-    $apps = @(Get-Process -Name ram-control-center -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $app })
+    $apps = @(Get-Process -Name himari -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $app })
     foreach ($process in $apps) {
         Stop-Process -Id $process.Id -Force -ErrorAction Stop
         Wait-Process -Id $process.Id -Timeout 10 -ErrorAction SilentlyContinue
@@ -87,9 +87,9 @@ try {
 
     Start-Process -FilePath $app -ArgumentList '--background'
     Start-Sleep -Seconds 3
-    $live = @(Get-Process -Name ram-control-center -ErrorAction Stop | Where-Object { $_.Path -eq $app })
+    $live = @(Get-Process -Name himari -ErrorAction Stop | Where-Object { $_.Path -eq $app })
     if ($live.Count -ne 1) {
-        throw "Expected one RAM CONTROL CENTER process after retirement, got $($live.Count)"
+        throw "Expected one HIMARI process after retirement, got $($live.Count)"
     }
     $result = [ordered]@{
         RetiredAt = (Get-Date).ToString('o')

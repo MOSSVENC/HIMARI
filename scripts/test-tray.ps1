@@ -113,7 +113,7 @@ try {
             do {
                 if ($process.HasExited) { throw "Diagnostic exited during startup: $($process.ExitCode)" }
                 foreach ($window in @([RamTrayTest]::Windows($process.Id, $false))) {
-                    if ([RamTrayTest]::ClassName($window) -eq 'RAMControlCenterTrayWindow') { $script:tray = $window }
+                    if ([RamTrayTest]::ClassName($window) -eq 'HimariTrayWindow') { $script:tray = $window }
                     if ($background -and [RamTrayTest]::HasVisibleArea($window)) {
                         throw "Background startup exposed a visible window: class=$([RamTrayTest]::ClassName($window)) title=$([RamTrayTest]::Title($window)) elapsed_ms=$($watch.ElapsedMilliseconds)"
                     }

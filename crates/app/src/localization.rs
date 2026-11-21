@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use ram_control_center_protocol::{FanMode, PowerMode, QuickToggle};
+use himari_protocol::{FanMode, PowerMode, QuickToggle};
 
 include!(concat!(env!("OUT_DIR"), "/runtime_translations.rs"));
 

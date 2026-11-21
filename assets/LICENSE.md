@@ -1,7 +1,7 @@
 # RAM portrait artwork
 
-`ram_control_center_logo.svg` is an original vector illustration created for
-RAM CONTROL CENTER. The PNG and ICO files are exports of the same illustration.
+`himari_logo.svg` is an original vector illustration created for
+HIMARI. The PNG and ICO files are exports of the same illustration.
 
 The project contributors dedicate this artwork to the public domain under
 **CC0 1.0 Universal (CC0-1.0)**. You may copy, modify, redistribute and use the

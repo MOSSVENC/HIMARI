@@ -12,6 +12,40 @@
 
 use std::sync::Mutex;
 use std::sync::OnceLock;
+
+/// Primary monitor work area in physical pixels, excluding the taskbar.
+///
+/// The vendor overlay anchors to the screen, not to another window, so the card
+/// stays in the same place whether or not the control center is open.
+#[cfg(windows)]
+pub(crate) fn work_area() -> Option<(i32, i32, i32, i32)> {
+    use std::ffi::c_void;
+    use windows_sys::Win32::Foundation::RECT;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{SPI_GETWORKAREA, SystemParametersInfoW};
+
+    let mut rect = RECT {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+    };
+    // SAFETY: SPI_GETWORKAREA writes one RECT into the caller-provided buffer
+    // and takes no other output; the pointer is valid for the call.
+    let ok = unsafe {
+        SystemParametersInfoW(
+            SPI_GETWORKAREA,
+            0,
+            (&mut rect) as *mut RECT as *mut c_void,
+            0,
+        )
+    };
+    (ok != 0).then_some((rect.left, rect.top, rect.right, rect.bottom))
+}
+
+#[cfg(not(windows))]
+pub(crate) fn work_area() -> Option<(i32, i32, i32, i32)> {
+    None
+}
 use std::sync::mpsc::Sender;
 
 /// One overlay presentation: text, palette and where to place the card.
@@ -26,6 +60,9 @@ pub(crate) struct Presentation {
     pub title_colour: [f32; 3],
     pub detail_colour: [f32; 3],
     pub origin: (i32, i32),
+    pub width: i32,
+    pub height: i32,
+    pub scale: f32,
 }
 
 static REQUESTS: OnceLock<Mutex<Option<Sender<Presentation>>>> = OnceLock::new();
@@ -92,9 +129,6 @@ mod windows_impl {
         UpdateLayeredWindow, WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
         WS_POPUP,
     };
-
-    pub(crate) const WIDTH: i32 = 320;
-    pub(crate) const HEIGHT: i32 = 84;
 
     const DT_LEFT: u32 = 0x0000_0000;
     const DT_SINGLELINE: u32 = 0x0000_0020;
@@ -231,12 +265,15 @@ mod windows_impl {
         panel: Surface,
         mask: Surface,
         origin: std::cell::Cell<(i32, i32)>,
+        width: i32,
+        height: i32,
+        scale: f32,
     }
 
     impl Overlay {
-        pub(crate) fn new() -> Option<Self> {
-            let panel = Surface::new(WIDTH, HEIGHT)?;
-            let mask = Surface::new(WIDTH, HEIGHT)?;
+        pub(crate) fn new(width: i32, height: i32, scale: f32) -> Option<Self> {
+            let panel = Surface::new(width, height)?;
+            let mask = Surface::new(width, height)?;
             let class = wide("STATIC");
             // SAFETY: the class name is a predefined control class used as a
             // top-level popup, every style flag is a documented layered-window
@@ -245,12 +282,12 @@ mod windows_impl {
                 CreateWindowExW(
                     WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW,
                     class.as_ptr(),
-                    wide("RAM CONTROL CENTER OSD").as_ptr(),
+                    wide("HIMARI OSD").as_ptr(),
                     WS_POPUP,
                     0,
                     0,
-                    WIDTH,
-                    HEIGHT,
+                    width,
+                    height,
                     ptr::null_mut(),
                     ptr::null_mut(),
                     ptr::null_mut(),
@@ -268,6 +305,9 @@ mod windows_impl {
                 panel,
                 mask,
                 origin: std::cell::Cell::new((0, 0)),
+                width,
+                height,
+                scale,
             })
         }
 
@@ -335,25 +375,27 @@ mod windows_impl {
         /// Rasterise the current title and detail into the mask surface.
         pub(crate) fn set_content(&mut self, title: &str, detail: &str) {
             self.mask.clear();
+            let margin = (40.0 * self.scale) as i32;
+            let card_w = self.width - margin;
             self.draw_text(TextSpec {
                 text: title,
-                px_size: 22,
+                px_size: (22.0 * self.scale) as i32,
                 weight: FW_SEMIBOLD as i32,
                 face: "Bahnschrift",
-                left: 40,
-                top: 12,
-                width: WIDTH - 60,
-                height: 30,
+                left: margin,
+                top: (12.0 * self.scale) as i32,
+                width: card_w,
+                height: (30.0 * self.scale) as i32,
             });
             self.draw_text(TextSpec {
                 text: detail,
-                px_size: 15,
+                px_size: (15.0 * self.scale) as i32,
                 weight: 400,
                 face: "Microsoft YaHei UI",
-                left: 40,
-                top: 44,
-                width: WIDTH - 60,
-                height: 24,
+                left: margin,
+                top: (44.0 * self.scale) as i32,
+                width: card_w,
+                height: (24.0 * self.scale) as i32,
             });
         }
 
@@ -378,14 +420,14 @@ mod windows_impl {
             let offset = (1.0 - reveal) * 10.0;
             let card_x = 8.0;
             let card_y = 8.0 + offset;
-            let card_w = (WIDTH - 16) as f32;
-            let card_h = (HEIGHT - 16) as f32;
+            let card_w = (self.width - 16) as f32;
+            let card_h = (self.height - 16) as f32;
             // Both surfaces are owned by this overlay and stay alive for this
             // frame; the borrow ends before the next mutation.
             let (panel_pixels, mask_pixels) = (self.panel.pixels(), self.mask.pixels());
-            let stride = WIDTH as usize;
-            for y in 0..HEIGHT {
-                for x in 0..WIDTH {
+            let stride = self.width as usize;
+            for y in 0..self.height {
+                for x in 0..self.width {
                     let fx = x as f32 + 0.5 - card_x;
                     let fy = y as f32 + 0.5 - card_y;
                     let coverage = rounded_coverage(fx, fy, card_w, card_h, 13.0);
@@ -418,8 +460,8 @@ mod windows_impl {
 
         fn present(&self) {
             let size = SIZE {
-                cx: WIDTH,
-                cy: HEIGHT,
+                cx: self.width,
+                cy: self.height,
             };
             let blend_function = BLENDFUNCTION {
                 BlendOp: AC_SRC_OVER as u8,
@@ -470,13 +512,16 @@ mod windows_impl {
 
     /// Own the layered window and replay the reveal for each request.
     pub(crate) fn overlay_loop(receiver: Receiver<super::Presentation>) {
-        let Some(mut overlay) = Overlay::new() else {
-            crate::diagnostics::log_action("OSD overlay window could not be created");
-            return;
-        };
         let mut pending = match receiver.recv() {
             Ok(presentation) => presentation,
             Err(_) => return,
+        };
+        let mut overlay = match Overlay::new(pending.width, pending.height, pending.scale) {
+            Some(overlay) => overlay,
+            None => {
+                crate::diagnostics::log_action("OSD overlay window could not be created");
+                return;
+            }
         };
         loop {
             overlay.set_content(&pending.title, &pending.detail);
@@ -496,6 +541,12 @@ mod windows_impl {
             // Hold the card, but let a newer request cut the display short.
             match receiver.recv_timeout(std::time::Duration::from_millis(2_100)) {
                 Ok(next) => {
+                    if next.width != overlay.width || next.height != overlay.height {
+                        match Overlay::new(next.width, next.height, next.scale) {
+                            Some(replacement) => overlay = replacement,
+                            None => return,
+                        }
+                    }
                     pending = next;
                     continue;
                 }
@@ -518,9 +569,12 @@ pub(crate) use windows_impl::{Overlay, overlay_loop};
 
 #[cfg(windows)]
 pub(crate) fn smoke() -> Result<(), Box<dyn std::error::Error>> {
-    let mut overlay = Overlay::new().ok_or("layered overlay could not be created")?;
+    let mut overlay = Overlay::new(320, 84, 1.0).ok_or("layered overlay could not be created")?;
     overlay.set_content("CAPS LOCK", "ON");
-    overlay.move_to(600, 500);
+    let origin = work_area()
+        .map(|(left, _, right, bottom)| (left + (right - left - 320) / 2, bottom - 84 - 24))
+        .unwrap_or((600, 500));
+    overlay.move_to(origin.0, origin.1);
     let steps = 24;
     for step in 0..=steps {
         let reveal = step as f32 / steps as f32;

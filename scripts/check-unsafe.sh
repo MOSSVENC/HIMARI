@@ -22,19 +22,19 @@ declare -A ceilings=(
     ["crates/app/src/runtime_state.rs"]=1
     ["crates/app/src/flexikey_store.rs"]=1
     ["crates/app/src/input_hooks.rs"]=5
-    ["crates/app/src/bin/ram-control-center-uninstaller.rs"]=6
+    ["crates/app/src/bin/himari-uninstaller.rs"]=6
     # Native layered OSD: one DIB/DCC section, one window creation, one font
     # rasterisation pass, one presentation call and their teardown. All of the
     # overlay's FFI lives here, grouped into the smallest blocks that keep the
     # safety argument readable.
-    ["crates/app/src/osd_layer.rs"]=10
+    ["crates/app/src/osd_layer.rs"]=11
 )
 
 total=0
 failed=0
 # Includes the five audited hook handle/event boundaries and six uninstaller
 # boundaries; the dispatcher and tray ceilings were lowered after refactoring.
-max_total=110
+max_total=111
 
 while IFS= read -r file; do
     count=$(grep -o -E '\bunsafe\b' "$file" | wc -l)

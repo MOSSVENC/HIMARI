@@ -16,7 +16,7 @@ mod platform {
     use std::thread;
     use std::time::{Duration, Instant};
 
-    use ram_control_center_protocol::Dchu;
+    use himari_protocol::Dchu;
 
     use crate::product::product_data_dir;
 

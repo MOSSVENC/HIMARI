@@ -4,8 +4,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 const FILES: &[&str] = &[
-    "ram-control-center.exe",
-    "ram-control-center-uninstaller.exe",
+    "himari.exe",
+    "himari-uninstaller.exe",
     "neo-control.exe",
     "boot-profile.ini",
     "boot-agent.log",

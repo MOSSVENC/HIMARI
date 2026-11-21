@@ -26,7 +26,7 @@ impl Summary {
 }
 
 #[cfg(windows)]
-pub(crate) fn run(dchu: &ram_control_center_protocol::Dchu, duration: std::time::Duration) {
+pub(crate) fn run(dchu: &himari_protocol::Dchu, duration: std::time::Duration) {
     use std::time::{Duration, Instant};
 
     use crate::boot_agent::log_line;
@@ -62,7 +62,7 @@ pub(crate) fn run(dchu: &ram_control_center_protocol::Dchu, duration: std::time:
         let policy = dchu.read_setting_byte(1, 16);
         if Instant::now() >= next_thermal {
             thermal = dchu.read_thermal().ok().and_then(|reading| {
-                ram_control_center_protocol::is_plausible_temperature(reading.cpu.temperature_c)
+                himari_protocol::is_plausible_temperature(reading.cpu.temperature_c)
                     .then_some(reading.cpu.temperature_c)
             });
             thermal_age = thermal.map(|_| Instant::now());

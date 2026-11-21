@@ -4,7 +4,7 @@ use crate::{
     control_sync::{Control, Controls},
     localization::{localized_fan_label, localized_power_label},
 };
-use ram_control_center_protocol::{FanMode, PowerMode};
+use himari_protocol::{FanMode, PowerMode};
 
 pub(super) fn apply(ui: &MainWindow, update: &UiUpdate, accepted: Controls, sync: Controls) {
     if update.extended_reads {

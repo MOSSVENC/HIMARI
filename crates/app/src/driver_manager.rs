@@ -6,7 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
-use ram_control_center_protocol::Dchu;
+use himari_protocol::Dchu;
 
 use crate::product::product_data_dir;
 
@@ -204,7 +204,7 @@ mod platform {
     use std::thread;
     use std::time::Duration;
 
-    use ram_control_center_protocol::Dchu;
+    use himari_protocol::Dchu;
     use windows_service::service::ServiceAccess;
     use windows_service::service_manager::{ServiceManager, ServiceManagerAccess};
     use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0};
@@ -459,10 +459,7 @@ mod tests {
 
     #[test]
     fn required_payload_requires_all_three_files() {
-        let root = std::env::temp_dir().join(format!(
-            "ram-control-center-driver-test-{}",
-            std::process::id()
-        ));
+        let root = std::env::temp_dir().join(format!("himari-driver-test-{}", std::process::id()));
         let directory = root.join("acpibridge");
         std::fs::create_dir_all(&directory).expect("create test directory");
         std::fs::write(directory.join("AcpiBridge.inf"), b"inf").expect("write inf");

@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, SyncSender};
 use std::sync::{Arc, Mutex};
 
-use ram_control_center_protocol::{FlexiKeyProfile, FlexiKeyStore};
+use himari_protocol::{FlexiKeyProfile, FlexiKeyStore};
 
 use crate::diagnostics::log_action;
 use crate::flexikey_engine::{EngineReport, FlexiKeyEngine};

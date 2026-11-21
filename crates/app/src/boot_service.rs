@@ -25,7 +25,7 @@ mod platform {
     use crate::product::{LEGACY_SERVICE_NAME, SERVICE_DISPLAY_NAME, SERVICE_NAME};
 
     const SERVICE_DESCRIPTION: &str =
-        "Applies the persisted RAM CONTROL CENTER power policy before the user shell starts.";
+        "Applies the persisted HIMARI power policy before the user shell starts.";
     const SERVICE_DEPENDENCY: &str = "AcpiBridge";
     const SERVICE_WAIT_MS: u32 = 120_000;
 
@@ -160,7 +160,7 @@ mod platform {
             Err(error) if error_code(&error) == Some(ERROR_SERVICE_EXISTS as i32) => {
                 let service = manager
                     .open_service(SERVICE_NAME, service_access)
-                    .map_err(|error| describe("OpenServiceW(RAMControlCenterBoot)", error))?;
+                    .map_err(|error| describe("OpenServiceW(HimariBoot)", error))?;
                 service
                     .change_config(&service_info)
                     .map_err(|error| describe("ChangeServiceConfigW", error))?;

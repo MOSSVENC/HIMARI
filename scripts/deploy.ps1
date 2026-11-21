@@ -7,11 +7,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$taskInstallRoot = Join-Path $env:ProgramData 'RAM Control Center'
+$taskInstallRoot = Join-Path $env:ProgramData 'Himari'
 $taskLegacyRoot = Join-Path $env:ProgramData 'NeoControl'
-$taskExecutable = Join-Path $taskInstallRoot 'ram-control-center.exe'
-$taskUninstaller = Join-Path $taskInstallRoot 'ram-control-center-uninstaller.exe'
-$taskBinaryNames = @('ram-control-center.exe', 'ram-control-center-uninstaller.exe')
+$taskExecutable = Join-Path $taskInstallRoot 'himari.exe'
+$taskUninstaller = Join-Path $taskInstallRoot 'himari-uninstaller.exe'
+$taskBinaryNames = @('himari.exe', 'himari-uninstaller.exe')
 
 function Assert-PlainDirectory([string]$Path) {
     $candidate = [IO.DirectoryInfo]::new([IO.Path]::GetFullPath($Path))
@@ -85,7 +85,7 @@ foreach ($name in $taskBinaryNames) {
 }
 Assert-PlainDirectory $taskInstallRoot
 Assert-PlainDirectory $taskLegacyRoot
-Invoke-ProductCommand (Join-Path $ReleaseDirectory 'ram-control-center.exe') '--input-hooks-smoke'
+Invoke-ProductCommand (Join-Path $ReleaseDirectory 'himari.exe') '--input-hooks-smoke'
 
 $taskOwnedExecutables = @($taskExecutable, (Join-Path $taskLegacyRoot 'neo-control.exe'))
 Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -in $taskOwnedExecutables } | ForEach-Object {
@@ -127,12 +127,59 @@ foreach ($migration in $taskMigrations) {
         }
     }
 }
+# Retire the previous product identity so the machine never runs both. The
+# rename moved the data directory, service, run value and registry entries.
+$previousProductRoot = Join-Path $env:ProgramData 'RAM Control Center'
+$previousServiceName = 'RAMControlCenterBoot'
+$previousRunValue = 'RAMControlCenter'
+
+$previousService = Get-CimInstance Win32_Service -Filter "Name='$previousServiceName'" -ErrorAction SilentlyContinue
+if ($previousService) {
+    if ($previousService.State -ne 'Stopped') {
+        $stop = Start-Process -FilePath "$env:SystemRoot\System32\sc.exe" -ArgumentList @('stop', $previousServiceName) -PassThru -NoNewWindow -Wait
+        if ($stop.ExitCode -ne 0) { throw "Could not stop $previousServiceName" }
+    }
+    $delete = Start-Process -FilePath "$env:SystemRoot\System32\sc.exe" -ArgumentList @('delete', $previousServiceName) -PassThru -NoNewWindow -Wait
+    if ($delete.ExitCode -ne 0) { throw "Could not delete $previousServiceName" }
+}
+Get-Process -Name 'ram-control-center' -ErrorAction SilentlyContinue | ForEach-Object {
+    Stop-Process -Id $_.Id -Force -ErrorAction Stop
+}
+if (Test-Path -LiteralPath $previousProductRoot) {
+    Get-ChildItem -LiteralPath $previousProductRoot -File -Force -ErrorAction SilentlyContinue | ForEach-Object {
+        $destination = Join-Path $taskInstallRoot $_.Name
+        if (-not (Test-Path -LiteralPath $destination)) {
+            Copy-Item -LiteralPath $_.FullName -Destination $destination
+        }
+    }
+    foreach ($directory in @('migration', 'repair-backup', 'drivers')) {
+        $sourceDirectory = Join-Path $previousProductRoot $directory
+        if (Test-Path -LiteralPath $sourceDirectory -PathType Container) {
+            New-Item -ItemType Directory -Path (Join-Path $taskInstallRoot $directory) -Force | Out-Null
+            Get-ChildItem -LiteralPath $sourceDirectory -File -Force -ErrorAction SilentlyContinue | ForEach-Object {
+                $destination = Join-Path $taskInstallRoot "$directory/$($_.Name)"
+                if (-not (Test-Path -LiteralPath $destination)) {
+                    Copy-Item -LiteralPath $_.FullName -Destination $destination
+                }
+            }
+        }
+    }
+    Remove-Item -LiteralPath $previousProductRoot -Recurse -Force
+}
+Remove-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name $previousRunValue -ErrorAction SilentlyContinue
+foreach ($root in @('HKCU:', 'HKLM:')) {
+    foreach ($path in @('Software\Microsoft\Windows\CurrentVersion\Uninstall\RAMControlCenter', 'Software\Microsoft\Windows\CurrentVersion\App Paths\ram-control-center.exe')) {
+        $key = Join-Path $root $path
+        if (Test-Path -LiteralPath $key) { Remove-Item -LiteralPath $key -Recurse }
+    }
+}
+if (Get-CimInstance Win32_Service -Filter "Name='$previousServiceName'") { throw 'Previous boot service still registered' }
 Invoke-ProductCommand $taskExecutable '--install-boot-service'
 # The service permits 120 seconds for transport readiness, then observes the
 # CPU for 60 seconds. Leave 15 seconds for SCM status propagation.
 $taskDeadline = [DateTime]::UtcNow.AddSeconds(195)
 do {
-    $service = Get-CimInstance Win32_Service -Filter "Name='RAMControlCenterBoot'"
+    $service = Get-CimInstance Win32_Service -Filter "Name='HimariBoot'"
     if ($service.State -eq 'Stopped') { break }
     if ([DateTime]::UtcNow -ge $taskDeadline) { throw 'Boot policy replay and CPU observation did not finish within 195 seconds' }
     Start-Sleep -Milliseconds 100
@@ -141,15 +188,15 @@ if ($service.ExitCode -ne 0 -or $service.ServiceSpecificExitCode -ne 0) {
     throw "Boot policy replay failed: $($service.ExitCode)/$($service.ServiceSpecificExitCode)"
 }
 Invoke-ProductCommand $taskExecutable '--install-startup'
-$taskRunValue = Get-ItemPropertyValue -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name RAMControlCenter
+$taskRunValue = Get-ItemPropertyValue -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name Himari
 if ($taskRunValue -ne "`"$taskExecutable`" --background") { throw 'Startup registration readback mismatch' }
 if (Get-CimInstance Win32_Service -Filter "Name='NeoControlBoot'") { throw 'Legacy boot service remains registered' }
 
-$taskRegistration = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\RAMControlCenter'
+$taskRegistration = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Himari'
 New-Item -Path $taskRegistration -Force | Out-Null
 $taskRegistryValues = @{
-    DisplayName = 'RAM CONTROL CENTER'
-    Publisher = 'RAM CONTROL CENTER contributors'
+    DisplayName = 'HIMARI'
+    Publisher = 'HIMARI contributors'
     InstallLocation = $taskInstallRoot
     DisplayIcon = $taskExecutable
     UninstallString = "`"$taskUninstaller`" --remove"
@@ -158,7 +205,7 @@ $taskRegistryValues.GetEnumerator() | ForEach-Object { New-ItemProperty -Path $t
 foreach ($name in @('NoModify', 'NoRepair')) {
     New-ItemProperty -Path $taskRegistration -Name $name -Value 1 -PropertyType DWord -Force | Out-Null
 }
-$taskAppPath = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\App Paths\ram-control-center.exe'
+$taskAppPath = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\App Paths\himari.exe'
 New-Item -Path $taskAppPath -Force | Out-Null
 Set-Item -Path $taskAppPath -Value $taskExecutable
 

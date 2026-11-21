@@ -6,7 +6,7 @@ use crate::{
     formatting::{format_threshold_ranges, toggle_value_text},
     localization::{localized_gpu_label, tr},
 };
-use ram_control_center_protocol::GpuSwitchMode;
+use himari_protocol::GpuSwitchMode;
 
 pub(super) fn apply(ui: &MainWindow, update: &UiUpdate, accepted: Controls, sync: Controls) {
     if update.extended_reads {

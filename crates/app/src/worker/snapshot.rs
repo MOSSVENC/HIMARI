@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use ram_control_center_protocol::{Dchu, ThermalSample};
+use himari_protocol::{Dchu, ThermalSample};
 use slint::Weak;
 
 use crate::MainWindow;

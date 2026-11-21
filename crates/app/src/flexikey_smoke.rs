@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use ram_control_center_protocol::FlexiKeyStore;
+use himari_protocol::FlexiKeyStore;
 use slint::ComponentHandle;
 
 use crate::MainWindow;

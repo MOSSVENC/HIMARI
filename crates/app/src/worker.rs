@@ -9,7 +9,7 @@ use std::sync::mpsc::RecvTimeoutError;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use ram_control_center_protocol::Dchu;
+use himari_protocol::Dchu;
 use slint::Weak;
 
 use crate::MainWindow;

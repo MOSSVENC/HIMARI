@@ -1,7 +1,7 @@
 #[cfg(windows)]
 use std::time::{Duration, SystemTime};
 
-use ram_control_center_protocol::PowerMode;
+use himari_protocol::PowerMode;
 
 use crate::product::{legacy_data_dir, product_data_dir};
 
