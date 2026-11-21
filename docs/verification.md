@@ -1182,3 +1182,41 @@ physical Fn feedback still belongs to FnKey while it holds the channel.
 81 application, 4 uninstaller and 35 protocol host tests pass, strict Windows
 Clippy is clean, `unsafe total: 111 (ceiling 111)`. Deployed Release 51211480…,
 boot service exit 0.
+
+## 2026-11-21 The quiet tier that powers down the discrete GPU
+
+The Fn power key cycled only through platform profiles. The UI path already had
+`apply_quiet(dchu, disable_dgpu)`, which applies Quiet and then powers the
+discrete GPU down, but the Fn path never touched the GPU at all — so cycling to
+quiet left the discrete GPU running.
+
+The Fn cycle now builds a tier list instead of a profile list:
+
+```text
+Performance, Entertainment, PowerSaving, Quiet     (only where supported)
+QuietWithoutDiscreteGpu                            (when nvidia_power_off)
+```
+
+Notes on the gating, because it is not the same flag:
+
+- the platform profiles are filtered by `supports_power_mode`, and this machine
+  reports `quiet: false`, so the plain quiet profile is not offered here;
+- the GPU tier is gated by `nvidia_power_off`, which this machine does report,
+  so the tier exists even though the quiet profile does not. It applies the
+  quiet profile when the platform accepts it and otherwise keeps the active one,
+  but it always powers the discrete GPU down.
+
+Entering the tier calls `gpu_power::request(false)`; leaving it calls
+`request(true)` before the next profile is applied. The OSD names the tier and
+states which GPU action happened, using the crescent glyph for the GPU tier.
+
+`gpu_power::is_disabled` answers from a marker file written when a power
+transition succeeds, rather than paying an elevated device query inside a key
+press. The cycle therefore reflects the state it last applied, which is what it
+needs to decide the next step.
+
+Tests cover the three gating combinations: the tier appears with the capability,
+disappears without it, and stays independent of the quiet profile flag.
+84 application, 4 uninstaller and 35 protocol host tests pass, strict Windows
+Clippy is clean, `unsafe total: 111 (ceiling 111)`. Deployed Release 97bd1757…,
+boot service exit 0.

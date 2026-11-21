@@ -266,8 +266,8 @@ fn execute(event: FnEvent) -> Result<Option<OsdView>, String> {
             GLYPH_FAN,
         ))),
         FnEvent::PowerModeCycle => {
-            let detail = cycle_power_mode()?;
-            Ok(Some(OsdView::new(title, detail, GLYPH_GAUGE)))
+            let (detail, glyph) = cycle_power_mode()?;
+            Ok(Some(OsdView::new(title, detail, glyph)))
         }
         FnEvent::ControlCenterToggle => {
             toggle_control_center()?;
@@ -372,38 +372,111 @@ fn toggle_noiseless_fan() -> Result<String, String> {
     })
 }
 
-fn cycle_power_mode() -> Result<String, String> {
-    let device = open_dchu()?;
-    let current = device
-        .read_setting_byte(1, 1)
-        .and_then(PowerMode::from_u8)
-        .ok_or_else(|| tr("Power mode is unavailable").to_owned())?;
-    let capabilities = device
-        .read_capabilities()
-        .map_err(|error| error.to_string())?;
-    let modes = [
+/// One stop on the Fn power key.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PowerTier {
+    /// A platform power profile, applied through the DCHU power packet.
+    Profile(PowerMode),
+    /// Quiet profile with the discrete GPU powered down. The vendor console
+    /// calls this out as a separate tier because it is the only one that
+    /// changes what the discrete GPU consumes.
+    QuietWithoutDiscreteGpu,
+}
+
+impl PowerTier {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Profile(mode) => crate::localization::localized_power_label(mode),
+            Self::QuietWithoutDiscreteGpu => tr("Quiet + discrete GPU off"),
+        }
+    }
+
+    const fn profile(self) -> PowerMode {
+        match self {
+            Self::Profile(mode) => mode,
+            Self::QuietWithoutDiscreteGpu => PowerMode::Quiet,
+        }
+    }
+
+    const fn powers_down_discrete_gpu(self) -> bool {
+        matches!(self, Self::QuietWithoutDiscreteGpu)
+    }
+}
+
+/// Stops the Fn key cycles through, gated by what the platform reports.
+fn power_tiers(capabilities: &himari_protocol::PlatformCapabilities) -> Vec<PowerTier> {
+    let mut tiers = Vec::new();
+    for mode in [
         PowerMode::Performance,
         PowerMode::Entertainment,
         PowerMode::PowerSaving,
         PowerMode::Quiet,
-    ];
-    let supported = modes
-        .into_iter()
-        .filter(|mode| capabilities.supports_power_mode(*mode))
-        .collect::<Vec<_>>();
-    if supported.is_empty() {
+    ] {
+        if capabilities.supports_power_mode(mode) {
+            tiers.push(PowerTier::Profile(mode));
+        }
+    }
+    // The GPU tier needs no profile support: it keeps the quiet profile when
+    // the platform offers one and otherwise stays on whatever profile is
+    // active, but it always powers the discrete GPU down.
+    if capabilities.nvidia_power_off && !tiers.iter().any(|tier| tier.powers_down_discrete_gpu()) {
+        tiers.push(PowerTier::QuietWithoutDiscreteGpu);
+    }
+    tiers
+}
+
+fn cycle_power_mode() -> Result<(String, i32), String> {
+    let device = open_dchu()?;
+    let capabilities = device
+        .read_capabilities()
+        .map_err(|error| error.to_string())?;
+    let tiers = power_tiers(&capabilities);
+    if tiers.is_empty() {
         return Err(tr("No power profiles are supported").to_owned());
     }
-    let index = supported
+    let current_mode = device
+        .read_setting_byte(1, 1)
+        .and_then(PowerMode::from_u8)
+        .ok_or_else(|| tr("Power mode is unavailable").to_owned())?;
+    let discrete_gpu_off = crate::gpu_power::is_disabled();
+    let current = tiers
         .iter()
-        .position(|mode| *mode == current)
-        .map_or(0, |index| (index + 1) % supported.len());
-    let target = supported[index];
+        .position(|tier| {
+            tier.powers_down_discrete_gpu() == discrete_gpu_off
+                && (!tier.powers_down_discrete_gpu() || tier.profile() == current_mode)
+                && (tier.powers_down_discrete_gpu() || tier.profile() == current_mode)
+        })
+        .unwrap_or_else(|| {
+            tiers
+                .iter()
+                .position(|tier| !tier.powers_down_discrete_gpu() && tier.profile() == current_mode)
+                .unwrap_or(0)
+        });
+    let next = tiers[(current + 1) % tiers.len()];
+
+    // Leave the previous tier cleanly: bring the discrete GPU back before the
+    // next profile is applied when the cycle moves away from the quiet tier.
+    if !next.powers_down_discrete_gpu() && discrete_gpu_off {
+        crate::gpu_power::request(true)?;
+    }
     device
-        .set_power_mode(target)
+        .set_power_mode(next.profile())
         .map_err(|error| error.to_string())?;
-    crate::runtime_state::persist_power_mode(target);
-    Ok(crate::localization::localized_power_label(target).to_owned())
+    crate::runtime_state::persist_power_mode(next.profile());
+
+    let mut detail = next.label().to_owned();
+    if next.powers_down_discrete_gpu() {
+        crate::gpu_power::request(false)?;
+        detail = format!("{detail} · {}", tr("discrete GPU powered off"));
+    } else if discrete_gpu_off {
+        detail = format!("{detail} · {}", tr("discrete GPU restored"));
+    }
+    let glyph = if next.powers_down_discrete_gpu() {
+        GLYPH_MOON
+    } else {
+        GLYPH_GAUGE
+    };
+    Ok((detail, glyph))
 }
 
 fn toggle_touchpad() -> Result<String, String> {
@@ -591,5 +664,52 @@ mod tests {
                 format!("{} {level}/4", tr("Brightness"))
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tier_tests {
+    use super::*;
+    use himari_protocol::PlatformCapabilities;
+
+    /// The GPU tier must appear whenever the platform can power the discrete
+    /// GPU down, because it is the only tier that changes what the discrete GPU
+    /// consumes.
+    #[test]
+    fn gpu_tier_is_offered_when_the_platform_supports_it() {
+        let caps = PlatformCapabilities {
+            performance: true,
+            nvidia_power_off: true,
+            ..Default::default()
+        };
+        let tiers = power_tiers(&caps);
+        assert!(tiers.iter().any(|tier| tier.powers_down_discrete_gpu()));
+    }
+
+    /// Without the capability the cycle must not pretend the tier exists.
+    #[test]
+    fn gpu_tier_is_absent_without_the_capability() {
+        let caps = PlatformCapabilities {
+            performance: true,
+            ..Default::default()
+        };
+        let tiers = power_tiers(&caps);
+        assert!(!tiers.iter().any(|tier| tier.powers_down_discrete_gpu()));
+        assert!(tiers.contains(&PowerTier::Profile(PowerMode::Performance)));
+    }
+
+    /// Quiet is only listed when the platform accepts it, but the GPU tier is
+    /// listed independently of that flag.
+    #[test]
+    fn quiet_profile_and_gpu_tier_are_gated_separately() {
+        let caps = PlatformCapabilities {
+            power_saving: true,
+            nvidia_power_off: true,
+            ..Default::default()
+        };
+        let tiers = power_tiers(&caps);
+        assert!(!tiers.contains(&PowerTier::Profile(PowerMode::Quiet)));
+        assert!(tiers.iter().any(|tier| tier.powers_down_discrete_gpu()));
+        assert_eq!(tiers.len(), 2);
     }
 }

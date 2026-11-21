@@ -38,6 +38,7 @@ mod platform {
         );
         let output = run_powershell(&script)?;
         if output.status.success() {
+            super::record_discrete_gpu_state(!enabled);
             Ok(())
         } else {
             Err(format!(
@@ -194,6 +195,31 @@ mod platform {
             let _ = writeln!(file, "{message}");
         }
     }
+}
+
+/// Marker file recording the last power state we successfully applied.
+///
+/// The device node query costs an elevated round trip, so the Fn cycle reads
+/// this marker instead: it answers "did we power the discrete GPU down", which
+/// is exactly the question the cycle needs.
+const STATE_MARKER: &str = "discrete-gpu-off.marker";
+
+#[cfg(windows)]
+fn record_discrete_gpu_state(disabled: bool) {
+    let root = crate::product::product_data_dir();
+    let _ = std::fs::create_dir_all(&root);
+    let marker = root.join(STATE_MARKER);
+    if disabled {
+        let _ = std::fs::write(marker, b"");
+    } else {
+        let _ = std::fs::remove_file(marker);
+    }
+}
+
+pub(crate) fn is_disabled() -> bool {
+    crate::product::product_data_dir()
+        .join(STATE_MARKER)
+        .exists()
 }
 
 #[cfg(windows)]
