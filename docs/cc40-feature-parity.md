@@ -430,3 +430,33 @@ notification through the production presentation/dispatch path.
 Physical Fn combinations, channel takeover during an actual key press and
 one-by-one hardware validation of every event branch remain open. The synthetic
 tests do not claim those physical results.
+
+### Fn notification coverage after the 2026-11-21 decode pass
+
+Three vendor identifiers were recovered from the main dispatch, whose switch
+value is the whole notification rather than its low byte:
+
+```text
+123  Win/Fn swap        reads the swap state and shows the opposite
+301  FlexiKey access on
+302  FlexiKey access off
+303  discrete GPU on
+304  discrete GPU off
+```
+
+That matters beyond the three new events: the decoder used to mask every value
+to the low byte, so 301 would have been read as 45 and silently dropped. The
+decoder now matches the wide identifiers first and falls back to the low byte,
+which keeps every earlier mapping intact — `0x0012_34f7` still decodes as
+`Camera(true)`.
+
+`airplane` is a different case, and the honest finding is that this build does
+not emit it: `osd_airplane_on` and `osd_airplane_off` exist in the vendor enum
+but nothing in the dispatch references them, and the only airplane code in the
+package is the `SetAirplaneMode` P/Invoke into `InsydeAirplanemodehid.dll`.
+There is no event id to map on this platform, so the gap is the firmware's,
+not a missing decode.
+
+The four power profiles also stopped sharing one glyph: performance draws a
+bolt, entertainment a film frame, power saving a leaf, quiet the crescent, and
+the GPU tier the crescent with the GPU action named in the detail line.

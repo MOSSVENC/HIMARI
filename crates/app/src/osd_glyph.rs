@@ -39,6 +39,8 @@ pub(crate) enum Glyph {
     Window,
     Moon,
     Alert,
+    Film,
+    Leaf,
 }
 
 impl Glyph {
@@ -58,6 +60,8 @@ impl Glyph {
             12 => Self::Window,
             13 => Self::Moon,
             14 => Self::Alert,
+            15 => Self::Film,
+            16 => Self::Leaf,
             _ => Self::None,
         }
     }
@@ -152,6 +156,20 @@ impl Glyph {
             ],
             // Moon: crescent from two arcs.
             Self::Moon => &[Prim::Arc(24.0, 24.0, 14.0, 0.12, 0.62)],
+            // Film: media frame with sprocket holes.
+            Self::Film => &[
+                Prim::Rect(8.0, 12.0, 32.0, 24.0, 3.0),
+                Prim::Dot(14.0, 18.0, 1.5),
+                Prim::Dot(14.0, 30.0, 1.5),
+                Prim::Dot(34.0, 18.0, 1.5),
+                Prim::Dot(34.0, 30.0, 1.5),
+            ],
+            // Leaf: two arcs meeting at a stem, for power saving.
+            Self::Leaf => &[
+                Prim::Arc(24.0, 24.0, 15.0, 0.25, 0.75),
+                Prim::Arc(24.0, 24.0, 8.0, 0.25, 0.75),
+                Prim::Line(24.0, 8.0, 24.0, 40.0),
+            ],
             // Alert: ring with a bang.
             Self::Alert => &[
                 Prim::Ring(24.0, 26.0, 13.0),
@@ -257,6 +275,8 @@ mod tests {
             Glyph::Window,
             Glyph::Moon,
             Glyph::Alert,
+            Glyph::Film,
+            Glyph::Leaf,
         ] {
             assert!(!glyph.prims().is_empty(), "glyph {glyph:?} has no geometry");
         }

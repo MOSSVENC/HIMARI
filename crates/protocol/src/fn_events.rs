@@ -51,7 +51,23 @@ impl FnNotification {
         Some(((value & 255) as u8, value >> 8))
     }
 
+    /// Event for the raw notification value.
+    ///
+    /// Most events fit in one byte, so the code is the low byte and the high
+    /// byte carries an argument. A few vendor identifiers exceed 255 — the
+    /// FlexiKey and GPU switches, for instance — and those arrive as the whole
+    /// value, so they are matched before the low byte is decoded.
     pub fn event(self) -> Option<FnEvent> {
+        let raw = self.raw();
+        if let Some(event) = match raw {
+            301 => Some(FnEvent::FlexiAccess(true)),
+            302 => Some(FnEvent::FlexiAccess(false)),
+            303 => Some(FnEvent::DiscreteGpuSwitch(true)),
+            304 => Some(FnEvent::DiscreteGpuSwitch(false)),
+            _ => None,
+        } {
+            return Some(event);
+        }
         let (code, _) = self.message()?;
         Some(match code {
             0x20 | 0x81 => FnEvent::BacklightStep(Adjustment::Down),
@@ -64,6 +80,9 @@ impl FnNotification {
             0x6a => FnEvent::FanNotice(FanNotice::MaxQ),
             0x6b => FnEvent::FanNotice(FanNotice::Custom),
             0x70 => FnEvent::NoiselessFanToggle,
+            // The vendor handler for this ID reads the current swap state and
+            // reports the opposite of it.
+            0x7b => FnEvent::ComboSwap(true),
             0x8a => FnEvent::BacklightCycle,
             0x8f => FnEvent::FanNotice(FanNotice::Maximum),
             0x95 => FnEvent::ControlCenterToggle,
@@ -129,7 +148,15 @@ pub enum FnEvent {
     MobileRadio(bool),
     Camera(bool),
     CameraMicrophone(bool),
-    TouchpadToggle { legacy_enabled: bool },
+    TouchpadToggle {
+        legacy_enabled: bool,
+    },
+    /// Win/Fn key swap notification (vendor ID 123).
+    ComboSwap(bool),
+    /// FlexiKey access switch position (vendor IDs 301 and 302).
+    FlexiAccess(bool),
+    /// Discrete GPU switch position (vendor IDs 303 and 304).
+    DiscreteGpuSwitch(bool),
 }
 
 #[cfg(test)]
@@ -215,5 +242,35 @@ mod tests {
         for code in [0, 24, 25, 0x41, 0x42, 0x48, 0xff] {
             assert_eq!(notification(code).event(), None, "event {code:#x}");
         }
+    }
+
+    /// Identifiers above 255 arrive unmasked; the low byte alone must not be
+    /// decoded, because 301 would otherwise read as 45.
+    #[test]
+    fn wide_vendor_identifiers_decode_before_the_low_byte() {
+        assert_eq!(notification(301).event(), Some(FnEvent::FlexiAccess(true)));
+        assert_eq!(notification(302).event(), Some(FnEvent::FlexiAccess(false)));
+        assert_eq!(
+            notification(303).event(),
+            Some(FnEvent::DiscreteGpuSwitch(true))
+        );
+        assert_eq!(
+            notification(304).event(),
+            Some(FnEvent::DiscreteGpuSwitch(false))
+        );
+        // The same low byte with an argument still decodes as the one-byte event.
+        assert_eq!(
+            notification(0x0000_012d).event(),
+            Some(FnEvent::FlexiAccess(true))
+        );
+        assert_eq!(
+            notification(0x0012_34f7).event(),
+            Some(FnEvent::Camera(true))
+        );
+    }
+
+    #[test]
+    fn combo_swap_notification_decodes() {
+        assert_eq!(notification(0x7b).event(), Some(FnEvent::ComboSwap(true)));
     }
 }

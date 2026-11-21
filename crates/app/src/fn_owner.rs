@@ -119,6 +119,7 @@ const ACCENT_ERROR: slint::Color = slint::Color::from_rgb_u8(255, 91, 104);
 const GLYPH_KEYBOARD: i32 = 1;
 const GLYPH_LOCK: i32 = 2;
 const GLYPH_FAN: i32 = 3;
+const GLYPH_BOLT: i32 = 4;
 const GLYPH_GAUGE: i32 = 5;
 const GLYPH_KEY: i32 = 6;
 const GLYPH_TOUCHPAD: i32 = 7;
@@ -128,6 +129,8 @@ const GLYPH_DOCK: i32 = 10;
 const GLYPH_WAVES: i32 = 11;
 const GLYPH_WINDOW: i32 = 12;
 const GLYPH_MOON: i32 = 13;
+const GLYPH_FILM: i32 = 15;
+const GLYPH_LEAF: i32 = 16;
 
 impl OsdView {
     fn new(title: String, detail: String, glyph: i32) -> Self {
@@ -191,6 +194,12 @@ fn state_view(event: FnEvent) -> Option<OsdView> {
         FnEvent::ScrollLock(enabled) => {
             OsdView::new(tr("Scroll Lock").to_owned(), on_off(enabled), GLYPH_KEY)
         }
+        FnEvent::FlexiAccess(enabled) => {
+            OsdView::new(tr("FlexiKey access").to_owned(), on_off(enabled), GLYPH_KEY)
+        }
+        FnEvent::DiscreteGpuSwitch(enabled) => {
+            OsdView::new(tr("Discrete GPU").to_owned(), on_off(enabled), GLYPH_BOLT)
+        }
         FnEvent::CameraMicrophone(enabled) => OsdView::new(
             tr("Camera and microphone").to_owned(),
             on_off(enabled),
@@ -230,6 +239,9 @@ fn event_title(event: FnEvent) -> &'static str {
         FnEvent::Camera(_) => tr("Camera"),
         FnEvent::CameraMicrophone(_) => tr("Camera and microphone"),
         FnEvent::TouchpadToggle { .. } => tr("Touchpad"),
+        FnEvent::ComboSwap(_) => tr("Win / Fn swap"),
+        FnEvent::FlexiAccess(_) => tr("FlexiKey access"),
+        FnEvent::DiscreteGpuSwitch(_) => tr("Discrete GPU"),
     }
 }
 
@@ -288,6 +300,11 @@ fn execute(event: FnEvent) -> Result<Option<OsdView>, String> {
             title,
             toggle_touchpad()?,
             GLYPH_TOUCHPAD,
+        ))),
+        FnEvent::ComboSwap(_) => Ok(Some(OsdView::new(
+            title,
+            toggle_combo_swap()?,
+            GLYPH_KEYBOARD,
         ))),
         _ => Ok(None),
     }
@@ -398,6 +415,20 @@ impl PowerTier {
         }
     }
 
+    /// Glyph that identifies this tier on the overlay.
+    const fn glyph(self) -> i32 {
+        match self {
+            Self::QuietWithoutDiscreteGpu => GLYPH_MOON,
+            Self::Profile(mode) => match mode {
+                PowerMode::Performance => GLYPH_BOLT,
+                PowerMode::Entertainment => GLYPH_FILM,
+                PowerMode::PowerSaving => GLYPH_LEAF,
+                PowerMode::Quiet | PowerMode::QuietPlus => GLYPH_MOON,
+                _ => GLYPH_GAUGE,
+            },
+        }
+    }
+
     const fn powers_down_discrete_gpu(self) -> bool {
         matches!(self, Self::QuietWithoutDiscreteGpu)
     }
@@ -471,12 +502,28 @@ fn cycle_power_mode() -> Result<(String, i32), String> {
     } else if discrete_gpu_off {
         detail = format!("{detail} · {}", tr("discrete GPU restored"));
     }
-    let glyph = if next.powers_down_discrete_gpu() {
-        GLYPH_MOON
-    } else {
-        GLYPH_GAUGE
-    };
+    let glyph = next.glyph();
     Ok((detail, glyph))
+}
+
+/// Flip the Win/Fn key swap and report the state it landed in.
+///
+/// The vendor handler for the same notification reads the current swap state
+/// and shows the opposite, so the action and the feedback agree.
+fn toggle_combo_swap() -> Result<String, String> {
+    let device = open_dchu()?;
+    let current = device
+        .read_quick_toggles()
+        .swap_win_fn
+        .ok_or_else(|| tr("Keys are locked").to_owned())?;
+    device
+        .set_quick_toggle(himari_protocol::QuickToggle::SwapWinFn, !current)
+        .map_err(|error| error.to_string())?;
+    Ok(if current {
+        tr("Off").to_owned()
+    } else {
+        tr("On").to_owned()
+    })
 }
 
 fn toggle_touchpad() -> Result<String, String> {
