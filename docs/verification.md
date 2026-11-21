@@ -1256,3 +1256,34 @@ two frames 600 ms apart during the hold: 454 pixels differ in the icon box
 
 The fan notice now names both fans, because the platform runs a CPU and a GPU
 fan and a single figure would hide which one moved.
+
+## 2026-11-21 Attributing frame gaps to the page that caused them
+
+The graphics smoke reported a single maximum interval, which said nothing about
+which page stall it belonged to. Each submission interval is now recorded with
+the transition step it fell inside, and the three worst are printed with their
+round and page.
+
+First useful result on this machine:
+
+```text
+transitions=22  p50=3.38 ms  p95=4.26 ms  max=30.60 ms  gaps_over_33ms=0
+transition_gap round=1 page=8  interval_ms=30.60   (FanCurve, first visit)
+transition_gap round=1 page=3  interval_ms=14.21
+transition_gap round=2 page=8  interval_ms=12.68
+```
+
+So the cold cost is the fan-curve page on its first visit, and round 2 is ten
+times cheaper: it is construction, not steady-state drawing.
+
+**Experiment that failed, kept on the record.** Converting all eleven
+`if selected-page == n : Page {}` blocks into always-instantiated components
+with `visible: selected-page == n` moved the cost rather than removing it:
+
+```text
+max=38.60 ms  gaps_over_33ms=1   worst: round 2 page 7 (InputIo) 38.60 ms
+```
+
+Instantiation was not the expense; showing is. The change was reverted and the
+baseline above is the current behaviour. The remaining 13.9 ms over the 16.67 ms
+budget on the fan-curve page is an open item, not a solved one.

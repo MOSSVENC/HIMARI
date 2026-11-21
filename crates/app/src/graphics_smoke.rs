@@ -22,6 +22,8 @@ struct Measurements {
     measuring: bool,
     previous_submission: Option<Instant>,
     intervals_ms: Vec<f64>,
+    /// Submission interval attributed to the transition step it fell inside.
+    interval_steps: Vec<(usize, f64)>,
     frame_timings: Vec<(usize, FrameTimings)>,
     snapshot: Option<graphics::SnapshotResult>,
 }
@@ -55,8 +57,10 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
             if data.measuring {
                 data.submitted_frames += 1;
                 if let Some(previous) = data.previous_submission.replace(now) {
-                    data.intervals_ms
-                        .push(now.duration_since(previous).as_secs_f64() * 1000.0);
+                    let milliseconds = now.duration_since(previous).as_secs_f64() * 1000.0;
+                    let step = data.completed;
+                    data.intervals_ms.push(milliseconds);
+                    data.interval_steps.push((step, milliseconds));
                 }
             }
         }
@@ -107,6 +111,16 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
         data.intervals_ms[count - 1],
         data.intervals_ms.iter().filter(|&&v| v > 33.34).count()
     );
+    // Attribute the longest gaps to the page whose construction caused them.
+    let mut worst = data.interval_steps.clone();
+    worst.sort_by(|a, b| b.1.total_cmp(&a.1));
+    for (step, milliseconds) in worst.iter().take(3) {
+        println!(
+            "transition_gap round={} page={} interval_ms={milliseconds:.2}",
+            step / PAGES.len() + 1,
+            PAGES[step % PAGES.len()],
+        );
+    }
     for step in 0..PAGES.len() * 2 {
         let frames: Vec<_> = data
             .frame_timings
