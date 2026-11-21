@@ -39,6 +39,7 @@ pub(crate) fn show_with(
     accent: slint::Color,
     glyph: crate::osd_glyph::Glyph,
     level: f32,
+    spin: bool,
 ) {
     let Some(main) = MAIN_WINDOW
         .get()
@@ -110,6 +111,7 @@ pub(crate) fn show_with(
             scale,
             glyph: glyph.id(),
             level,
+            spin,
         });
     })
     .is_err()

@@ -89,6 +89,7 @@ fn dispatch_notification(notification: FnNotification) {
                 accent: ACCENT_ERROR,
                 glyph: Glyph::Alert,
                 level: -1.0,
+                spin: false,
             }
         }
     };
@@ -98,6 +99,7 @@ fn dispatch_notification(notification: FnNotification) {
         view.accent,
         view.glyph,
         view.level,
+        view.spin,
     );
 }
 
@@ -109,6 +111,8 @@ struct OsdView {
     glyph: Glyph,
     /// Level shown as a five-step bar, negative to hide it.
     level: f32,
+    /// Keep the glyph turning, used while anti-dust is running.
+    spin: bool,
 }
 
 const ACCENT_INFO: slint::Color = slint::Color::from_rgb_u8(66, 211, 255);
@@ -122,11 +126,17 @@ impl OsdView {
             accent: ACCENT_INFO,
             glyph,
             level: -1.0,
+            spin: false,
         }
     }
 
     fn with_level(mut self, level: f32) -> Self {
         self.level = level;
+        self
+    }
+
+    fn spinning(mut self) -> Self {
+        self.spin = true;
         self
     }
 }
@@ -149,18 +159,28 @@ fn backlight_text(level: u8) -> String {
 /// nothing to execute and only the resulting condition is reported.
 fn state_view(event: FnEvent) -> Option<OsdView> {
     let view = match event {
-        FnEvent::FanNotice(notice) => OsdView::new(
-            tr("Cooling").to_owned(),
-            match notice {
+        FnEvent::FanNotice(notice) => {
+            let detail = match notice {
                 FanNotice::AntiDustRunning => tr("Anti-dust running"),
                 FanNotice::Turbo => tr("Turbo fan"),
                 FanNotice::MaxQ => tr("MaxQ fan profile"),
                 FanNotice::Custom => tr("Custom fan profile"),
                 FanNotice::Maximum => tr("Maximum fan"),
             }
-            .to_owned(),
-            Glyph::Fan,
-        ),
+            .to_owned();
+            // Both fans are reported together: the platform runs a CPU and a
+            // GPU fan, and one number would hide which one changed.
+            let detail = match fan_speeds() {
+                Some((cpu, gpu)) => format!("{detail} · CPU {cpu} / GPU {gpu}"),
+                None => detail,
+            };
+            let view = OsdView::new(tr("Cooling").to_owned(), detail, Glyph::Fan);
+            if notice == FanNotice::AntiDustRunning {
+                view.spinning()
+            } else {
+                view
+            }
+        }
         FnEvent::SilentMode(enabled) => {
             OsdView::new(tr("Silent mode").to_owned(), on_off(enabled), Glyph::Moon)
         }
@@ -488,6 +508,18 @@ fn cycle_power_mode() -> Result<(String, Glyph), String> {
     }
     let glyph = next.glyph();
     Ok((detail, glyph))
+}
+
+/// Current CPU and GPU fan speeds, from the thermal mailbox.
+///
+/// The Fn fan notice reports both fans because the platform runs two and a
+/// single figure would hide which one moved.
+fn fan_speeds() -> Option<(u32, u32)> {
+    let sample = open_dchu().ok()?.read_thermal().ok()?;
+    if !sample.has_plausible_temperature() {
+        return None;
+    }
+    Some((sample.cpu.rpm, sample.gpu.rpm))
 }
 
 /// Flip the Win/Fn key swap and report the state it landed in.

@@ -67,6 +67,8 @@ pub(crate) struct Presentation {
     pub glyph: i32,
     /// Backlight or brightness step, 0..=4, or negative to hide the bar.
     pub level: f32,
+    /// Keep the glyph turning while the card is held.
+    pub spin: bool,
 }
 
 static REQUESTS: OnceLock<Mutex<Option<Sender<Presentation>>>> = OnceLock::new();
@@ -291,6 +293,9 @@ mod windows_impl {
         width: i32,
         height: i32,
         scale: f32,
+        /// Card, border, text and level bar, composed once per presentation.
+        base: Vec<u32>,
+        style: FrameStyle,
     }
 
     impl Overlay {
@@ -331,6 +336,15 @@ mod windows_impl {
                 width,
                 height,
                 scale,
+                base: vec![0; (width * height) as usize],
+                style: FrameStyle {
+                    panel: [0.0; 3],
+                    accent: [0.0; 3],
+                    title: [0.0; 3],
+                    detail: [0.0; 3],
+                    glyph: 0,
+                    level: -1.0,
+                },
             })
         }
 
@@ -430,46 +444,45 @@ mod windows_impl {
             max as f32 / 255.0
         }
 
-        /// Compose one frame and push it to the compositor.
-        pub(crate) fn render(&mut self, reveal: f32, style: FrameStyle) {
+        /// Compose the static layers, then draw and present one frame.
+        ///
+        /// Everything that does not move during the reveal — panel, border,
+        /// text and level bar — is baked into `base` once. Held frames that
+        /// animate the glyph copy `base` and redraw only the icon box, which
+        /// keeps the per-frame cost at a few hundred pixels instead of the
+        /// whole surface.
+        pub(crate) fn compose(&mut self, reveal: f32, style: FrameStyle) {
+            self.style = style;
             let FrameStyle {
                 panel,
                 accent,
                 title,
                 detail,
-                glyph,
                 level,
+                ..
             } = style;
-            self.panel.clear();
             let offset = (1.0 - reveal) * 10.0 * self.scale;
             let card_x = 8.0 * self.scale;
             let card_y = 8.0 * self.scale + offset;
             let card_w = (self.width as f32) - 16.0 * self.scale;
             let card_h = (self.height as f32) - 16.0 * self.scale;
             let radius = 14.0 * self.scale;
-
-            let (panel_pixels, mask_pixels) = (self.panel.pixels(), self.mask.pixels());
-            let stride = self.width as usize;
-            let glyph = crate::osd_glyph::Glyph::from_id(glyph);
-            let prims = glyph.prims();
-            let icon_size = 34.0 * self.scale;
-            let icon_x = card_x + 16.0 * self.scale;
-            let icon_y = card_y + (card_h - icon_size) * 0.5;
-            let glyph_scale = icon_size / crate::osd_glyph::GLYPH_BOX;
             let stroke = 1.9 * self.scale;
 
+            let stride = self.width as usize;
+            let mask_pixels = self.mask.pixels();
+            let base = &mut self.base;
             for y in 0..self.height {
                 for x in 0..self.width {
+                    let index = y as usize * stride + x as usize;
+                    base[index] = 0;
                     let fx = x as f32 + 0.5 - card_x;
                     let fy = y as f32 + 0.5 - card_y;
                     let coverage = rounded_coverage(fx, fy, card_w, card_h, radius);
                     if coverage <= 0.0 {
                         continue;
                     }
-                    let index = y as usize * stride + x as usize;
-                    let pixel = &mut panel_pixels[index];
-                    // Vertical two-stop gradient makes the panel read as glass
-                    // rather than a flat block.
+                    let pixel = &mut base[index];
                     let t = (fy / card_h).clamp(0.0, 1.0);
                     let tint = [
                         panel[0] * (1.0 - t) + panel[0] * 0.62 * t,
@@ -477,26 +490,12 @@ mod windows_impl {
                         panel[2] * (1.0 - t) + panel[2] * 0.76 * t,
                     ];
                     blend(pixel, tint, coverage * 0.9 * reveal);
-                    // Hairline border follows the rounded outline.
                     let border = (stroke * 0.5 + 0.5
                         - coverage_distance(fx, fy, card_w, card_h, radius).abs())
                     .clamp(0.0, 1.0);
                     if border > 0.0 {
                         blend(pixel, accent, border * 0.45 * reveal);
                     }
-                    // Glyph strokes, drawn on top of the panel.
-                    let gx = (x as f32 + 0.5 - icon_x) / glyph_scale;
-                    let gy = (y as f32 + 0.5 - icon_y) / glyph_scale;
-                    let mut glyph_alpha: f32 = 0.0;
-                    for prim in prims {
-                        let c =
-                            crate::osd_glyph::coverage(prim, gx, gy, stroke / glyph_scale * 0.5);
-                        glyph_alpha = glyph_alpha.max(c);
-                    }
-                    if glyph_alpha > 0.0 {
-                        blend(pixel, accent, glyph_alpha * reveal);
-                    }
-                    // Level bar: five segments under the detail line.
                     if level >= 0.0 {
                         let bar_x = card_x + 66.0 * self.scale;
                         let bar_y = card_y + card_h - 16.0 * self.scale;
@@ -526,6 +525,68 @@ mod windows_impl {
                     }
                 }
             }
+            self.paint(0.0);
+            self.present();
+        }
+
+        /// Copy the composed background and draw the glyph at `spin`.
+        fn paint(&mut self, spin: f32) {
+            let stride = self.width as usize;
+            let base = self.base.clone();
+            self.panel.pixels().copy_from_slice(&base);
+            let accent = self.style.accent;
+            let glyph = crate::osd_glyph::Glyph::from_id(self.style.glyph);
+            let prims = glyph.prims();
+            if prims.is_empty() {
+                return;
+            }
+            let offset = 0.0;
+            let card_x = 8.0 * self.scale;
+            let card_y = 8.0 * self.scale + offset;
+            let card_h = (self.height as f32) - 16.0 * self.scale;
+            let icon_size = 34.0 * self.scale;
+            let icon_x = card_x + 16.0 * self.scale;
+            let icon_y = card_y + (card_h - icon_size) * 0.5;
+            let glyph_scale = icon_size / crate::osd_glyph::GLYPH_BOX;
+            let stroke = 1.9 * self.scale;
+            // Only the icon box needs to be visited.
+            let box_left = icon_x.floor() as i32 - 1;
+            let box_top = icon_y.floor() as i32 - 1;
+            let box_right = (icon_x + icon_size).ceil() as i32 + 1;
+            let box_bottom = (icon_y + icon_size).ceil() as i32 + 1;
+            let (spin_sin, spin_cos) = spin.sin_cos();
+            let half = crate::osd_glyph::GLYPH_BOX * 0.5;
+            let pixels = self.panel.pixels();
+            for y in box_top.max(0)..box_bottom.min(self.height) {
+                for x in box_left.max(0)..box_right.min(self.width) {
+                    let gx = (x as f32 + 0.5 - icon_x) / glyph_scale;
+                    let gy = (y as f32 + 0.5 - icon_y) / glyph_scale;
+                    let (dx, dy) = (gx - half, gy - half);
+                    let (rx, ry) = if spin == 0.0 {
+                        (gx, gy)
+                    } else {
+                        (
+                            dx * spin_cos - dy * spin_sin + half,
+                            dx * spin_sin + dy * spin_cos + half,
+                        )
+                    };
+                    let mut alpha: f32 = 0.0;
+                    for prim in prims {
+                        let c =
+                            crate::osd_glyph::coverage(prim, rx, ry, stroke / glyph_scale * 0.5);
+                        alpha = alpha.max(c);
+                    }
+                    if alpha > 0.0 {
+                        let index = y as usize * stride + x as usize;
+                        blend(&mut pixels[index], accent, alpha);
+                    }
+                }
+            }
+        }
+
+        /// Redraw the glyph at a new rotation and present the held card.
+        pub(crate) fn spin_frame(&mut self, spin: f32) {
+            self.paint(spin);
             self.present();
         }
 
@@ -605,7 +666,7 @@ mod windows_impl {
             let steps = 14;
             for step in 0..=steps {
                 let reveal = step as f32 / steps as f32;
-                overlay.render(
+                overlay.compose(
                     reveal,
                     FrameStyle {
                         panel: pending.panel,
@@ -618,28 +679,52 @@ mod windows_impl {
                 );
                 std::thread::sleep(std::time::Duration::from_millis(16));
             }
-            // Hold the card, but let a newer request cut the display short.
-            match receiver.recv_timeout(std::time::Duration::from_millis(2_100)) {
-                Ok(next) => {
-                    if next.width != overlay.width || next.height != overlay.height {
-                        match Overlay::new(next.width, next.height, next.scale) {
-                            Some(replacement) => overlay = replacement,
-                            None => return,
+            // Hold the card. A spinning glyph keeps redrawing its icon box at
+            // roughly 60 frames per second; a static card presents once and
+            // waits for the next request.
+            let mut held: Option<super::Presentation> = None;
+            if pending.spin {
+                let hold = std::time::Duration::from_millis(2_100);
+                let start = std::time::Instant::now();
+                let mut turn: f32 = 0.0;
+                while start.elapsed() < hold {
+                    if let Ok(request) = receiver.try_recv() {
+                        held = Some(request);
+                        break;
+                    }
+                    turn += 0.25;
+                    overlay.spin_frame(turn);
+                    std::thread::sleep(std::time::Duration::from_millis(16));
+                }
+            }
+            let next = match held {
+                Some(next) => next,
+                None => {
+                    let wait =
+                        std::time::Duration::from_millis(if pending.spin { 0 } else { 2_100 });
+                    match receiver.recv_timeout(wait) {
+                        Ok(next) => next,
+                        Err(RecvTimeoutError::Timeout) => {
+                            overlay.hide();
+                            match receiver.recv() {
+                                Ok(next) => next,
+                                Err(_) => return,
+                            }
+                        }
+                        Err(RecvTimeoutError::Disconnected) => {
+                            overlay.hide();
+                            return;
                         }
                     }
-                    pending = next;
-                    continue;
                 }
-                Err(RecvTimeoutError::Timeout) => overlay.hide(),
-                Err(RecvTimeoutError::Disconnected) => {
-                    overlay.hide();
-                    return;
+            };
+            if next.width != overlay.width || next.height != overlay.height {
+                match Overlay::new(next.width, next.height, next.scale) {
+                    Some(replacement) => overlay = replacement,
+                    None => return,
                 }
             }
-            match receiver.recv() {
-                Ok(next) => pending = next,
-                Err(_) => return,
-            }
+            pending = next;
         }
     }
 }
@@ -658,15 +743,15 @@ pub(crate) fn smoke() -> Result<(), Box<dyn std::error::Error>> {
     let steps = 24;
     for step in 0..=steps {
         let reveal = step as f32 / steps as f32;
-        overlay.render(
+        overlay.compose(
             reveal,
             FrameStyle {
                 panel: [0.07, 0.08, 0.11],
                 accent: [0.26, 0.83, 1.0],
                 title: [0.96, 0.95, 0.98],
                 detail: [0.65, 0.67, 0.73],
-                glyph: 1,
-                level: 3.0,
+                glyph: 3,
+                level: -1.0,
             },
         );
         std::thread::sleep(std::time::Duration::from_millis(20));

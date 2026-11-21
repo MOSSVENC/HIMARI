@@ -85,7 +85,7 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
         .into());
     }
     println!("resize_and_restore=passed idle_interval_ms=1000 idle_submissions=0");
-    if let Some(path) = std::env::var_os("RAM_GRAPHICS_SMOKE_SNAPSHOT") {
+    if let Some(path) = std::env::var_os("HIMARI_GRAPHICS_SMOKE_SNAPSHOT") {
         let pixels = data
             .snapshot
             .take()
@@ -257,7 +257,7 @@ fn check_resize(ui: slint::Weak<MainWindow>, measurements: Rc<RefCell<Measuremen
 }
 
 fn finish_with_snapshot(ui: slint::Weak<MainWindow>, measurements: Rc<RefCell<Measurements>>) {
-    if std::env::var_os("RAM_GRAPHICS_SMOKE_SNAPSHOT").is_none() {
+    if std::env::var_os("HIMARI_GRAPHICS_SMOKE_SNAPSHOT").is_none() {
         let _ = slint::quit_event_loop();
         return;
     }
@@ -283,7 +283,7 @@ fn capture_content_update(
         let _ = slint::quit_event_loop();
         return;
     };
-    let check_text = std::env::var_os("RAM_GRAPHICS_SMOKE_TEXT_CHANGES").is_some();
+    let check_text = std::env::var_os("HIMARI_GRAPHICS_SMOKE_TEXT_CHANGES").is_some();
     window.set_cpu_temp(if step == 1 { "88°C" } else { "--°C" }.into());
     if check_text {
         let english = step == 3;

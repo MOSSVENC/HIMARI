@@ -1220,3 +1220,39 @@ disappears without it, and stays independent of the quiet profile flag.
 84 application, 4 uninstaller and 35 protocol host tests pass, strict Windows
 Clippy is clean, `unsafe total: 111 (ceiling 111)`. Deployed Release 97bd1757…,
 boot service exit 0.
+
+## 2026-11-21 The in-app wordmark, the filled glyph, and a cached frame
+
+Three defects from the rename and the new renderer, all found by looking at
+real captures rather than at the code.
+
+**The wordmark still said RAM.** The header is two separate Slint `Text`
+elements — `RAM` on one line, `CONTROL CENTER` on the next — so the rename
+sweep, which replaced the joined string, never matched them. The window title
+was already `HIMARI`, which made the mismatch easy to miss. Now the header
+reads `HIMARI / CONTROL CENTER`, letter-spaced to suit the shorter word, and
+the two catalog entries follow.
+
+**Every glyph drew as a filled block.** `distance_to_arc` computed the
+out-of-sweep distance by projecting onto a segment that ended at the sample
+point, which always gives zero, so every arc pixel counted as covered. The fan
+came out as a solid square. The fix returns the distance to the nearer endpoint,
+and a test now asserts the fan outline: empty centre, stroked ring, and fewer
+than 900 of 2304 samples lit.
+
+**Held frames repainted the whole surface.** Composition is split: panel,
+border, text and level bar are baked into `base` once per presentation, and a
+held frame copies `base` and redraws only the 34×34 icon box. That made the
+anti-dust rotation affordable — the glyph turns while the card is held at
+roughly 60 frames per second.
+
+Evidence on the machine, `--fn-event-smoke 0x40` through the real dispatch path
+(`target/validation/osd-theme/dust-*.png`):
+
+```text
+card: 散热 / 正在运行防尘 · CPU 5298 / GPU 3085
+two frames 600 ms apart during the hold: 454 pixels differ in the icon box
+```
+
+The fan notice now names both fans, because the platform runs a CPU and a GPU
+fan and a single figure would hide which one moved.

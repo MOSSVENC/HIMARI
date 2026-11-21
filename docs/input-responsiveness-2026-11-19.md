@@ -38,7 +38,7 @@
 
 修改后的同一测试测得最大提交间隔 **30.43 ms**、P95 **4.38 ms**，超过 33 ms 的间隔为 0；散热页首次绘制为 **26.67 ms**。该轮通过 33.34 ms 门槛，记录位于 overlay-graphics/results.json。单次对照有运行波动，后续继续保留首次进入的单独测量。
 
-默认 Release 的 --graphics-smoke 支持通过 RAM_GRAPHICS_SMOKE_SNAPSHOT 指定最终渲染快照路径；性能采样在快照生成之前结束。
+默认 Release 的 --graphics-smoke 支持通过 HIMARI_GRAPHICS_SMOKE_SNAPSHOT 指定最终渲染快照路径；性能采样在快照生成之前结束。
 
 最终构建复测：最大提交间隔 **30.61 ms**，P95 **4.30 ms**，散热页首次绘制 **25.04 ms**，22 次转换和 33.34 ms 门槛通过。窗口缩放、最小化恢复及一秒空闲零提交检查通过。当轮最终快照由 Slint take_snapshot() 在 CPU 上重新绘制，只验证静态布局，不能验证 Vulkan 目标图像；记录在 final-graphics/。屏幕遮挡采集未用于此结论。后续 GPU 直接读回的检查见 rendering.md。
 

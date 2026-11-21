@@ -235,9 +235,10 @@ fn distance_to_arc(px: f32, py: f32, cx: f32, cy: f32, radius: f32, start: f32, 
         };
         let (x0, y0) = point(start);
         let (x1, y1) = point(end);
-        distance_to_segment(px, py, x0, y0, px, py)
-            .min(distance_to_segment(px, py, x1, y1, px, py))
-            .min((px - x0).hypot(py - y0).min((px - x1).hypot(py - y1)))
+        // Distance to an arc outside its sweep is the distance to whichever
+        // endpoint is nearer. Projecting onto a segment that ends at the
+        // sample point would always give zero and flood the glyph.
+        (px - x0).hypot(py - y0).min((px - x1).hypot(py - y1))
     }
 }
 
@@ -261,21 +262,11 @@ pub(crate) fn coverage(prim: &Prim, px: f32, py: f32, half_width: f32) -> f32 {
         Prim::Arc(cx, cy, radius, start, end) => {
             distance_to_arc(px, py, cx, cy, radius, start, end)
         }
-        Prim::Ring(cx, cy, radius) => (px - cx).hypot(py - cy).sub(radius).abs(),
+        Prim::Ring(cx, cy, radius) => ((px - cx).hypot(py - cy) - radius).abs(),
         Prim::Rect(x, y, w, h, radius) => distance_to_rect_outline(px, py, x, y, w, h, radius),
         Prim::Dot(cx, cy, radius) => (px - cx).hypot(py - cy) - radius,
     };
     (half_width + 0.5 - distance).clamp(0.0, 1.0)
-}
-
-trait Sub {
-    fn sub(self, rhs: f32) -> f32;
-}
-
-impl Sub for f32 {
-    fn sub(self, rhs: f32) -> f32 {
-        self - rhs
-    }
 }
 
 #[cfg(test)]
@@ -348,6 +339,37 @@ mod tests {
             assert!(!ids.contains(&id), "duplicate glyph id {id}");
             ids.push(id);
         }
+    }
+
+    /// The fan glyph must be an outline: the centre is empty and only the
+    /// strokes light up. A filled icon means the distance maths collapsed.
+    #[test]
+    fn fan_glyph_is_an_outline_not_a_filled_block() {
+        let glyph = Glyph::Fan;
+        let prims = glyph.prims();
+        let half = 0.95_f32;
+        let at = |x: f32, y: f32| {
+            prims
+                .iter()
+                .map(|prim| coverage(prim, x, y, half))
+                .fold(0.0_f32, f32::max)
+        };
+        assert!(
+            at(24.0, 24.0) < 0.2,
+            "centre should be empty, got {}",
+            at(24.0, 24.0)
+        );
+        assert!(at(24.0, 13.0) > 0.5, "ring top should be stroked");
+        assert!(at(8.0, 8.0) < 0.1, "corner should be empty");
+        let mut filled = 0;
+        for y in 0..48 {
+            for x in 0..48 {
+                if at(x as f32, y as f32) > 0.5 {
+                    filled += 1;
+                }
+            }
+        }
+        assert!(filled < 900, "glyph covers {filled} of 2304 samples");
     }
 
     #[test]

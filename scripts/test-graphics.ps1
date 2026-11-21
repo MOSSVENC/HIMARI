@@ -17,13 +17,13 @@ $stderr = Join-Path $OutputDirectory 'vulkan.stderr.log'
 $snapshot = Join-Path $OutputDirectory 'overview.ppm'
 $clock = [Diagnostics.Stopwatch]::StartNew()
 if (Test-Path -LiteralPath $snapshot) { Remove-Item -LiteralPath $snapshot -Force }
-$oldSnapshotSetting = $env:RAM_GRAPHICS_SMOKE_SNAPSHOT
-$oldTextSetting = $env:RAM_GRAPHICS_SMOKE_TEXT_CHANGES
-$env:RAM_GRAPHICS_SMOKE_SNAPSHOT = $snapshot
+$oldSnapshotSetting = $env:HIMARI_GRAPHICS_SMOKE_SNAPSHOT
+$oldTextSetting = $env:HIMARI_GRAPHICS_SMOKE_TEXT_CHANGES
+$env:HIMARI_GRAPHICS_SMOKE_SNAPSHOT = $snapshot
 if ($RequireTextInvalidation) {
-    $env:RAM_GRAPHICS_SMOKE_TEXT_CHANGES = '1'
+    $env:HIMARI_GRAPHICS_SMOKE_TEXT_CHANGES = '1'
 } else {
-    Remove-Item Env:RAM_GRAPHICS_SMOKE_TEXT_CHANGES -ErrorAction SilentlyContinue
+    Remove-Item Env:HIMARI_GRAPHICS_SMOKE_TEXT_CHANGES -ErrorAction SilentlyContinue
 }
 $process = Start-Process -FilePath $Executable -PassThru -NoNewWindow `
     -ArgumentList @('--graphics-smoke', '--renderer=vulkan') `
@@ -136,14 +136,14 @@ try {
     }
     $process.Dispose()
     if ($null -eq $oldSnapshotSetting) {
-        Remove-Item Env:RAM_GRAPHICS_SMOKE_SNAPSHOT -ErrorAction SilentlyContinue
+        Remove-Item Env:HIMARI_GRAPHICS_SMOKE_SNAPSHOT -ErrorAction SilentlyContinue
     } else {
-        $env:RAM_GRAPHICS_SMOKE_SNAPSHOT = $oldSnapshotSetting
+        $env:HIMARI_GRAPHICS_SMOKE_SNAPSHOT = $oldSnapshotSetting
     }
     if ($null -eq $oldTextSetting) {
-        Remove-Item Env:RAM_GRAPHICS_SMOKE_TEXT_CHANGES -ErrorAction SilentlyContinue
+        Remove-Item Env:HIMARI_GRAPHICS_SMOKE_TEXT_CHANGES -ErrorAction SilentlyContinue
     } else {
-        $env:RAM_GRAPHICS_SMOKE_TEXT_CHANGES = $oldTextSetting
+        $env:HIMARI_GRAPHICS_SMOKE_TEXT_CHANGES = $oldTextSetting
     }
 }
 
