@@ -430,8 +430,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     resume_recovery::start();
 
     let ui = MainWindow::new()?;
-    let osd = OsdWindow::new()?;
-    osd::install(osd.as_weak(), ui.as_weak());
+    osd::install(ui.as_weak());
+    osd_layer::start();
     ui_callbacks::apply_persisted_theme(&ui);
     fn_owner::install_ui(ui.as_weak());
     if let Err(error) = slint::select_bundled_translation("zh-CN") {
@@ -449,7 +449,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     spawn_worker(receiver, weak);
     fn_owner::start();
 
-    let result = resident_ui::run(&ui, start_background);
-    drop(osd);
-    result
+    resident_ui::run(&ui, start_background)
 }

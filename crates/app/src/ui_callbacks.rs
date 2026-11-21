@@ -42,7 +42,6 @@ fn ease_out_cubic(progress: f32) -> f32 {
 fn publish_theme(ui: &MainWindow, dark: bool, blend: f32) {
     ui.global::<Palette>().set_dark(dark);
     ui.global::<Palette>().set_blend(blend);
-    crate::osd::set_theme(dark, blend);
 }
 
 /// Apply the persisted theme before the first frame, and seed the overlay.

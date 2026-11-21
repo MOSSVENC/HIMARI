@@ -386,8 +386,8 @@ fn log_line(message: &str) {
 /// process and exits after the OSD auto-hide interval.
 pub(crate) fn osd_smoke() -> Result<(), Box<dyn std::error::Error>> {
     let ui = MainWindow::new()?;
-    let osd = crate::OsdWindow::new()?;
-    osd::install(osd.as_weak(), ui.as_weak());
+    crate::osd::install(ui.as_weak());
+    crate::osd_layer::start();
     crate::ui_callbacks::apply_persisted_theme(&ui);
     install_ui(ui.as_weak());
     dispatch_notification(FnNotification::from_payload(
@@ -397,7 +397,6 @@ pub(crate) fn osd_smoke() -> Result<(), Box<dyn std::error::Error>> {
         let _ = slint::quit_event_loop();
     });
     slint::run_event_loop()?;
-    drop(osd);
     Ok(())
 }
 
@@ -406,8 +405,8 @@ pub(crate) fn osd_smoke() -> Result<(), Box<dyn std::error::Error>> {
 /// Fn capture.
 pub(crate) fn event_smoke(code: u8) -> Result<(), Box<dyn std::error::Error>> {
     let ui = MainWindow::new()?;
-    let osd = crate::OsdWindow::new()?;
-    osd::install(osd.as_weak(), ui.as_weak());
+    crate::osd::install(ui.as_weak());
+    crate::osd_layer::start();
     crate::ui_callbacks::apply_persisted_theme(&ui);
     install_ui(ui.as_weak());
     dispatch_notification(FnNotification::from_payload(
@@ -417,7 +416,6 @@ pub(crate) fn event_smoke(code: u8) -> Result<(), Box<dyn std::error::Error>> {
         let _ = slint::quit_event_loop();
     });
     slint::run_event_loop()?;
-    drop(osd);
     Ok(())
 }
 

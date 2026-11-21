@@ -1069,3 +1069,36 @@ composite mode — were all dead ends on the same surface.
 FFI is confined to this module: `unsafe total: 110 (ceiling 110)`, ten
 boundaries, each with a safety comment. The overlay is not yet wired into the
 Fn dispatch; this commit adds the verified primitive and a smoke entry point.
+
+## 2026-11-21 The overlay is wired into the Fn path
+
+The Slint overlay window is retired. Fn events now reach the native layered
+overlay through the same `osd::show` entry point, so nothing in the dispatch
+had to change:
+
+- `osd_layer::start` spawns one `osd-overlay` thread that owns the layered
+  window for the process lifetime;
+- `osd::show` assembles the presentation on the UI thread, because the palette
+  and the anchor geometry both live there, then queues it to that thread;
+- later requests cut the current display short instead of queueing behind it,
+  which keeps the overlay honest when keys are pressed in quick succession;
+- the anchor is clamped to the desktop, so a hidden or unplaced main window
+  cannot push the card off-screen.
+
+Panel, title and detail colours are chosen from the live palette blend, and
+the accent comes from the event's own colour, so the card follows the panel
+theme the same way the rest of the UI does.
+
+Verified on the installed build with `--osd-smoke`:
+
+```text
+target/validation/osd-theme/native-osd-full.png
+```
+
+The card shows `大写锁定 / 开启` over the desktop with the wallpaper visible
+through the panel.
+
+The Slint overlay component and its `bars.slint` re-export were deleted with
+it, and `osd::set_theme` went away because the overlay reads the palette when
+it presents. 78 application, 4 uninstaller and 35 protocol host tests pass,
+strict Windows Clippy is clean, `unsafe total: 110 (ceiling 110)`.

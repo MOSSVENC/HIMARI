@@ -1,92 +1,84 @@
-//! Always-on-top Fn/OSD surface owned by the Slint event loop.
+//! Overlay presentation router.
+//!
+//! The card is drawn by the native layered window in `osd_layer`, which is the
+//! only path on this machine that can carry per-pixel alpha. The Slint overlay
+//! window was retired: its Vulkan surface advertises `COMPOSITE_ALPHA_OPAQUE`
+//! only, so it could never be translucent.
 
 use std::sync::Mutex;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Duration;
 
 use slint::{ComponentHandle, Weak};
 
-use crate::OsdWindow;
+use crate::osd_layer::{self, Presentation};
 
-static WINDOW: OnceLock<Mutex<Option<Weak<OsdWindow>>>> = OnceLock::new();
 static MAIN_WINDOW: OnceLock<Mutex<Option<Weak<crate::MainWindow>>>> = OnceLock::new();
-static GENERATION: AtomicU64 = AtomicU64::new(0);
 
-const DISPLAY_TIME: Duration = Duration::from_millis(2_200);
-
-pub(crate) fn set_theme(dark: bool, blend: f32) {
-    let Some(window) = WINDOW
-        .get()
-        .and_then(|slot| slot.lock().ok())
-        .and_then(|slot| slot.clone())
-    else {
-        return;
-    };
-    let _ = slint::invoke_from_event_loop(move || {
-        if let Some(osd) = window.upgrade() {
-            osd.global::<crate::Palette>().set_dark(dark);
-            osd.global::<crate::Palette>().set_blend(blend);
-        }
-    });
-}
-
-pub(crate) fn install(window: Weak<OsdWindow>, main_window: Weak<crate::MainWindow>) {
-    let slot = WINDOW.get_or_init(|| Mutex::new(None));
-    if let Ok(mut slot) = slot.lock() {
-        *slot = Some(window);
-    }
+pub(crate) fn install(main_window: Weak<crate::MainWindow>) {
     let main = MAIN_WINDOW.get_or_init(|| Mutex::new(None));
     if let Ok(mut main) = main.lock() {
         *main = Some(main_window);
     }
 }
 
+/// Present one overlay card.
+///
+/// The palette and the anchor geometry both live on the UI thread, so the
+/// presentation is assembled there and only the finished description is handed
+/// to the overlay thread.
 pub(crate) fn show(title: &str, detail: &str, accent: slint::Color) {
-    let Some(window) = WINDOW
+    let Some(main) = MAIN_WINDOW
         .get()
         .and_then(|slot| slot.lock().ok())
         .and_then(|slot| slot.clone())
     else {
         return;
     };
-    let generation = GENERATION.fetch_add(1, Ordering::AcqRel) + 1;
     let title = title.to_owned();
     let detail = detail.to_owned();
     if slint::invoke_from_event_loop(move || {
-        let weak = window.clone();
-        let Some(osd) = window.upgrade() else {
+        let Some(ui) = main.upgrade() else {
             return;
         };
-        osd.set_osd_title(title.into());
-        osd.set_osd_detail(detail.into());
-        osd.set_osd_accent(accent);
-        osd.set_osd_reveal(0.0);
-        position_over_main_window(&osd);
-        let _ = osd.show();
-        slint::Timer::single_shot(Duration::from_millis(1), {
-            let weak = weak.clone();
-            move || {
-                if GENERATION.load(Ordering::Acquire) == generation
-                    && let Some(osd) = weak.upgrade()
-                {
-                    osd.set_osd_reveal(1.0);
-                }
-            }
-        });
-        slint::Timer::single_shot(DISPLAY_TIME, move || {
-            if GENERATION.load(Ordering::Acquire) == generation && weak.upgrade().is_some() {
-                // A colour-keyed window cannot fade: a blended pixel stops
-                // matching the key and survives as a tinted smear. Withdraw
-                // the overlay after a short settle instead.
-                slint::Timer::single_shot(Duration::from_millis(180), move || {
-                    if GENERATION.load(Ordering::Acquire) == generation
-                        && let Some(osd) = weak.upgrade()
-                    {
-                        osd.hide().ok();
-                    }
-                });
-            }
+        let dark = ui.global::<crate::Palette>().get_blend() >= 0.5;
+        let panel = if dark {
+            [0.11, 0.13, 0.18]
+        } else {
+            [0.93, 0.95, 0.98]
+        };
+        let title_colour = if dark {
+            [0.96, 0.95, 0.98]
+        } else {
+            [0.08, 0.10, 0.14]
+        };
+        let detail_colour = if dark {
+            [0.65, 0.67, 0.73]
+        } else {
+            [0.35, 0.40, 0.47]
+        };
+        let accent = [
+            f32::from(accent.red()) / 255.0,
+            f32::from(accent.green()) / 255.0,
+            f32::from(accent.blue()) / 255.0,
+        ];
+        let position = ui.window().position();
+        let size = ui.window().size();
+        let width = i32::try_from(size.width).unwrap_or(0);
+        let height = i32::try_from(size.height).unwrap_or(0);
+        // A hidden or unplaced main window yields an off-screen anchor; clamp
+        // so the card always lands inside the desktop.
+        let origin = (
+            (position.x + (width - 320) / 2).max(0),
+            (position.y + height - 84 - 28).max(0),
+        );
+        osd_layer::show(Presentation {
+            title,
+            detail,
+            panel,
+            accent,
+            title_colour,
+            detail_colour,
+            origin,
         });
     })
     .is_err()
@@ -95,24 +87,4 @@ pub(crate) fn show(title: &str, detail: &str, accent: slint::Color) {
             "OSD update could not be dispatched to the Slint event loop",
         );
     }
-}
-
-fn position_over_main_window(window: &OsdWindow) {
-    let Some(main) = MAIN_WINDOW
-        .get()
-        .and_then(|slot| slot.lock().ok())
-        .and_then(|slot| slot.clone())
-        .and_then(|main| main.upgrade())
-    else {
-        return;
-    };
-    let position = main.window().position();
-    let size = main.window().size();
-    let scale = window.window().scale_factor();
-    let width = (320.0 * scale).round() as i32;
-    let height = (84.0 * scale).round() as i32;
-    window.window().set_position(slint::PhysicalPosition::new(
-        position.x + (i32::try_from(size.width).unwrap_or(0) - width) / 2,
-        position.y + i32::try_from(size.height).unwrap_or(0) - height - 28,
-    ));
 }

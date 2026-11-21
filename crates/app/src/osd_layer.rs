@@ -10,6 +10,62 @@
 //! `UpdateLayeredWindow`. GDI rasterises the glyphs into a separate mask bitmap
 //! so text antialiasing comes from the font engine rather than from us.
 
+use std::sync::Mutex;
+use std::sync::OnceLock;
+use std::sync::mpsc::Sender;
+
+/// One overlay presentation: text, palette and where to place the card.
+///
+/// The fields are consumed by the Windows overlay thread only.
+#[cfg_attr(not(windows), allow(dead_code))]
+pub(crate) struct Presentation {
+    pub title: String,
+    pub detail: String,
+    pub panel: [f32; 3],
+    pub accent: [f32; 3],
+    pub title_colour: [f32; 3],
+    pub detail_colour: [f32; 3],
+    pub origin: (i32, i32),
+}
+
+static REQUESTS: OnceLock<Mutex<Option<Sender<Presentation>>>> = OnceLock::new();
+
+/// Start the overlay thread once. It owns the layered window for the life of
+/// the process; presentation requests only carry text and palette.
+pub(crate) fn start() {
+    static STARTED: OnceLock<()> = OnceLock::new();
+    if STARTED.set(()).is_err() {
+        return;
+    }
+    let (sender, receiver) = std::sync::mpsc::channel::<Presentation>();
+    if let Ok(mut slot) = REQUESTS.get_or_init(|| Mutex::new(None)).lock() {
+        *slot = Some(sender);
+    }
+    #[cfg(windows)]
+    {
+        let result = std::thread::Builder::new()
+            .name("osd-overlay".to_owned())
+            .spawn(move || overlay_loop(receiver));
+        if let Err(error) = result {
+            crate::diagnostics::log_action(&format!("OSD overlay thread failed: {error}"));
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = receiver;
+}
+
+/// Queue one presentation. Later requests replace the one on screen.
+pub(crate) fn show(presentation: Presentation) {
+    let Some(sender) = REQUESTS
+        .get()
+        .and_then(|slot| slot.lock().ok())
+        .and_then(|slot| slot.clone())
+    else {
+        return;
+    };
+    let _ = sender.send(presentation);
+}
+
 #[cfg(not(windows))]
 pub(crate) fn smoke() -> Result<(), Box<dyn std::error::Error>> {
     Err("the layered overlay is Windows-only".into())
@@ -19,6 +75,7 @@ pub(crate) fn smoke() -> Result<(), Box<dyn std::error::Error>> {
 mod windows_impl {
     use std::ffi::c_void;
     use std::ptr;
+    use std::sync::mpsc::{Receiver, RecvTimeoutError};
 
     use windows_sys::Win32::Foundation::{HWND, POINT, SIZE};
     use windows_sys::Win32::Graphics::Gdi::{
@@ -410,10 +467,54 @@ mod windows_impl {
     fn wide(value: &str) -> Vec<u16> {
         value.encode_utf16().chain(std::iter::once(0)).collect()
     }
+
+    /// Own the layered window and replay the reveal for each request.
+    pub(crate) fn overlay_loop(receiver: Receiver<super::Presentation>) {
+        let Some(mut overlay) = Overlay::new() else {
+            crate::diagnostics::log_action("OSD overlay window could not be created");
+            return;
+        };
+        let mut pending = match receiver.recv() {
+            Ok(presentation) => presentation,
+            Err(_) => return,
+        };
+        loop {
+            overlay.set_content(&pending.title, &pending.detail);
+            overlay.move_to(pending.origin.0, pending.origin.1);
+            let steps = 14;
+            for step in 0..=steps {
+                let reveal = step as f32 / steps as f32;
+                overlay.render(
+                    reveal,
+                    pending.panel,
+                    pending.accent,
+                    pending.title_colour,
+                    pending.detail_colour,
+                );
+                std::thread::sleep(std::time::Duration::from_millis(16));
+            }
+            // Hold the card, but let a newer request cut the display short.
+            match receiver.recv_timeout(std::time::Duration::from_millis(2_100)) {
+                Ok(next) => {
+                    pending = next;
+                    continue;
+                }
+                Err(RecvTimeoutError::Timeout) => overlay.hide(),
+                Err(RecvTimeoutError::Disconnected) => {
+                    overlay.hide();
+                    return;
+                }
+            }
+            match receiver.recv() {
+                Ok(next) => pending = next,
+                Err(_) => return,
+            }
+        }
+    }
 }
 
 #[cfg(windows)]
-pub(crate) use windows_impl::Overlay;
+pub(crate) use windows_impl::{Overlay, overlay_loop};
 
 #[cfg(windows)]
 pub(crate) fn smoke() -> Result<(), Box<dyn std::error::Error>> {
