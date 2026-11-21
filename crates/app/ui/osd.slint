@@ -1,9 +1,8 @@
 import { Palette } from "theme.slint";
 
-// The overlay window is opaque: the Vulkan swapchain on this driver carries no
-// per-pixel alpha, and a layered colour key is ignored by the compositor for
-// this surface, so the card is the visible object and the window rectangle
-// around it uses the same surface colour.
+// Opaque overlay. The Vulkan surface on the reference driver advertises only
+// COMPOSITE_ALPHA_OPAQUE, so a transparent window would render black around
+// the card instead of showing the desktop. See docs/verification.md.
 export component OsdWindow inherits Window {
     in property <string> osd-title: "";
     in property <string> osd-detail: "";
@@ -26,8 +25,8 @@ export component OsdWindow inherits Window {
         background: Palette.surface-gradient;
         border-width: 1px;
         border-color: root.osd-accent.with-alpha(0.55);
-        drop-shadow-blur: 16px;
-        drop-shadow-color: #000000C0;
+        drop-shadow-blur: 18px;
+        drop-shadow-color: #000000A0;
         transform-scale-x: 0.97 + 0.03 * root.osd-reveal;
         transform-scale-y: 0.97 + 0.03 * root.osd-reveal;
         animate y { duration: 220ms; easing: cubic-bezier(0.22, 1, 0.36, 1); }

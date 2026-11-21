@@ -999,3 +999,37 @@ presenting a swapchain surface. That is the vendor's approach and the only way
 to obtain per-pixel alpha here. It is a second renderer for the overlay
 (GDI or D2D text plus our own glyphs), not a parameter change, and it replaces
 Slint's animation path for that window.
+
+### Correction: the Vulkan surface cannot be transparent here
+
+The layered-window measurement above showed that a colour key is ignored for
+this surface. The next step was to ask the swapchain for a premultiplied
+composite mode instead, since Slint already creates every window with
+`with_transparent(true)` and only the surface alpha was missing.
+
+A diagnostic that recorded each `Swapchain::new` attempt reported:
+
+```text
+rejected PreMultiplied: a validation error occurred
+accepted Opaque
+```
+
+twice, once per window. `VkSurfaceCapabilitiesKHR.supportedCompositeAlpha` on
+this driver therefore offers no alpha-bearing mode at all, and the swapchain
+cannot carry per-pixel alpha regardless of how the window is styled. Slint's
+own layer was never the problem.
+
+The fork now tries `PRE_MULTIPLIED` first and falls back to the advertised
+modes, which is a no-op here and a real improvement on drivers that accept it.
+The overlay stays opaque, and the documentation no longer implies otherwise.
+
+Remaining options for a translucent overlay, none of which are parameter
+changes:
+
+1. A native layered overlay (`UpdateLayeredWindow` with a premultiplied ARGB
+   bitmap and GDI text) — the vendor's approach, independent of the GPU
+   renderer, but it replaces Slint for that window and adds real FFI.
+2. A separate overlay process using a pixel-software renderer, which renders
+   into a CPU buffer instead of a swapchain.
+3. Changing the whole application renderer to `femtovg`/OpenGL, which accepts
+   alpha on Windows but discards the verified Vulkan path.

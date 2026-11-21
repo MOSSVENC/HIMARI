@@ -42,3 +42,11 @@ vulkan_surface.rs, the vulkan_diagnostics.rs module and Cargo.toml:
 The other files retain upstream source. The application pins the complete Slint
 family to 1.17.0. Review these patched modules and the feature declaration
 explicitly when updating the renderer.
+
+- Try `COMPOSITE_ALPHA_PRE_MULTIPLIED` before the modes the surface advertises,
+  and fall back to them in order. The advertised bitfield iterates to `OPAQUE`
+  first, which silently makes every window opaque; on the reference driver the
+  premultiplied mode is rejected outright (`Swapchain::new` validation error),
+  so the fallback keeps startup working while drivers that do support it get
+  real window transparency. Measured on 2026-11-20: candidate probe wrote
+  `rejected PreMultiplied / accepted Opaque` for both windows.

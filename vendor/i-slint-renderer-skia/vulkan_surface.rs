@@ -19,12 +19,32 @@ use vulkano::image::view::ImageView;
 use vulkano::image::{Image, ImageUsage};
 use vulkano::instance::{Instance, InstanceCreateFlags, InstanceCreateInfo, InstanceExtensions};
 use vulkano::swapchain::{
-    PresentMode, Surface, Swapchain, SwapchainCreateInfo, SwapchainPresentInfo,
+    CompositeAlpha, PresentMode, Surface, Swapchain, SwapchainCreateInfo, SwapchainPresentInfo,
 };
 use vulkano::sync::GpuFuture;
 use vulkano::{Handle, Validated, VulkanError, VulkanLibrary, VulkanObject, sync};
 
 use crate::SkiaSharedContext;
+
+/// Composite-alpha candidates in order of preference.
+///
+/// `supported_composite_alpha` is a bitfield whose iteration order yields
+/// `OPAQUE` first on this driver, which silently disables window transparency:
+/// the content renders, but the desktop behind it never shows through.
+/// `PRE_MULTIPLIED` is therefore attempted first even when the driver does not
+/// advertise it, because this driver accepts it while omitting the bit, and
+/// `OPAQUE` remains as a last resort so a stricter driver still starts.
+fn composite_alpha_candidates(
+    capabilities: &vulkano::swapchain::SurfaceCapabilities,
+) -> Vec<CompositeAlpha> {
+    let mut candidates = vec![CompositeAlpha::PreMultiplied];
+    for alpha in capabilities.supported_composite_alpha.into_iter() {
+        if alpha != CompositeAlpha::PreMultiplied {
+            candidates.push(alpha);
+        }
+    }
+    candidates
+}
 
 pub struct SharedVulkanContext {
     instance: Arc<Instance>,
@@ -138,27 +158,40 @@ impl VulkanSurface {
             }
             let image_format = vulkano::format::Format::B8G8R8A8_UNORM;
 
-            Swapchain::new(
-                device.clone(),
-                surface.clone(),
-                SwapchainCreateInfo {
-                    min_image_count: surface_capabilities.min_image_count,
-                    image_format,
-                    image_extent: [size.width, size.height],
-                    image_usage,
-                    present_mode: PresentMode::Fifo,
-                    composite_alpha: surface_capabilities
-                        .supported_composite_alpha
-                        .into_iter()
-                        .next()
-                        .ok_or_else(|| {
-                            "fatal: Vulkan surface capabilities missing composite alpha descriptor"
-                                .to_string()
-                        })?,
-                    ..Default::default()
-                },
-            )
-            .map_err(|vke| format!("Error creating Vulkan swapchain: {vke}"))?
+            let candidates = composite_alpha_candidates(&surface_capabilities);
+            if candidates.is_empty() {
+                return Err(
+                    "fatal: Vulkan surface capabilities missing composite alpha descriptor".into(),
+                );
+            }
+            let mut last_swapchain_error = None;
+            let mut created = None;
+            for composite_alpha in candidates {
+                match Swapchain::new(
+                    device.clone(),
+                    surface.clone(),
+                    SwapchainCreateInfo {
+                        min_image_count: surface_capabilities.min_image_count,
+                        image_format,
+                        image_extent: [size.width, size.height],
+                        image_usage,
+                        present_mode: PresentMode::Fifo,
+                        composite_alpha,
+                        ..Default::default()
+                    },
+                ) {
+                    Ok(swapchain) => {
+                        created = Some(swapchain);
+                        break;
+                    }
+                    Err(vke) => last_swapchain_error = Some((composite_alpha, vke)),
+                }
+            }
+            created.ok_or_else(|| {
+                // Every candidate was attempted, so an error was recorded.
+                let (alpha, vke) = last_swapchain_error.expect("candidates is non-empty");
+                format!("Error creating Vulkan swapchain with {alpha:?}: {vke}")
+            })?
         };
 
         let mut swapchain_image_views = Vec::with_capacity(swapchain_images.len());
