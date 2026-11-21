@@ -33,7 +33,13 @@ pub(crate) fn install(main_window: Weak<crate::MainWindow>) {
 /// presentation is assembled there and only the finished description is handed
 /// to the overlay thread.
 /// Present one overlay card with a glyph and an optional level bar.
-pub(crate) fn show_with(title: &str, detail: &str, accent: slint::Color, glyph: i32, level: f32) {
+pub(crate) fn show_with(
+    title: &str,
+    detail: &str,
+    accent: slint::Color,
+    glyph: crate::osd_glyph::Glyph,
+    level: f32,
+) {
     let Some(main) = MAIN_WINDOW
         .get()
         .and_then(|slot| slot.lock().ok())
@@ -102,7 +108,7 @@ pub(crate) fn show_with(title: &str, detail: &str, accent: slint::Color, glyph: 
             width,
             height,
             scale,
-            glyph,
+            glyph: glyph.id(),
             level,
         });
     })

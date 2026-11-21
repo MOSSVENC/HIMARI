@@ -44,6 +44,30 @@ pub(crate) enum Glyph {
 }
 
 impl Glyph {
+    /// Numeric id used only where a plain integer has to cross into the
+    /// compositor; every caller keeps the enum.
+    pub(crate) const fn id(self) -> i32 {
+        match self {
+            Self::None => 0,
+            Self::Keyboard => 1,
+            Self::Lock => 2,
+            Self::Fan => 3,
+            Self::Bolt => 4,
+            Self::Gauge => 5,
+            Self::Key => 6,
+            Self::Touchpad => 7,
+            Self::Camera => 8,
+            Self::Microphone => 9,
+            Self::Dock => 10,
+            Self::Waves => 11,
+            Self::Window => 12,
+            Self::Moon => 13,
+            Self::Alert => 14,
+            Self::Film => 15,
+            Self::Leaf => 16,
+        }
+    }
+
     pub(crate) fn from_id(id: i32) -> Self {
         match id {
             1 => Self::Keyboard,
@@ -290,6 +314,40 @@ mod tests {
         assert_eq!(coverage(&line, 5.0, 20.0, 1.5), 0.0);
         let dot = Prim::Dot(4.0, 4.0, 3.0);
         assert_eq!(coverage(&dot, 4.0, 4.0, 1.0), 1.0);
+    }
+
+    const ALL_GLYPHS: [Glyph; 17] = [
+        Glyph::None,
+        Glyph::Keyboard,
+        Glyph::Lock,
+        Glyph::Fan,
+        Glyph::Bolt,
+        Glyph::Gauge,
+        Glyph::Key,
+        Glyph::Touchpad,
+        Glyph::Camera,
+        Glyph::Microphone,
+        Glyph::Dock,
+        Glyph::Waves,
+        Glyph::Window,
+        Glyph::Moon,
+        Glyph::Alert,
+        Glyph::Film,
+        Glyph::Leaf,
+    ];
+
+    /// The integer id is the only place a glyph crosses into the compositor,
+    /// so it has to be unique and reversible. A duplicate here would silently
+    /// show the wrong icon, which is exactly the drift the enum prevents.
+    #[test]
+    fn glyph_ids_are_unique_and_round_trip() {
+        let mut ids = Vec::new();
+        for glyph in ALL_GLYPHS {
+            let id = glyph.id();
+            assert_eq!(Glyph::from_id(id), glyph, "id {id} maps to another glyph");
+            assert!(!ids.contains(&id), "duplicate glyph id {id}");
+            ids.push(id);
+        }
     }
 
     #[test]

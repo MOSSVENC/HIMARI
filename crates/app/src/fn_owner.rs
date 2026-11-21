@@ -7,7 +7,7 @@ use std::time::Duration;
 use himari_protocol::{Adjustment, Dchu, FanNotice, FnEvent, FnNotification, PowerMode};
 use slint::{ComponentHandle, Weak};
 
-use crate::{MainWindow, localization::tr, osd};
+use crate::{MainWindow, localization::tr, osd, osd_glyph::Glyph};
 
 static MAIN_WINDOW: OnceLock<Mutex<Option<Weak<MainWindow>>>> = OnceLock::new();
 
@@ -87,7 +87,7 @@ fn dispatch_notification(notification: FnNotification) {
                 title: event_title(event).to_owned(),
                 detail: format!("{}: {error}", tr("Action failed")),
                 accent: ACCENT_ERROR,
-                glyph: 14,
+                glyph: Glyph::Alert,
                 level: -1.0,
             }
         }
@@ -106,8 +106,7 @@ struct OsdView {
     title: String,
     detail: String,
     accent: slint::Color,
-    /// `osd_glyph::Glyph` identifier; zero means text only.
-    glyph: i32,
+    glyph: Glyph,
     /// Level shown as a five-step bar, negative to hide it.
     level: f32,
 }
@@ -115,25 +114,8 @@ struct OsdView {
 const ACCENT_INFO: slint::Color = slint::Color::from_rgb_u8(66, 211, 255);
 const ACCENT_ERROR: slint::Color = slint::Color::from_rgb_u8(255, 91, 104);
 
-// Glyph identifiers mirror `osd_glyph::Glyph`.
-const GLYPH_KEYBOARD: i32 = 1;
-const GLYPH_LOCK: i32 = 2;
-const GLYPH_FAN: i32 = 3;
-const GLYPH_BOLT: i32 = 4;
-const GLYPH_GAUGE: i32 = 5;
-const GLYPH_KEY: i32 = 6;
-const GLYPH_TOUCHPAD: i32 = 7;
-const GLYPH_CAMERA: i32 = 8;
-const GLYPH_MICROPHONE: i32 = 9;
-const GLYPH_DOCK: i32 = 10;
-const GLYPH_WAVES: i32 = 11;
-const GLYPH_WINDOW: i32 = 12;
-const GLYPH_MOON: i32 = 13;
-const GLYPH_FILM: i32 = 15;
-const GLYPH_LEAF: i32 = 16;
-
 impl OsdView {
-    fn new(title: String, detail: String, glyph: i32) -> Self {
+    fn new(title: String, detail: String, glyph: Glyph) -> Self {
         Self {
             title,
             detail,
@@ -177,33 +159,35 @@ fn state_view(event: FnEvent) -> Option<OsdView> {
                 FanNotice::Maximum => tr("Maximum fan"),
             }
             .to_owned(),
-            GLYPH_FAN,
+            Glyph::Fan,
         ),
         FnEvent::SilentMode(enabled) => {
-            OsdView::new(tr("Silent mode").to_owned(), on_off(enabled), GLYPH_MOON)
+            OsdView::new(tr("Silent mode").to_owned(), on_off(enabled), Glyph::Moon)
         }
         FnEvent::MobileRadio(enabled) => {
-            OsdView::new(tr("Mobile radio").to_owned(), on_off(enabled), GLYPH_WAVES)
+            OsdView::new(tr("Mobile radio").to_owned(), on_off(enabled), Glyph::Waves)
         }
         FnEvent::CapsLock(enabled) => {
-            OsdView::new(tr("Caps Lock").to_owned(), on_off(enabled), GLYPH_KEY)
+            OsdView::new(tr("Caps Lock").to_owned(), on_off(enabled), Glyph::Key)
         }
         FnEvent::NumLock(enabled) => {
-            OsdView::new(tr("Num Lock").to_owned(), on_off(enabled), GLYPH_KEY)
+            OsdView::new(tr("Num Lock").to_owned(), on_off(enabled), Glyph::Key)
         }
         FnEvent::ScrollLock(enabled) => {
-            OsdView::new(tr("Scroll Lock").to_owned(), on_off(enabled), GLYPH_KEY)
+            OsdView::new(tr("Scroll Lock").to_owned(), on_off(enabled), Glyph::Key)
         }
-        FnEvent::FlexiAccess(enabled) => {
-            OsdView::new(tr("FlexiKey access").to_owned(), on_off(enabled), GLYPH_KEY)
-        }
+        FnEvent::FlexiAccess(enabled) => OsdView::new(
+            tr("FlexiKey access").to_owned(),
+            on_off(enabled),
+            Glyph::Key,
+        ),
         FnEvent::DiscreteGpuSwitch(enabled) => {
-            OsdView::new(tr("Discrete GPU").to_owned(), on_off(enabled), GLYPH_BOLT)
+            OsdView::new(tr("Discrete GPU").to_owned(), on_off(enabled), Glyph::Bolt)
         }
         FnEvent::CameraMicrophone(enabled) => OsdView::new(
             tr("Camera and microphone").to_owned(),
             on_off(enabled),
-            GLYPH_MICROPHONE,
+            Glyph::Microphone,
         ),
         FnEvent::Docking(connected) => OsdView::new(
             tr("Docking").to_owned(),
@@ -213,7 +197,7 @@ fn state_view(event: FnEvent) -> Option<OsdView> {
                 tr("Disconnected")
             }
             .to_owned(),
-            GLYPH_DOCK,
+            Glyph::Dock,
         ),
         _ => return None,
     };
@@ -256,26 +240,26 @@ fn execute(event: FnEvent) -> Result<Option<OsdView>, String> {
         FnEvent::BacklightStep(direction) => {
             let (detail, level) = adjust_backlight(direction)?;
             Ok(Some(
-                OsdView::new(title, detail, GLYPH_KEYBOARD).with_level(level),
+                OsdView::new(title, detail, Glyph::Keyboard).with_level(level),
             ))
         }
         FnEvent::BacklightToggle => {
             let (detail, level) = toggle_backlight()?;
             Ok(Some(
-                OsdView::new(title, detail, GLYPH_KEYBOARD).with_level(level),
+                OsdView::new(title, detail, Glyph::Keyboard).with_level(level),
             ))
         }
         FnEvent::BacklightCycle => {
             let (detail, level) = cycle_backlight()?;
             Ok(Some(
-                OsdView::new(title, detail, GLYPH_KEYBOARD).with_level(level),
+                OsdView::new(title, detail, Glyph::Keyboard).with_level(level),
             ))
         }
-        FnEvent::FnLockToggle => Ok(Some(OsdView::new(title, toggle_fn_lock()?, GLYPH_LOCK))),
+        FnEvent::FnLockToggle => Ok(Some(OsdView::new(title, toggle_fn_lock()?, Glyph::Lock))),
         FnEvent::NoiselessFanToggle => Ok(Some(OsdView::new(
             title,
             toggle_noiseless_fan()?,
-            GLYPH_FAN,
+            Glyph::Fan,
         ))),
         FnEvent::PowerModeCycle => {
             let (detail, glyph) = cycle_power_mode()?;
@@ -286,7 +270,7 @@ fn execute(event: FnEvent) -> Result<Option<OsdView>, String> {
             Ok(Some(OsdView::new(
                 title,
                 tr("Toggle window").to_owned(),
-                GLYPH_WINDOW,
+                Glyph::Window,
             )))
         }
         FnEvent::Camera(enabled) => {
@@ -294,17 +278,17 @@ fn execute(event: FnEvent) -> Result<Option<OsdView>, String> {
             device
                 .set_camera_enabled(enabled)
                 .map_err(|error| error.to_string())?;
-            Ok(Some(OsdView::new(title, on_off(enabled), GLYPH_CAMERA)))
+            Ok(Some(OsdView::new(title, on_off(enabled), Glyph::Camera)))
         }
         FnEvent::TouchpadToggle { .. } => Ok(Some(OsdView::new(
             title,
             toggle_touchpad()?,
-            GLYPH_TOUCHPAD,
+            Glyph::Touchpad,
         ))),
         FnEvent::ComboSwap(_) => Ok(Some(OsdView::new(
             title,
             toggle_combo_swap()?,
-            GLYPH_KEYBOARD,
+            Glyph::Keyboard,
         ))),
         _ => Ok(None),
     }
@@ -416,15 +400,15 @@ impl PowerTier {
     }
 
     /// Glyph that identifies this tier on the overlay.
-    const fn glyph(self) -> i32 {
+    const fn glyph(self) -> Glyph {
         match self {
-            Self::QuietWithoutDiscreteGpu => GLYPH_MOON,
+            Self::QuietWithoutDiscreteGpu => Glyph::Moon,
             Self::Profile(mode) => match mode {
-                PowerMode::Performance => GLYPH_BOLT,
-                PowerMode::Entertainment => GLYPH_FILM,
-                PowerMode::PowerSaving => GLYPH_LEAF,
-                PowerMode::Quiet | PowerMode::QuietPlus => GLYPH_MOON,
-                _ => GLYPH_GAUGE,
+                PowerMode::Performance => Glyph::Bolt,
+                PowerMode::Entertainment => Glyph::Film,
+                PowerMode::PowerSaving => Glyph::Leaf,
+                PowerMode::Quiet | PowerMode::QuietPlus => Glyph::Moon,
+                _ => Glyph::Gauge,
             },
         }
     }
@@ -456,7 +440,7 @@ fn power_tiers(capabilities: &himari_protocol::PlatformCapabilities) -> Vec<Powe
     tiers
 }
 
-fn cycle_power_mode() -> Result<(String, i32), String> {
+fn cycle_power_mode() -> Result<(String, Glyph), String> {
     let device = open_dchu()?;
     let capabilities = device
         .read_capabilities()
