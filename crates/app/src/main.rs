@@ -33,6 +33,8 @@ mod input_recovery;
 mod input_replay;
 mod localization;
 mod osd;
+#[cfg_attr(not(windows), allow(dead_code))]
+mod osd_glyph;
 mod osd_layer;
 #[allow(dead_code)]
 mod process_query;

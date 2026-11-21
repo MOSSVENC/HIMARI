@@ -1145,3 +1145,40 @@ Boot log evidence on the installed build:
 ```text
 processor-hot limit released
 ```
+
+## 2026-11-21 Overlay glyphs and level bars
+
+The overlay was text plus a single accent bar, which carried no state beyond the
+words. It now draws a vector glyph per event and a five-step level bar where a
+step value exists, so a backlight step and a lock toggle are distinguishable at
+a glance rather than by reading.
+
+`crates/app/src/osd_glyph.rs` describes fourteen icons as normalised line and
+arc primitives in a 48-unit box and rasterises them with an analytic distance
+field, so strokes stay smooth at any display scale. Nothing is taken from vendor
+artwork.
+
+Rendering additions in the overlay:
+
+- two-stop vertical gradient inside the panel, so it reads as glass instead of a
+  flat block;
+- a one-pixel hairline border following the rounded outline;
+- the glyph stroked in the event accent colour;
+- a five-segment level bar under the detail line, dimmed for empty steps.
+
+Event mapping: backlight to the keyboard glyph with its level, Fn Lock to a
+lock, fan notices and noiseless mode to a fan, profile cycling to a gauge,
+lock keys to a key cap, touchpad, camera, microphone, dock, radio waves, window
+and silent mode to their own glyphs, and failures to an alert ring.
+
+Verified on the machine with `--osd-layer-smoke`
+(`target/validation/osd-theme/icon-osd-full.png`): the card shows the keyboard
+glyph, `CAPS LOCK`, `ON` and three lit steps.
+
+Still missing for parity: the four undecoded triggers (airplane, combo, gc,
+microphone mute) have no glyph because they have no decoded event yet, and
+physical Fn feedback still belongs to FnKey while it holds the channel.
+
+81 application, 4 uninstaller and 35 protocol host tests pass, strict Windows
+Clippy is clean, `unsafe total: 111 (ceiling 111)`. Deployed Release 51211480…,
+boot service exit 0.

@@ -63,6 +63,10 @@ pub(crate) struct Presentation {
     pub width: i32,
     pub height: i32,
     pub scale: f32,
+    /// `crate::osd_glyph::Glyph` identifier for the event.
+    pub glyph: i32,
+    /// Backlight or brightness step, 0..=4, or negative to hide the bar.
+    pub level: f32,
 }
 
 static REQUESTS: OnceLock<Mutex<Option<Sender<Presentation>>>> = OnceLock::new();
@@ -230,6 +234,14 @@ mod windows_impl {
         (0.5 - distance).clamp(0.0, 1.0)
     }
 
+    /// Signed distance to a rounded-rectangle outline, used for the hairline.
+    fn coverage_distance(x: f32, y: f32, w: f32, h: f32, radius: f32) -> f32 {
+        let cx = (x - w * 0.5).abs() - (w * 0.5 - radius);
+        let cy = (y - h * 0.5).abs() - (h * 0.5 - radius);
+        let outside = cx.max(0.0).hypot(cy.max(0.0));
+        outside + cx.max(cy).min(0.0) - radius
+    }
+
     fn blend(pixel: &mut u32, colour: [f32; 3], alpha: f32) {
         if alpha <= 0.0 {
             return;
@@ -258,6 +270,17 @@ mod windows_impl {
         top: i32,
         width: i32,
         height: i32,
+    }
+
+    /// Colours and measurements for one composed frame.
+    #[derive(Clone, Copy)]
+    pub(crate) struct FrameStyle {
+        pub panel: [f32; 3],
+        pub accent: [f32; 3],
+        pub title: [f32; 3],
+        pub detail: [f32; 3],
+        pub glyph: i32,
+        pub level: f32,
     }
 
     pub(crate) struct Overlay {
@@ -375,15 +398,15 @@ mod windows_impl {
         /// Rasterise the current title and detail into the mask surface.
         pub(crate) fn set_content(&mut self, title: &str, detail: &str) {
             self.mask.clear();
-            let margin = (40.0 * self.scale) as i32;
-            let card_w = self.width - margin;
+            let margin = (66.0 * self.scale) as i32;
+            let card_w = self.width - margin - (16.0 * self.scale) as i32;
             self.draw_text(TextSpec {
                 text: title,
                 px_size: (22.0 * self.scale) as i32,
                 weight: FW_SEMIBOLD as i32,
                 face: "Bahnschrift",
                 left: margin,
-                top: (12.0 * self.scale) as i32,
+                top: (10.0 * self.scale) as i32,
                 width: card_w,
                 height: (30.0 * self.scale) as i32,
             });
@@ -393,7 +416,7 @@ mod windows_impl {
                 weight: 400,
                 face: "Microsoft YaHei UI",
                 left: margin,
-                top: (44.0 * self.scale) as i32,
+                top: (36.0 * self.scale) as i32,
                 width: card_w,
                 height: (24.0 * self.scale) as i32,
             });
@@ -408,42 +431,95 @@ mod windows_impl {
         }
 
         /// Compose one frame and push it to the compositor.
-        pub(crate) fn render(
-            &mut self,
-            reveal: f32,
-            panel: [f32; 3],
-            accent: [f32; 3],
-            title: [f32; 3],
-            detail: [f32; 3],
-        ) {
+        pub(crate) fn render(&mut self, reveal: f32, style: FrameStyle) {
+            let FrameStyle {
+                panel,
+                accent,
+                title,
+                detail,
+                glyph,
+                level,
+            } = style;
             self.panel.clear();
-            let offset = (1.0 - reveal) * 10.0;
-            let card_x = 8.0;
-            let card_y = 8.0 + offset;
-            let card_w = (self.width - 16) as f32;
-            let card_h = (self.height - 16) as f32;
-            // Both surfaces are owned by this overlay and stay alive for this
-            // frame; the borrow ends before the next mutation.
+            let offset = (1.0 - reveal) * 10.0 * self.scale;
+            let card_x = 8.0 * self.scale;
+            let card_y = 8.0 * self.scale + offset;
+            let card_w = (self.width as f32) - 16.0 * self.scale;
+            let card_h = (self.height as f32) - 16.0 * self.scale;
+            let radius = 14.0 * self.scale;
+
             let (panel_pixels, mask_pixels) = (self.panel.pixels(), self.mask.pixels());
             let stride = self.width as usize;
+            let glyph = crate::osd_glyph::Glyph::from_id(glyph);
+            let prims = glyph.prims();
+            let icon_size = 34.0 * self.scale;
+            let icon_x = card_x + 16.0 * self.scale;
+            let icon_y = card_y + (card_h - icon_size) * 0.5;
+            let glyph_scale = icon_size / crate::osd_glyph::GLYPH_BOX;
+            let stroke = 1.9 * self.scale;
+
             for y in 0..self.height {
                 for x in 0..self.width {
                     let fx = x as f32 + 0.5 - card_x;
                     let fy = y as f32 + 0.5 - card_y;
-                    let coverage = rounded_coverage(fx, fy, card_w, card_h, 13.0);
+                    let coverage = rounded_coverage(fx, fy, card_w, card_h, radius);
                     if coverage <= 0.0 {
                         continue;
                     }
                     let index = y as usize * stride + x as usize;
                     let pixel = &mut panel_pixels[index];
-                    blend(pixel, panel, coverage * 0.88 * reveal);
-                    let bar = rounded_coverage(fx - 16.0, fy - 12.0, 4.0, card_h - 24.0, 2.0);
-                    if bar > 0.0 {
-                        blend(pixel, accent, bar * reveal);
+                    // Vertical two-stop gradient makes the panel read as glass
+                    // rather than a flat block.
+                    let t = (fy / card_h).clamp(0.0, 1.0);
+                    let tint = [
+                        panel[0] * (1.0 - t) + panel[0] * 0.62 * t,
+                        panel[1] * (1.0 - t) + panel[1] * 0.66 * t,
+                        panel[2] * (1.0 - t) + panel[2] * 0.76 * t,
+                    ];
+                    blend(pixel, tint, coverage * 0.9 * reveal);
+                    // Hairline border follows the rounded outline.
+                    let border = (stroke * 0.5 + 0.5
+                        - coverage_distance(fx, fy, card_w, card_h, radius).abs())
+                    .clamp(0.0, 1.0);
+                    if border > 0.0 {
+                        blend(pixel, accent, border * 0.45 * reveal);
+                    }
+                    // Glyph strokes, drawn on top of the panel.
+                    let gx = (x as f32 + 0.5 - icon_x) / glyph_scale;
+                    let gy = (y as f32 + 0.5 - icon_y) / glyph_scale;
+                    let mut glyph_alpha: f32 = 0.0;
+                    for prim in prims {
+                        let c =
+                            crate::osd_glyph::coverage(prim, gx, gy, stroke / glyph_scale * 0.5);
+                        glyph_alpha = glyph_alpha.max(c);
+                    }
+                    if glyph_alpha > 0.0 {
+                        blend(pixel, accent, glyph_alpha * reveal);
+                    }
+                    // Level bar: five segments under the detail line.
+                    if level >= 0.0 {
+                        let bar_x = card_x + 66.0 * self.scale;
+                        let bar_y = card_y + card_h - 16.0 * self.scale;
+                        let segment = 15.0 * self.scale;
+                        let gap = 4.0 * self.scale;
+                        let step = (level.round() as i32).clamp(0, 4);
+                        for slot in 0..5 {
+                            let bx = x as f32 + 0.5 - (bar_x + slot as f32 * (segment + gap));
+                            let by = y as f32 + 0.5 - bar_y;
+                            if !(0.0..segment).contains(&bx)
+                                || !(0.0..3.0 * self.scale).contains(&by)
+                            {
+                                continue;
+                            }
+                            if slot == 0 || slot <= step {
+                                blend(pixel, accent, 0.85 * reveal);
+                            } else {
+                                blend(pixel, accent, 0.18 * reveal);
+                            }
+                        }
                     }
                     let mask = Self::coverage(mask_pixels, index);
                     if mask > 0.0 {
-                        // The title sits above the detail line.
                         let centre = card_h * 0.46;
                         let colour = if fy < centre { title } else { detail };
                         blend(pixel, colour, mask * reveal);
@@ -531,10 +607,14 @@ mod windows_impl {
                 let reveal = step as f32 / steps as f32;
                 overlay.render(
                     reveal,
-                    pending.panel,
-                    pending.accent,
-                    pending.title_colour,
-                    pending.detail_colour,
+                    FrameStyle {
+                        panel: pending.panel,
+                        accent: pending.accent,
+                        title: pending.title_colour,
+                        detail: pending.detail_colour,
+                        glyph: pending.glyph,
+                        level: pending.level,
+                    },
                 );
                 std::thread::sleep(std::time::Duration::from_millis(16));
             }
@@ -565,7 +645,7 @@ mod windows_impl {
 }
 
 #[cfg(windows)]
-pub(crate) use windows_impl::{Overlay, overlay_loop};
+pub(crate) use windows_impl::{FrameStyle, Overlay, overlay_loop};
 
 #[cfg(windows)]
 pub(crate) fn smoke() -> Result<(), Box<dyn std::error::Error>> {
@@ -580,10 +660,14 @@ pub(crate) fn smoke() -> Result<(), Box<dyn std::error::Error>> {
         let reveal = step as f32 / steps as f32;
         overlay.render(
             reveal,
-            [0.07, 0.08, 0.11],
-            [0.26, 0.83, 1.0],
-            [0.96, 0.95, 0.98],
-            [0.65, 0.67, 0.73],
+            FrameStyle {
+                panel: [0.07, 0.08, 0.11],
+                accent: [0.26, 0.83, 1.0],
+                title: [0.96, 0.95, 0.98],
+                detail: [0.65, 0.67, 0.73],
+                glyph: 1,
+                level: 3.0,
+            },
         );
         std::thread::sleep(std::time::Duration::from_millis(20));
     }

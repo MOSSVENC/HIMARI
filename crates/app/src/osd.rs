@@ -32,7 +32,8 @@ pub(crate) fn install(main_window: Weak<crate::MainWindow>) {
 /// The palette and the anchor geometry both live on the UI thread, so the
 /// presentation is assembled there and only the finished description is handed
 /// to the overlay thread.
-pub(crate) fn show(title: &str, detail: &str, accent: slint::Color) {
+/// Present one overlay card with a glyph and an optional level bar.
+pub(crate) fn show_with(title: &str, detail: &str, accent: slint::Color, glyph: i32, level: f32) {
     let Some(main) = MAIN_WINDOW
         .get()
         .and_then(|slot| slot.lock().ok())
@@ -101,6 +102,8 @@ pub(crate) fn show(title: &str, detail: &str, accent: slint::Color) {
             width,
             height,
             scale,
+            glyph,
+            level,
         });
     })
     .is_err()
