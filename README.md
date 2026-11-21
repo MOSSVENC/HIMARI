@@ -120,6 +120,8 @@ Fn/OSD work are listed in the [repair record](docs/repair-status-2026-11-16.md).
 
 ## Documentation
 
+All notes, current and historical, are indexed in [docs/README.md](docs/README.md).
+
 - [Architecture](docs/architecture.md)
 - [Feature parity](docs/cc40-feature-parity.md)
 - [Protocol map](docs/protocol-map.md)
