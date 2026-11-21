@@ -101,19 +101,20 @@ pub(crate) fn smoke() -> i32 {
     use std::time::{Duration, Instant};
 
     let result = (|| {
-        let mut listener = open_listener()?;
-        println!("Fn notifications: subscription registered");
-        for iteration in 0..3 {
-            let started = Instant::now();
-            match listener.wait_next_timeout(Duration::from_millis(150))? {
-                Some(value) => println!("{}", describe(value)),
-                None => println!(
-                    "Fn notifications: timeout iteration={iteration} ms={}",
-                    started.elapsed().as_millis()
-                ),
+        {
+            let mut listener = open_listener()?;
+            println!("Fn notifications: subscription registered");
+            for iteration in 0..3 {
+                let started = Instant::now();
+                match listener.wait_next_timeout(Duration::from_millis(150))? {
+                    Some(value) => println!("{}", describe(value)),
+                    None => println!(
+                        "Fn notifications: timeout iteration={iteration} ms={}",
+                        started.elapsed().as_millis()
+                    ),
+                }
             }
         }
-        drop(listener);
         println!("Fn notifications: subscription closed");
         Ok::<(), himari_protocol::DchuError>(())
     })();
