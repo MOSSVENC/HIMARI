@@ -1686,3 +1686,13 @@ So all six reversible modes pass on the refactored build; blue-light control its
 remains unverified while the display rejects every ramp. The UI still attempts the
 write and reports the driver error; gating the control on the same probe is the
 next step if this display state persists.
+
+The same probe now gates the control. `ui_callbacks::apply_capabilities` runs
+next to `apply_persisted_theme` at startup and sets `blue-light-supported`; the
+Input/I/O page disables the BLUE LIGHT stepper and its apply button and prints
+"This display driver rejects gamma ramps, so blue-light is unavailable" when the
+value is false. On this machine the probe is false (the smoke prints the skip
+line), so a user can no longer trigger the driver error from the UI.
+
+Visual capture of the disabled control is still pending; the evidence here is the
+probe result, the compiled binding and the full hardware-smoke suite passing.

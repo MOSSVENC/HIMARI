@@ -299,6 +299,7 @@ export component MainWindow inherits Window {
     in-out property <int> display-brightness-requested: 50;
     in property <int> blue-light-level: 0;
     in-out property <int> blue-light-requested: 0;
+    in property <bool> blue-light-supported: true;
     in property <int> audio-volume: 50;
     in-out property <int> audio-volume-requested: 50;
     in property <bool> audio-muted: false;
@@ -681,6 +682,7 @@ export component MainWindow inherits Window {
                             display-brightness: root.display-brightness;
                             display-brightness-requested <=> root.display-brightness-requested;
                             blue-light-level: root.blue-light-level;
+                            blue-light-supported: root.blue-light-supported;
                             blue-light-requested <=> root.blue-light-requested;
                             audio-volume: root.audio-volume;
                             audio-volume-requested <=> root.audio-volume-requested;

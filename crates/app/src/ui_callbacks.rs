@@ -45,6 +45,11 @@ fn publish_theme(ui: &MainWindow, dark: bool, blend: f32) {
 }
 
 /// Apply the persisted theme before the first frame, and seed the overlay.
+/// Static capabilities applied once at startup, next to the persisted theme.
+pub(crate) fn apply_capabilities(ui: &MainWindow) {
+    ui.set_blue_light_supported(crate::system_controls::gamma_ramp_supported());
+}
+
 pub(crate) fn apply_persisted_theme(ui: &MainWindow) {
     let dark = runtime_state::theme_dark();
     publish_theme(ui, dark, if dark { 1.0 } else { 0.0 });

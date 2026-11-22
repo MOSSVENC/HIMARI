@@ -466,6 +466,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     osd::install(ui.as_weak());
     osd_layer::start();
     ui_callbacks::apply_persisted_theme(&ui);
+    ui_callbacks::apply_capabilities(&ui);
     fn_owner::install_ui(ui.as_weak());
     if let Err(error) = slint::select_bundled_translation("zh-CN") {
         log_action(&format!("Chinese translation unavailable: {error}"));

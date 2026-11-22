@@ -20,6 +20,7 @@ import {
     in property <int> display-brightness: 50;
     in-out property <int> display-brightness-requested: 50;
     in property <int> blue-light-level: 0;
+    in property <bool> blue-light-supported: true;
     in-out property <int> blue-light-requested: 0;
     in property <int> audio-volume: 50;
     in-out property <int> audio-volume-requested: 50;
@@ -169,14 +170,18 @@ import {
                     upper: 10;
                     step: 1;
                     suffix: "";
-                    enabled: !root.busy;
+                    enabled: !root.busy && root.blue-light-supported;
                     changed(v) => { root.blue-light-requested = v; }
                 }
                 StageButton {
                     text: @tr("Apply blue-light filter");
                     primary: false;
-                    enabled: !root.busy && root.blue-light-requested != root.blue-light-level;
+                    enabled: !root.busy && root.blue-light-supported && root.blue-light-requested != root.blue-light-level;
                     clicked => { root.apply-blue-light(root.blue-light-requested); }
+                }
+                if !root.blue-light-supported : MicroLabel {
+                    text: @tr("This display driver rejects gamma ramps, so blue-light is unavailable");
+                    wrap: word-wrap;
                 }
                 Rectangle { vertical-stretch: 1; }
             }
