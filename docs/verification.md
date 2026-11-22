@@ -1528,3 +1528,33 @@ What remains is not one element: the page's 24 nested layouts and roughly forty
 Text runs make the first frame's raster and text shaping the floor. `gaps_over_33ms`
 stays 0, so there is no visible stall; the open gap is the last 1-2 ms above
 16.67 ms on some runs.
+
+## 2026-11-22 Where the Cooling first frame actually goes: glyph raster
+
+The `render-tracing` feature was built for the Windows target and the smoke run
+printed per-page text spans:
+
+```text
+page  1  text draw 5.05 ms   glyph 4.78 ms   font 0.00 ms
+page  2  text draw 10.72 ms  glyph 10.01 ms  font 0.01 ms
+page  3  text draw 6.37 ms   glyph 5.94 ms   font 0.01 ms
+page  8  text draw 5.83 ms   glyph 4.91 ms   font 1.07 ms
+page  0  text draw 0.63 ms   glyph 0.18 ms   font 0.01 ms
+```
+
+Text measurement is zero on every page. The Cooling frame spends 10 of its
+roughly 16.8 ms inside `draw_text` glyph rasterisation; page 8 spends 4.9 ms for
+its forty cells. So the remaining 1-2 ms above budget is a glyph-cache cost for
+Cooling's mix of CJK labels, six text sizes and its own Latin strings, not a
+layout, layer or animation cost (those were excluded in the previous section).
+
+Ways forward, in order of risk:
+
+1. pre-raster the app's text at startup while the window is not yet visible (the
+   first submission already costs ~2.9 s, so 10-20 ms there is invisible);
+2. reduce Cooling's distinct face/size pairs (a visual decision, not a code
+   tweak);
+3. accept 16.8-19 ms with zero gaps over 33 ms, which is the current state.
+
+None of these is a one-line change, and the third is already true, so the budget
+claim stays open rather than dressed up.
