@@ -11,14 +11,9 @@ use std::sync::OnceLock;
 use slint::{ComponentHandle, Weak};
 
 use crate::osd_layer::{self, Presentation};
+use crate::platform_profile;
 
 static MAIN_WINDOW: OnceLock<Mutex<Option<Weak<crate::MainWindow>>>> = OnceLock::new();
-
-/// Logical overlay size before display scaling.
-const BASE_WIDTH: f32 = 320.0;
-const BASE_HEIGHT: f32 = 84.0;
-/// Gap between the card and the bottom of the work area.
-const BASE_MARGIN: f32 = 24.0;
 
 pub(crate) fn install(main_window: Weak<crate::MainWindow>) {
     let main = MAIN_WINDOW.get_or_init(|| Mutex::new(None));
@@ -78,25 +73,45 @@ pub(crate) fn show_with(
         // Size the card from the display scale so it keeps the same apparent
         // size at 125 % / 150 %, like the vendor overlay does.
         let scale = ui.window().scale_factor();
-        let width = (BASE_WIDTH * scale).round() as i32;
-        let height = (BASE_HEIGHT * scale).round() as i32;
-        let margin = (BASE_MARGIN * scale).round() as i32;
-        // Anchor to the primary work area, which is what the vendor overlay
-        // does: bottom centre of the desktop, above the taskbar.
-        let origin = match osd_layer::work_area() {
-            Some((left, _top, right, bottom)) => {
-                (left + (right - left - width) / 2, bottom - height - margin)
-            }
-            None => {
-                let position = ui.window().position();
-                let size = ui.window().size();
-                let anchor_width = i32::try_from(size.width).unwrap_or(0);
-                let anchor_height = i32::try_from(size.height).unwrap_or(0);
-                (
-                    (position.x + (anchor_width - width) / 2).max(0),
-                    (position.y + anchor_height - height - margin).max(0),
-                )
-            }
+        let width = (platform_profile::CARD_WIDTH * scale).round() as i32;
+        let height = (platform_profile::CARD_HEIGHT * scale).round() as i32;
+        let position = ui.window().position();
+        let size = ui.window().size();
+        let anchor_width = i32::try_from(size.width).unwrap_or(0);
+        let anchor_height = i32::try_from(size.height).unwrap_or(0);
+        // The vendor overlay centres on the work area above the taskbar. Use
+        // the monitor under the window first, so a multi-monitor desktop gets
+        // the card on the screen the user is looking at, then fall back to the
+        // primary work area, then to the window itself.
+        let window = platform_profile::Rect {
+            left: position.x,
+            top: position.y,
+            right: position.x + anchor_width,
+            bottom: position.y + anchor_height,
+        };
+        let work = platform_profile::work_area_near(window)
+            .filter(|rect| rect.is_usable())
+            .or_else(|| {
+                osd_layer::work_area().map(|(left, top, right, bottom)| platform_profile::Rect {
+                    left,
+                    top,
+                    right,
+                    bottom,
+                })
+            });
+        let origin = match work {
+            Some(work) => platform_profile::card_origin(
+                work,
+                scale,
+                (platform_profile::CARD_WIDTH, platform_profile::CARD_HEIGHT),
+            ),
+            None => (
+                (position.x + (anchor_width - width) / 2).max(0),
+                (position.y + anchor_height
+                    - height
+                    - (platform_profile::CARD_MARGIN * scale).round() as i32)
+                    .max(0),
+            ),
         };
         osd_layer::show(Presentation {
             title,

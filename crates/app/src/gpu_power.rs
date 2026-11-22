@@ -77,6 +77,19 @@ mod platform {
     fn perform(enabled: bool) -> Result<(), String> {
         let dchu = Dchu::open()
             .map_err(|error| format!("could not open the signed ACPI transport: {error}"))?;
+        // Capability first: a CC4.0 model without the NVIDIA power-off flag must
+        // be told this control is unsupported, not handed a failing NVPCF write.
+        match dchu.read_capabilities() {
+            Ok(capabilities)
+                if !crate::platform_profile::discrete_gpu_power_supported(&capabilities) =>
+            {
+                return Err("this platform does not report discrete GPU power control".to_owned());
+            }
+            Ok(_) => {}
+            Err(error) => append_log(&format!(
+                "GPU power: capability query failed ({error}); continuing on the signed command path"
+            )),
+        }
         append_log(if enabled {
             "GPU power: enabling NVPCF and device node"
         } else {

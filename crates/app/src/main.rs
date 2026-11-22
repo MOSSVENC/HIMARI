@@ -38,6 +38,7 @@ mod osd;
 #[cfg_attr(not(windows), allow(dead_code))]
 mod osd_glyph;
 mod osd_layer;
+mod platform_profile;
 #[allow(dead_code)]
 mod process_query;
 #[allow(dead_code)]

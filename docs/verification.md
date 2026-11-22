@@ -1324,3 +1324,40 @@ The global maximum has moved to page 5 (Settings), `transition_gap round=1
 page=5 interval_ms=58.18`, while its own draw stage is only `7.70 ms`. That gap
 sits outside the Vulkan stage timings — acquire/layout/scheduling — and is the
 next open item, not a fan-curve problem.
+
+## 2026-11-22 Platform profile: monitor-aware OSD and capability-gated GPU power
+
+The overlay used to place itself with arithmetic against the primary work area
+only. `platform_profile` now owns the pixel decision:
+
+- `card_origin(work, scale, border)` is pure: bottom centre, DPI-scaled, clamped
+  so a card wider than the work area pins to its left edge instead of leaving
+  the screen. Seven unit tests cover 1366×768 at 100 %, 3840×2160 at 150 %,
+  a negative-origin secondary monitor, a narrow work area, a partly off-screen
+  window and a NaN scale factor.
+- `work_area_near(window)` uses `MonitorFromPoint` + `GetMonitorInfoW` so the
+  card follows the monitor holding the window centre; the primary work area
+  from `SPI_GETWORKAREA` remains the fallback. That is the only new FFI: the
+  ratchet moved 111 → 113 deliberately, with both blocks commented.
+- `discrete_gpu_power_supported(capabilities)` gates the NVPCF path on the
+  platform's `nvidia_power_off` flag. A model without that flag is told the
+  control is unsupported instead of receiving a failing `NVPCF` write; a failed
+  capability query is logged and leaves the existing signed path unchanged.
+
+Evidence on the reference machine (1920×1080, taskbar visible):
+
+```text
+pp-test.exe --gpu-power-status
+  NVPCF_INSTANCE=ACPI\NVDA0820\NPCF
+  NVPCF_STATUS=OK
+
+pp-test.exe --osd-layer-smoke  (captured 1200 ms in, docs/images/osd-capslock-2026-11-22.png)
+  card 320×84 logical, bottom-centre of the work area, above the taskbar
+
+pp-test.exe --graphics-smoke
+  run 1: max 42.98 ms  gaps_over_33ms 1
+  run 2: max 19.70 ms  gaps_over_33ms 0   page 8 first visit 7.02 ms
+```
+
+Host suite after the change: 152 tests (111 app + 4 uninstaller + 37 protocol),
+unsafe 113/113, clippy clean.

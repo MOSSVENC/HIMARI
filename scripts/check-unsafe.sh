@@ -28,13 +28,16 @@ declare -A ceilings=(
     # overlay's FFI lives here, grouped into the smallest blocks that keep the
     # safety argument readable.
     ["crates/app/src/osd_layer.rs"]=11
+    # MonitorFromPoint + GetMonitorInfoW: the only FFI in the platform profile;
+    # everything else there is pure geometry.
+    ["crates/app/src/platform_profile.rs"]=2
 )
 
 total=0
 failed=0
 # Includes the five audited hook handle/event boundaries and six uninstaller
 # boundaries; the dispatcher and tray ceilings were lowered after refactoring.
-max_total=111
+max_total=113
 
 while IFS= read -r file; do
     count=$(grep -o -E '\bunsafe\b' "$file" | wc -l)
