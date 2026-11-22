@@ -1558,3 +1558,21 @@ Ways forward, in order of risk:
 
 None of these is a one-line change, and the third is already true, so the budget
 claim stays open rather than dressed up.
+
+## 2026-11-22 Both OSD palettes through the product path
+
+`--fn-event-smoke 0x40` was captured twice with `theme.ini` set to `dark=0` and
+`dark=1`. The card pixel at (958, 965) on the 1920×1080 desktop:
+
+```text
+light  R=174 G=183 B=199   ([image](images/osd-antidust-light-2026-11-22.png))
+dark   R= 22 G= 26 B= 37   ([image](images/osd-antidust-dark-2026-11-22.png))
+```
+
+So the persisted theme reaches the layered overlay through
+`ui_callbacks::apply_persisted_theme` and the palette split in `osd::show_with`,
+not only the main window. The theme file was restored to `dark=0` after the run.
+
+`--osd-layer-smoke` is a different path: it builds the overlay directly with a
+fixed dark style, bypassing the persisted palette. Its CAPS LOCK capture proves
+placement and alpha, not theming; do not use it as palette evidence.
