@@ -1611,3 +1611,34 @@ workspace cannot trigger without the user.
 One more typography experiment: `FanReadout`'s four columns were moved from 12 px
 to 11 px (matching the curve cells). Page 2 first visit stayed at 17.2-18.3 ms,
 so the cost does not track a single font-size class either. Reverted.
+
+## 2026-11-22 Five-run first-visit report (canonical)
+
+`scripts/perf-report.ps1` runs `--graphics-smoke` N times and prints the per-page
+first-visit worst case as median/min/max plus the global maximum. Five runs on
+the reference machine:
+
+```text
+global max_ms: median 21.10  min 18.65  max 35.58  gaps_over_33ms 1
+
+page  median  min    max    <=16.67
+0        3.72   2.97   5.67   yes
+1        8.27   6.92   8.81   yes
+2       18.60  18.22  35.51   no
+3       10.24   9.44  14.55   yes
+4        9.34   8.91  10.08   yes
+5        9.01   8.64  12.45   yes
+6        6.64   6.37   8.29   yes
+7        6.87   6.76   9.05   yes
+8        9.45   9.19  13.44   yes
+9        6.94   6.64   9.11   yes
+10      10.19   9.64  11.42   yes
+```
+
+Page 2 (Cooling) is the only page above the 16.67 ms budget. Its cost is glyph
+rasterisation (10.0 of 16.8 ms in the traced build), and the earlier experiments
+show it cannot be moved by removing rows, layers, the fade, the cache hint, a
+font-size class or fractional page offsets. The systemic fix is a startup
+prewarm of every page while the window is still off-screen or hidden; that is a
+startup-path change with a real risk of a taskbar/window flash, so it is designed
+and not executed without the user watching it.
