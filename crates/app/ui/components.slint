@@ -808,6 +808,70 @@ export component CurveStepper inherits Rectangle {
     }
 }
 
+/// Compact fan-curve cell: one value line, two faint step signs and a single
+/// touch area. The dense ten-point editor repeats this forty times, so it
+/// deliberately avoids the two nested button Rectangles and their animation
+/// controllers that `CurveStepper` carries for low-count controls.
+export component RpmCell inherits Rectangle {
+    in property <string> label: "";
+    in property <int> value;
+    in property <string> suffix: "";
+    in property <int> lower: 0;
+    in property <int> upper: 100;
+    in property <int> step: 1;
+    in property <bool> enabled: true;
+    callback changed(int);
+    height: 38px;
+    border-radius: 9px;
+    background: Palette.panel-hover;
+    border-width: 1px;
+    border-color: Palette.line;
+
+    Text {
+        text: root.label + (root.label == "" ? "" : " ") + root.value + root.suffix;
+        color: root.enabled ? Palette.text : Palette.text-faint;
+        font-family: "Cascadia Mono";
+        font-size: 11px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    Text {
+        x: 8px;
+        y: 0;
+        width: 12px;
+        height: root.height;
+        text: @tr("−");
+        color: Palette.text-faint;
+        font-family: "Bahnschrift";
+        font-size: 13px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    Text {
+        x: root.width - 20px;
+        y: 0;
+        width: 12px;
+        height: root.height;
+        text: @tr("+");
+        color: Palette.text-faint;
+        font-family: "Bahnschrift";
+        font-size: 12px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    cell-tap := TouchArea {
+        mouse-cursor: root.enabled ? pointer : default;
+        clicked => {
+            if (!root.enabled) { return; }
+            if (self.mouse-x < root.width / 2) {
+                root.changed(max(root.lower, root.value - root.step));
+            } else {
+                root.changed(min(root.upper, root.value + root.step));
+            }
+        }
+    }
+}
+
 export component ValueSlider inherits Rectangle {
     in property <string> label;
     in-out property <int> value: 0;

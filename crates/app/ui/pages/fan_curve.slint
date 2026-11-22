@@ -1,6 +1,6 @@
 import { Palette } from "../theme.slint";
 import {
-    ChromeButton, ChoiceChip, CurveStepper, DataLabel, DataValue, FanOption, FanReadout,
+    ChromeButton, ChoiceChip, CurveStepper, RpmCell, DataLabel, DataValue, FanOption, FanReadout,
     FieldInput, Hairline, InfoRow, MetricBar, MicroLabel, NavGlyph, NavItem, PowerOption,
     ReadoutRow, SectionTitle, SignalDot, StageButton, ToggleStatusRow,
 } from "../components.slint";
@@ -121,62 +121,62 @@ import {
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "1"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-cpu-temp-0; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-0 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-cpu-rpm-0; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-0 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-cpu-temp-0; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-0 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-cpu-rpm-0; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-0 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "2"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-cpu-temp-1; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-1 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-cpu-rpm-1; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-1 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-cpu-temp-1; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-1 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-cpu-rpm-1; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-1 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "3"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-cpu-temp-2; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-2 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-cpu-rpm-2; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-2 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-cpu-temp-2; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-2 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-cpu-rpm-2; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-2 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "4"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-cpu-temp-3; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-3 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-cpu-rpm-3; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-3 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-cpu-temp-3; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-3 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-cpu-rpm-3; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-3 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "5"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-cpu-temp-4; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-4 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-cpu-rpm-4; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-4 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-cpu-temp-4; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-4 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-cpu-rpm-4; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-4 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "6"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-cpu-temp-5; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-5 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-cpu-rpm-5; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-5 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-cpu-temp-5; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-5 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-cpu-rpm-5; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-5 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "7"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-cpu-temp-6; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-6 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-cpu-rpm-6; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-6 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-cpu-temp-6; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-6 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-cpu-rpm-6; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-6 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "8"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-cpu-temp-7; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-7 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-cpu-rpm-7; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-7 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-cpu-temp-7; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-7 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-cpu-rpm-7; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-7 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "9"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-cpu-temp-8; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-8 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-cpu-rpm-8; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-8 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-cpu-temp-8; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-8 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-cpu-rpm-8; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-8 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "10"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-cpu-temp-9; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-9 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-cpu-rpm-9; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-9 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-cpu-temp-9; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-temp-9 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-cpu-rpm-9; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-cpu-rpm-9 = v; } }
                     }
             }
         }
@@ -195,62 +195,62 @@ import {
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "1"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-gpu-temp-0; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-0 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-gpu-rpm-0; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-0 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-gpu-temp-0; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-0 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-gpu-rpm-0; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-0 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "2"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-gpu-temp-1; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-1 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-gpu-rpm-1; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-1 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-gpu-temp-1; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-1 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-gpu-rpm-1; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-1 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "3"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-gpu-temp-2; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-2 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-gpu-rpm-2; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-2 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-gpu-temp-2; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-2 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-gpu-rpm-2; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-2 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "4"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-gpu-temp-3; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-3 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-gpu-rpm-3; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-3 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-gpu-temp-3; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-3 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-gpu-rpm-3; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-3 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "5"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-gpu-temp-4; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-4 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-gpu-rpm-4; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-4 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-gpu-temp-4; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-4 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-gpu-rpm-4; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-4 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "6"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-gpu-temp-5; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-5 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-gpu-rpm-5; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-5 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-gpu-temp-5; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-5 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-gpu-rpm-5; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-5 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "7"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-gpu-temp-6; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-6 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-gpu-rpm-6; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-6 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-gpu-temp-6; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-6 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-gpu-rpm-6; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-6 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "8"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-gpu-temp-7; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-7 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-gpu-rpm-7; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-7 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-gpu-temp-7; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-7 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-gpu-rpm-7; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-7 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "9"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-gpu-temp-8; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-8 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-gpu-rpm-8; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-8 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-gpu-temp-8; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-8 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-gpu-rpm-8; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-8 = v; } }
                     }
                     HorizontalLayout {
                         spacing: 8px;
                         Text { width: 16px; text: "10"; color: Palette.text-faint; font-family: "Cascadia Mono"; font-size: 9px; vertical-alignment: center; }
-                        CurveStepper { horizontal-stretch: 1; label: "T"; value: root.rpm-gpu-temp-9; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-9 = v; } }
-                        CurveStepper { horizontal-stretch: 1; label: "R"; value: root.rpm-gpu-rpm-9; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-9 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("T"); value: root.rpm-gpu-temp-9; lower: 0; upper: 100; step: 1; suffix: "°C"; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-temp-9 = v; } }
+                        RpmCell { horizontal-stretch: 1; label: @tr("R"); value: root.rpm-gpu-rpm-9; lower: 0; upper: 8000; step: 100; suffix: ""; enabled: root.rpm-editable && !root.busy; changed(v) => { root.rpm-gpu-rpm-9 = v; } }
                     }
             }
         }
