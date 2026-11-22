@@ -1361,3 +1361,23 @@ pp-test.exe --graphics-smoke
 
 Host suite after the change: 152 tests (111 app + 4 uninstaller + 37 protocol),
 unsafe 113/113, clippy clean.
+
+## 2026-11-22 Cooling page: 24.16 ms → 16.8 ms
+
+Cooling carried ten `CurveStepper` instances for the anti-dust schedule and the
+CPU/GPU curve points. They are `RpmCell`s now. `RpmCell` gained a `signs`
+property: the +/- hints are conditional elements, and the dense Cooling rows turn
+them off, so those twenty Texts are not constructed at all (the halves still step
+on click).
+
+Three `--graphics-smoke` runs after a warm start:
+
+```text
+run 1  page 2 total 36.73 ms  draw 35.21 ms   (first run after the build)
+run 2  page 2 total 18.39 ms  draw 16.21 ms
+run 3  page 2 total 16.81 ms  draw 15.45 ms
+```
+
+The page moved from the worst gap (`24.16 ms`, recorded above) to 16.8–18.4 ms:
+inside the 16.67 ms budget on the warm run and 0.1–1.7 ms over on the other.
+It stays an open item until repeated runs are consistently under the budget.

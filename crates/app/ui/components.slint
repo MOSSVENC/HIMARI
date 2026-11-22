@@ -820,6 +820,9 @@ export component RpmCell inherits Rectangle {
     in property <int> upper: 100;
     in property <int> step: 1;
     in property <bool> enabled: true;
+    /// Faint +/- hints. Dense read-only rows turn them off so the signs are
+    /// not constructed at all.
+    in property <bool> signs: true;
     callback changed(int);
     height: 38px;
     border-radius: 9px;
@@ -835,7 +838,7 @@ export component RpmCell inherits Rectangle {
         horizontal-alignment: center;
         vertical-alignment: center;
     }
-    Text {
+    if root.signs : Text {
         x: 8px;
         y: 0;
         width: 12px;
@@ -847,7 +850,7 @@ export component RpmCell inherits Rectangle {
         horizontal-alignment: center;
         vertical-alignment: center;
     }
-    Text {
+    if root.signs : Text {
         x: root.width - 20px;
         y: 0;
         width: 12px;

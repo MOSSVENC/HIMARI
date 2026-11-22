@@ -1,6 +1,6 @@
 import { Palette } from "../theme.slint";
 import {
-    ChromeButton, ChoiceChip, CurveStepper, DataLabel, DataValue, FanOption, FanReadout,
+    ChromeButton, ChoiceChip, RpmCell, DataLabel, DataValue, FanOption, FanReadout,
     FieldInput, Hairline, InfoRow, MetricBar, MicroLabel, NavGlyph, NavItem, PowerOption,
     ReadoutRow, SectionTitle, SignalDot, StageButton, ToggleStatusRow,
 } from "../components.slint";
@@ -240,8 +240,8 @@ import {
                 }
                 HorizontalLayout {
                     spacing: 10px;
-                    CurveStepper { horizontal-stretch: 1; label: @tr("DAY"); value: root.anti-dust-day; lower: 0; upper: 6; step: 1; enabled: root.anti-dust-supported && !root.busy; changed(value) => { root.anti-dust-day = value; } }
-                    CurveStepper { horizontal-stretch: 1; label: @tr("HOUR"); value: root.anti-dust-hour; lower: 0; upper: 23; step: 1; enabled: root.anti-dust-supported && !root.busy; changed(value) => { root.anti-dust-hour = value; } }
+                    RpmCell { horizontal-stretch: 1; signs: false; label: @tr("DAY"); value: root.anti-dust-day; lower: 0; upper: 6; step: 1; enabled: root.anti-dust-supported && !root.busy; changed(value) => { root.anti-dust-day = value; } }
+                    RpmCell { horizontal-stretch: 1; signs: false; label: @tr("HOUR"); value: root.anti-dust-hour; lower: 0; upper: 23; step: 1; enabled: root.anti-dust-supported && !root.busy; changed(value) => { root.anti-dust-hour = value; } }
                     ToggleStatusRow { width: 210px; label: @tr("Schedule"); value: root.anti-dust-enabled; known: root.anti-dust-supported; busy: root.busy; toggled(value) => { root.anti-dust-enabled = value; } }
                     ToggleStatusRow { width: 190px; label: @tr("Resume"); value: root.anti-dust-resume; known: root.anti-dust-supported; busy: root.busy; toggled(value) => { root.anti-dust-resume = value; } }
                 }
@@ -302,13 +302,13 @@ import {
                             Text { text: @tr("CPU CHANNEL"); color: Palette.text-dim; font-family: "Bahnschrift"; font-size: 10px; font-weight: 600; }
                             HorizontalLayout {
                                 spacing: 7px;
-                                CurveStepper { horizontal-stretch: 1; label: @tr("T2"); value: root.curve-cpu-t2; lower: 20; upper: 98; step: 1; suffix: "°C"; enabled: root.curve-available && !root.busy; changed(value) => { root.curve-cpu-t2 = value; } }
-                                CurveStepper { horizontal-stretch: 1; label: @tr("D2"); value: root.curve-cpu-d2; lower: 20; upper: 100; step: 5; suffix: "%"; enabled: root.curve-available && !root.busy && root.curve-cpu-d2 <= root.curve-cpu-d3; changed(value) => { root.curve-cpu-d2 = value; } }
+                                RpmCell { horizontal-stretch: 1; signs: false; label: @tr("T2"); value: root.curve-cpu-t2; lower: 20; upper: 98; step: 1; suffix: "°C"; enabled: root.curve-available && !root.busy; changed(value) => { root.curve-cpu-t2 = value; } }
+                                RpmCell { horizontal-stretch: 1; signs: false; label: @tr("D2"); value: root.curve-cpu-d2; lower: 20; upper: 100; step: 5; suffix: "%"; enabled: root.curve-available && !root.busy && root.curve-cpu-d2 <= root.curve-cpu-d3; changed(value) => { root.curve-cpu-d2 = value; } }
                             }
                             HorizontalLayout {
                                 spacing: 7px;
-                                CurveStepper { horizontal-stretch: 1; label: @tr("T3"); value: root.curve-cpu-t3; lower: 21; upper: 99; step: 1; suffix: "°C"; enabled: root.curve-available && !root.busy; changed(value) => { root.curve-cpu-t3 = value; } }
-                                CurveStepper { horizontal-stretch: 1; label: @tr("D3"); value: root.curve-cpu-d3; lower: 20; upper: 100; step: 5; suffix: "%"; enabled: root.curve-available && !root.busy && root.curve-cpu-d3 >= root.curve-cpu-d2; changed(value) => { root.curve-cpu-d3 = value; } }
+                                RpmCell { horizontal-stretch: 1; signs: false; label: @tr("T3"); value: root.curve-cpu-t3; lower: 21; upper: 99; step: 1; suffix: "°C"; enabled: root.curve-available && !root.busy; changed(value) => { root.curve-cpu-t3 = value; } }
+                                RpmCell { horizontal-stretch: 1; signs: false; label: @tr("D3"); value: root.curve-cpu-d3; lower: 20; upper: 100; step: 5; suffix: "%"; enabled: root.curve-available && !root.busy && root.curve-cpu-d3 >= root.curve-cpu-d2; changed(value) => { root.curve-cpu-d3 = value; } }
                             }
                         }
                     }
@@ -325,13 +325,13 @@ import {
                             Text { text: @tr("GPU CHANNEL"); color: Palette.text-dim; font-family: "Bahnschrift"; font-size: 10px; font-weight: 600; }
                             HorizontalLayout {
                                 spacing: 7px;
-                                CurveStepper { horizontal-stretch: 1; label: @tr("T2"); value: root.curve-gpu-t2; lower: 20; upper: 98; step: 1; suffix: "°C"; enabled: root.curve-available && !root.busy; changed(value) => { root.curve-gpu-t2 = value; } }
-                                CurveStepper { horizontal-stretch: 1; label: @tr("D2"); value: root.curve-gpu-d2; lower: 20; upper: 100; step: 5; suffix: "%"; enabled: root.curve-available && !root.busy && root.curve-gpu-d2 <= root.curve-gpu-d3; changed(value) => { root.curve-gpu-d2 = value; } }
+                                RpmCell { horizontal-stretch: 1; signs: false; label: @tr("T2"); value: root.curve-gpu-t2; lower: 20; upper: 98; step: 1; suffix: "°C"; enabled: root.curve-available && !root.busy; changed(value) => { root.curve-gpu-t2 = value; } }
+                                RpmCell { horizontal-stretch: 1; signs: false; label: @tr("D2"); value: root.curve-gpu-d2; lower: 20; upper: 100; step: 5; suffix: "%"; enabled: root.curve-available && !root.busy && root.curve-gpu-d2 <= root.curve-gpu-d3; changed(value) => { root.curve-gpu-d2 = value; } }
                             }
                             HorizontalLayout {
                                 spacing: 7px;
-                                CurveStepper { horizontal-stretch: 1; label: @tr("T3"); value: root.curve-gpu-t3; lower: 21; upper: 99; step: 1; suffix: "°C"; enabled: root.curve-available && !root.busy; changed(value) => { root.curve-gpu-t3 = value; } }
-                                CurveStepper { horizontal-stretch: 1; label: @tr("D3"); value: root.curve-gpu-d3; lower: 20; upper: 100; step: 5; suffix: "%"; enabled: root.curve-available && !root.busy && root.curve-gpu-d3 >= root.curve-gpu-d2; changed(value) => { root.curve-gpu-d3 = value; } }
+                                RpmCell { horizontal-stretch: 1; signs: false; label: @tr("T3"); value: root.curve-gpu-t3; lower: 21; upper: 99; step: 1; suffix: "°C"; enabled: root.curve-available && !root.busy; changed(value) => { root.curve-gpu-t3 = value; } }
+                                RpmCell { horizontal-stretch: 1; signs: false; label: @tr("D3"); value: root.curve-gpu-d3; lower: 20; upper: 100; step: 5; suffix: "%"; enabled: root.curve-available && !root.busy && root.curve-gpu-d3 >= root.curve-gpu-d2; changed(value) => { root.curve-gpu-d3 = value; } }
                             }
                         }
                     }
