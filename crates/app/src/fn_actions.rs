@@ -1,5 +1,6 @@
 //! Hardware work an Fn event asks for, and the result text it produces.
 
+#![forbid(unsafe_code)]
 use himari_protocol::{Adjustment, Dchu, FnEvent, PowerMode};
 use slint::ComponentHandle;
 

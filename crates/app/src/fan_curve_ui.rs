@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 use crate::MainWindow;
 use crate::localization::tr;
 use himari_protocol::{FanCurveNodes, FanCurveState, QuickToggle, QuickToggleState, RpmFanLevel};

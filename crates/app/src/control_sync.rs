@@ -1,5 +1,6 @@
 //! Orders control writes and snapshots while preserving local editing state.
 
+#![forbid(unsafe_code)]
 use std::sync::{Arc, Mutex};
 
 #[derive(Clone, Copy, Debug)]

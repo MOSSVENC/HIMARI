@@ -1,5 +1,6 @@
 //! Resident Fn-event ownership, action dispatch and OSD feedback.
 
+#![forbid(unsafe_code)]
 use std::sync::Mutex;
 use std::sync::OnceLock;
 use std::time::Duration;
@@ -70,8 +71,18 @@ fn owner_loop() {
         };
         log_line("Fn notification channel acquired");
         loop {
-            match listener.wait_next() {
-                Ok(notification) => dispatch_notification(notification),
+            match listener.wait_next_timeout(Duration::from_secs(5)) {
+                Ok(Some(notification)) => dispatch_notification(notification),
+                Ok(None) => {
+                    // The vendor listener can return while we own the channel
+                    // (a diagnostic, an update or a login-time restart). Give it
+                    // the channel back instead of holding it forever: the next
+                    // pass through the outer loop defers while FnKey runs.
+                    if crate::process_query::any_running(&["FnKey.exe"]) {
+                        log_line("Fn ownership released: FnKey.exe returned");
+                        break;
+                    }
+                }
                 Err(error) => {
                     log_line(&format!("Fn notification listener stopped: {error}"));
                     break;

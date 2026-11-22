@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 use crate::localization::tr;
 
 pub(crate) fn format_threshold_ranges(values: &[u8]) -> String {

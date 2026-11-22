@@ -4,6 +4,7 @@
 //! box, then stroked with an analytic distance so the edges stay smooth at any
 //! scale. Nothing here depends on vendor artwork.
 
+#![forbid(unsafe_code)]
 /// One drawing primitive in the 48-unit glyph box.
 #[derive(Clone, Copy)]
 pub(crate) enum Prim {

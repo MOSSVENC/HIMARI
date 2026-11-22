@@ -4,6 +4,7 @@
 //! already-decoded event into the text, colour and glyph that describe it, so
 //! the mapping can be tested without a device.
 
+#![forbid(unsafe_code)]
 use himari_protocol::{FanNotice, FnEvent, PlatformCapabilities, PowerMode};
 
 use crate::localization::tr;

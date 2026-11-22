@@ -1,5 +1,6 @@
 //! Input ownership and trigger capture, independent of the Windows hook transport.
 
+#![forbid(unsafe_code)]
 use himari_protocol::FlexiKeyAction;
 use std::collections::HashMap;
 

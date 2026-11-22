@@ -1,5 +1,6 @@
 //! Retains independent sensor samples through brief mailbox read failures.
 
+#![forbid(unsafe_code)]
 use himari_protocol::{FanChannel, ThermalSample, is_plausible_temperature};
 use std::time::{Duration, Instant};
 

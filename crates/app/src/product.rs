@@ -1,5 +1,6 @@
 //! Product identity and migration names used by the Windows application.
 
+#![forbid(unsafe_code)]
 pub(crate) const PRODUCT_NAME: &str = "HIMARI";
 pub(crate) const PRODUCT_DATA_DIR: &str = "Himari";
 pub(crate) const LEGACY_DATA_DIR: &str = "NeoControl";

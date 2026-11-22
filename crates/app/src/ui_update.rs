@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 mod devices;
 mod driver;
 mod fans;
