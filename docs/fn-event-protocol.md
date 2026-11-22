@@ -106,3 +106,24 @@ RVA `0xdd10` 将这两个参数调度到 UI 线程；嵌套回调 RVA `0x133b0` 
 2026-11-19 的物理接管日志还发现驱动可能返回 4 字节通知。协议层现在同时接受
 4 字节有符号 i32 与 8 字节 i64，i32 会符号扩展到 i64；第二次接管只验证了通道获取，
 没有捕获新的物理按键通知，因此不能把该轮视为 Fn 动作验收。
+
+## 物理按键采集工具（2026-11-22）
+
+```powershell
+# 管理员 PowerShell 7；停止原厂监听 → 打开采集窗口 → 恢复
+pwsh -File scripts/fn-capture.ps1 `
+  -Executable "C:\ProgramData\Himari\himari.exe" `
+  -OutputDirectory "C:\ProgramData\Himari\fn-capture" `
+  -Seconds 30
+```
+
+窗口内逐条打印 `Fn capture: n raw=<值> message=<命令,参数> event=<解码结果>`；
+到点后打印 `window ended after 30s, events=N` 并关闭订阅。脚本在 `finally` 中恢复
+`CCDCHUService`/`DCHUService` 与原 `FnKey.exe` 进程，并确认恢复后的实例路径一致。
+
+已知边界：
+
+- 采集窗口内不按任何 Fn 组合，`events=0` 是正常结果，不代表解码失败；
+- 通知通道被原厂监听占用时，采集会以 `CCDCHUService is Running` 退出 1，这是刻意的拒绝，
+  不是缺陷；
+- 一次真实按键验收需要在这个窗口内按下至少一组 Fn 组合，并把 stdout 留档。
