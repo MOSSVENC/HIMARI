@@ -1394,3 +1394,34 @@ Page 2 is at or just under the 16.67 ms budget in four of eight runs (median
 16.7 ms); the remaining 1–2 ms is the open gap. Nothing exceeded 33 ms, so the
 user-visible stall is gone, but "consistently under budget" is not yet true and
 is not claimed.
+
+## 2026-11-22 Fn channel arbitration on the reference machine
+
+`scripts/test-fn-events.ps1` ran against the Release build (`fn-test.exe`) with
+administrator rights. It checks three states: vendor services running, the
+channel released, and the vendor listener restored.
+
+```text
+service-occupied (expected rejection)
+  Fn notifications: coordinate Fn notification ownership failed: CCDCHUService is Running
+  -> exit 1, no subscription registered
+
+released-1 (FnKey stopped, CCDCHUService/DCHUService stopped)
+  Fn notifications: subscription registered
+  Fn notifications: timeout iteration=0 ms=164
+  Fn notifications: timeout iteration=1 ms=154
+  Fn notifications: timeout iteration=2 ms=155
+  Fn notifications: subscription closed
+  -> exit 0
+
+released-2  same lifecycle, 150/157/153 ms timeouts, exit 0
+Original vendor services and FnKey restored
+  DCHUService.exe  PID 2004   ...\acpibridge1.inf_amd64_0a24f05be94f40ec\DCHUService.exe
+  FnKey.exe        PID 25776  ...\CLEVOCO.FnhotkeysandOSD_7.101.0.0_x64__6h6z29zh29qx0\FnKey\FnKey.exe
+```
+
+So the app refuses the occupied channel instead of fighting the vendor process,
+acquires it when the vendor listener stops, and the diagnostic restores both
+services and the original FnKey process. This does not yet prove a physical Fn
+keypress reaches our decoder: that needs a capture window while FnKey is stopped,
+which is still open.
