@@ -1749,3 +1749,8 @@ snapshot reads `已连接` and `设备路径 未找到`
 
 `--snapshot` now also selects the translation bundle before creating the
 component tree, because `@tr` property defaults are evaluated at instantiation.
+
+Another font hypothesis was tested and rejected: `MicroLabel` moved from
+Bahnschrift to Microsoft YaHei UI (to avoid CJK fallback in the Cooling header and
+elsewhere). Four runs: page 2 median 18.95 ms (range 15.58-54.81), against the
+18.60 ms baseline, so fallback is not the cost either. Reverted.
