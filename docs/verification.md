@@ -1287,3 +1287,40 @@ max=38.60 ms  gaps_over_33ms=1   worst: round 2 page 7 (InputIo) 38.60 ms
 Instantiation was not the expense; showing is. The change was reverted and the
 baseline above is the current behaviour. The remaining 13.9 ms over the 16.67 ms
 budget on the fan-curve page is an open item, not a solved one.
+
+## 2026-11-22 FanCurve first visit: 30.60 ms → 10.2 ms
+
+`CurveStepper` is a low-count control: nested layout, four Texts, two button
+Rectangles and four animation controllers. FanCurve used it 41 times. It now
+uses `RpmCell` for the forty curve values — one value line, two faint signs and
+a single `TouchArea` that steps down on the left half and up on the right.
+`CurveStepper` remains for the OFFSET control.
+
+Four `--graphics-smoke` runs on the reference machine (build with attribution
+in both rounds; external AOSP clone had finished, load average 0.4):
+
+```text
+page 8 first visit  max_total_ms  9.33  19.49  10.03  10.42   (median 10.2)
+page 8 draw stage   max_draw_ms   6.40  16.06   7.29   7.30   (median 7.3)
+```
+
+The page that used to be the worst gap no longer appears in the top three:
+`10.42 ms` is inside the 16.67 ms budget. One run measured `19.49 ms` under
+load; it is kept here rather than dropped.
+
+**Wrong first attempt, kept on the record.** The first `RpmCell` gave the root
+rectangle `opacity: enabled ? 1 : 0.62`. Skia then composited forty offscreen
+groups every frame:
+
+```text
+page 8 draw stage   max_draw_ms  46.71  26.19  26.22  51.26  48.75
+page 8 first visit  interval_ms  53-88 ms
+```
+
+The disabled state is a text colour now. Drawing cost fell from ~27 ms to
+~7 ms, which is the whole difference.
+
+The global maximum has moved to page 5 (Settings), `transition_gap round=1
+page=5 interval_ms=58.18`, while its own draw stage is only `7.70 ms`. That gap
+sits outside the Vulkan stage timings — acquire/layout/scheduling — and is the
+next open item, not a fan-curve problem.
