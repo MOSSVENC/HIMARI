@@ -1655,3 +1655,6 @@ msgstr "没有受支持的电源配置"
 
 msgid "Main window is unavailable"
 msgstr "主窗口不可用"
+
+msgid "This display driver rejects gamma ramps, so blue-light is unavailable"
+msgstr "此显示器驱动不支持伽马校正，蓝光滤镜不可用"

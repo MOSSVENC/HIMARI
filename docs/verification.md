@@ -1696,3 +1696,16 @@ line), so a user can no longer trigger the driver error from the UI.
 
 Visual capture of the disabled control is still pending; the evidence here is the
 probe result, the compiled binding and the full hardware-smoke suite passing.
+
+`--snapshot=7` with the `snapshot-tools` feature now applies the persisted theme
+and the capability probe, so a snapshot shows the same state a user gets. The
+Input/I/O page on this machine renders with the BLUE LIGHT stepper's apply button
+disabled and the localized reason:
+
+```text
+此显示器驱动不支持伽马校正，蓝光滤镜不可用
+```
+
+[image](images/input-io-blue-light-disabled-2026-11-22.png) — the rest of the
+page (brightness, volume, device switches) stays enabled. This closes the
+visual-evidence gap from the previous round.

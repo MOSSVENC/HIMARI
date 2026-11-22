@@ -157,6 +157,8 @@ fn settings_backend_smoke() -> i32 {
 #[cfg(any(debug_assertions, feature = "snapshot-tools"))]
 fn run_snapshot(page: usize, path: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     let ui = MainWindow::new()?;
+    ui_callbacks::apply_persisted_theme(&ui);
+    ui_callbacks::apply_capabilities(&ui);
     if let Err(error) = slint::select_bundled_translation("zh-CN") {
         log_action(&format!("snapshot translation unavailable: {error}"));
     }
