@@ -141,11 +141,16 @@ pub(crate) fn capture(seconds: u64) -> i32 {
             let mut listener = open_listener()?;
             println!("Fn capture: subscription registered");
             let deadline = Instant::now() + Duration::from_secs(seconds);
+            let started = Instant::now();
             let mut seen = 0_u32;
             while Instant::now() < deadline {
                 if let Some(value) = listener.wait_next_timeout(Duration::from_millis(200))? {
                     seen += 1;
-                    println!("Fn capture: {seen} {}", describe(value));
+                    println!(
+                        "Fn capture: {seen} t_ms={} {}",
+                        started.elapsed().as_millis(),
+                        describe(value)
+                    );
                 }
             }
             println!("Fn capture: window ended after {seconds}s, events={seen}");

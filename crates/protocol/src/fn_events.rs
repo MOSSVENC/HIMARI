@@ -80,12 +80,12 @@ impl FnNotification {
             0x5d => FnEvent::TouchpadToggle {
                 legacy_enabled: false,
             },
-            // Vendor branch IL_2460 is model-gated and logs "GPU Turbo on/off";
-            // only SDCA029 / SDC4143 take the write path.
-            0xd7 => FnEvent::GpuTurbo,
-            // Vendor branch IL_1c1b toggles the keyboard backlight through the
-            // same clevofnkey^201 setting as 0x82.
-            0x85 => FnEvent::BacklightToggle,
+            // Vendor branch IL_2460 is the F2 display switch: model-gated
+            // (SDCA029 / SDC4143) and backed by ChangeDisplaySettings / AuxSwitch.
+            0xd7 => FnEvent::DisplaySwitch,
+            // Vendor branch IL_1c1b toggles airplane mode through the Insyde
+            // SetAirplaneMode path; the F11 keycap is the airplane icon.
+            0x85 => FnEvent::AirplaneToggle,
             0x40 => FnEvent::FanNotice(FanNotice::AntiDustRunning),
             0x59 => FnEvent::PowerModeCycle,
             0x6a => FnEvent::FanNotice(FanNotice::MaxQ),
@@ -162,8 +162,10 @@ pub enum FnEvent {
     TouchpadToggle {
         legacy_enabled: bool,
     },
-    /// Vendor GPU Turbo switch (model-gated, present on SDCA029 / SDC4143).
-    GpuTurbo,
+    /// F2 display switch (LCD / external), model-gated by the vendor.
+    DisplaySwitch,
+    /// F11 airplane mode toggle.
+    AirplaneToggle,
     /// Win/Fn key swap notification (vendor ID 123).
     ComboSwap(bool),
     /// FlexiKey access switch position (vendor IDs 301 and 302).
@@ -225,8 +227,8 @@ mod tests {
                 legacy_enabled: false
             })
         );
-        assert_eq!(notification(0xd7).event(), Some(FnEvent::GpuTurbo));
-        assert_eq!(notification(0x85).event(), Some(FnEvent::BacklightToggle));
+        assert_eq!(notification(0xd7).event(), Some(FnEvent::DisplaySwitch));
+        assert_eq!(notification(0x85).event(), Some(FnEvent::AirplaneToggle));
         // The vendor dispatch sends these two to its default branch, so the
         // firmware emits them but no vendor action exists.
         assert_eq!(notification(0xfa).event(), None);

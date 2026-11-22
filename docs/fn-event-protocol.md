@@ -50,8 +50,8 @@ RVA `0xdd10` 将这两个参数调度到 UI 线程；嵌套回调 RVA `0x133b0` 
 | f6 / f7 | 摄像头关闭 / 开启路径 | 2033 / 20cb |
 | f8 / f9 | 摄像头与麦克风关闭 / 开启提示，开启分支还写摄像头设置 | 2163 / 2171 |
 | 5d | 触摸板状态键：启动同目录 `TPStatus.exe`（I2C 触摸板助手） | 0cd9 |
-| 85 | 键盘背光切换：与 `82` 共用 `clevofnkey^201` 设置 | 1c1b |
-| d7 | GPU Turbo 切换：仅 `SDCA029` / `SDC4143` 执行写路径，其他机型只记录 | 2460 |
+| 85 | 飞行模式切换：走 Insyde `SetAirplaneMode` 路径，对应 F11 的飞机键 | 1c1b |
+| d7 | 显示切换（F2 的 LCD 键）：机型门控 `SDCA029` / `SDC4143`，底层为 `ChangeDisplaySettings` / `AuxSwitchCC30` | 2460 |
 | fa / fb | 固件会发出；原厂 dispatch 落到默认分支，无任何动作 | 2a01 |
 | fc / fd | 精确触摸板状态切换；旧设备路径分别表示关闭 / 开启 | 0bd3 / 0c56 |
 

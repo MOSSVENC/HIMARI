@@ -1858,12 +1858,14 @@ decrypts the real strings:
 
 ```text
 IL_0cd9 (0x5d): w_arg253^ / \TPStatus.exe
-IL_2460 (0xd7): SDCA029 / SDC4143 / clevofnkey^1ff / GPU Turbo off / GPU Turbo on
-IL_1c1b (0x85): clevofnkey^201   (same setting as the 0x82 backlight branch)
+IL_2460 (0xd7): SDCA029 / SDC4143 / clevofnkey^1ff   (F2 display switch, model-gated)
+IL_1c1b (0x85): no strings; the branch calls the airplane toggle path (F11)
 ```
 
-The decoder now maps 0x5d to touchpad toggle, 0xd7 to `GpuTurbo`, 0x85 to
-backlight toggle, and leaves 0xfa/0xfb unhandled because the vendor dispatch
-itself sends them to the default branch. `fn_events` tests pin all five IDs; the
+The decoder now maps 0x5d to touchpad toggle, 0xd7 to `DisplaySwitch`, 0x85 to
+`AirplaneToggle`, and leaves 0xfa/0xfb unhandled because the vendor dispatch
+itself sends them to the default branch. The keycaps supplied by the user
+(F1 touchpad, F2 LCD, F10 camera, F11 airplane, F12 sleep) and the event order
+line up with this mapping. `fn_events` tests pin all five IDs; the
 protocol suite is 38 tests. GPU Turbo reports the real capability: this machine
 does not expose `simple_gpu_oc`, so the action says so instead of pretending.
