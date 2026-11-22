@@ -363,6 +363,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("--io-smoke") => std::process::exit(io_smoke()),
         Some("--touchpad-smoke") => std::process::exit(smoke::touchpad_smoke()),
         Some("--fn-events-smoke") => std::process::exit(fn_diagnostics::smoke()),
+        Some("--fn-capture") => {
+            let seconds = std::env::args()
+                .nth(2)
+                .and_then(|value| value.parse::<u64>().ok())
+                .unwrap_or(30);
+            std::process::exit(fn_diagnostics::capture(seconds));
+        }
         Some("--osd-layer-smoke") => return osd_layer::smoke(),
         Some("--osd-smoke") => return fn_owner::osd_smoke(),
         Some("--fn-event-smoke") => {

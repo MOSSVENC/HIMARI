@@ -1445,3 +1445,24 @@ returns "does not report discrete GPU power control" before touching the node.
 The command encoding itself stays inside `gpu_power`; moving it behind a second
 backend needs a non-NVIDIA machine to test against, which this workspace does
 not have.
+
+## 2026-11-22 Bounded Fn capture tool
+
+`himari --fn-capture <seconds>` registers the notification channel, prints every
+notification as `raw=<value> message=<..> event=<..>`, ends at the deadline and
+closes the subscription. `scripts/fn-capture.ps1` stops FnKey and the DCHU
+services, runs the capture window, then restores both.
+
+A 10-second dry run with no key presses on the reference machine:
+
+```text
+Fn capture window: 10s. Press the Fn combinations now.
+Fn capture: subscription registered
+Fn capture: window ended after 10s, events=0
+Fn capture: subscription closed
+Original vendor services and FnKey restored
+```
+
+So the capture path itself is proven: registration, a full window, a clean close
+and vendor restoration. The remaining evidence is a run where physical Fn
+combinations are pressed inside that window; the tool now exists for it.

@@ -127,6 +127,44 @@ pub(crate) fn smoke() -> i32 {
     }
 }
 
+/// Capture physical Fn notifications for a bounded window.
+///
+/// The channel is only free while the vendor listener is stopped, so this is
+/// meant to run under `scripts/fn-capture.ps1`, which also restores FnKey and
+/// the DCHU services. Every notification is printed with its raw value and the
+/// decoded event, so a missing keypress is distinguishable from a lost event.
+pub(crate) fn capture(seconds: u64) -> i32 {
+    use std::time::{Duration, Instant};
+
+    let result = (|| {
+        {
+            let mut listener = open_listener()?;
+            println!("Fn capture: subscription registered");
+            let deadline = Instant::now() + Duration::from_secs(seconds);
+            let mut seen = 0_u32;
+            while Instant::now() < deadline {
+                match listener.wait_next_timeout(Duration::from_millis(200))? {
+                    Some(value) => {
+                        seen += 1;
+                        println!("Fn capture: {seen} {}", describe(value));
+                    }
+                    None => {}
+                }
+            }
+            println!("Fn capture: window ended after {seconds}s, events={seen}");
+        }
+        println!("Fn capture: subscription closed");
+        Ok::<(), himari_protocol::DchuError>(())
+    })();
+    match result {
+        Ok(()) => 0,
+        Err(error) => {
+            eprintln!("Fn notifications: {error}");
+            1
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::require_direct_mode;
