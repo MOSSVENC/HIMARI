@@ -75,6 +75,17 @@ impl FnNotification {
             0x25 => FnEvent::FnLockToggle,
             0x3a => FnEvent::FanNotice(FanNotice::Turbo),
             0x3f | 0x9e | 0x9f => FnEvent::BacklightToggle,
+            // Vendor branch IL_0cd9 launches TPStatus.exe (I2C touchpad helper),
+            // so this ID is the touchpad-status key rather than an OSD hint.
+            0x5d => FnEvent::TouchpadToggle {
+                legacy_enabled: false,
+            },
+            // Vendor branch IL_2460 is model-gated and logs "GPU Turbo on/off";
+            // only SDCA029 / SDC4143 take the write path.
+            0xd7 => FnEvent::GpuTurbo,
+            // Vendor branch IL_1c1b toggles the keyboard backlight through the
+            // same clevofnkey^201 setting as 0x82.
+            0x85 => FnEvent::BacklightToggle,
             0x40 => FnEvent::FanNotice(FanNotice::AntiDustRunning),
             0x59 => FnEvent::PowerModeCycle,
             0x6a => FnEvent::FanNotice(FanNotice::MaxQ),
@@ -151,6 +162,8 @@ pub enum FnEvent {
     TouchpadToggle {
         legacy_enabled: bool,
     },
+    /// Vendor GPU Turbo switch (model-gated, present on SDCA029 / SDC4143).
+    GpuTurbo,
     /// Win/Fn key swap notification (vendor ID 123).
     ComboSwap(bool),
     /// FlexiKey access switch position (vendor IDs 301 and 302).
@@ -202,6 +215,22 @@ mod tests {
         assert_eq!(narrow.event(), Some(FnEvent::Camera(true)));
         assert_eq!(wide.event(), Some(FnEvent::Camera(true)));
         assert!(FnNotification::from_driver_payload(&[0_u8; 2]).is_err());
+    }
+
+    #[test]
+    fn captured_vendor_ids_decode_to_their_branches() {
+        assert_eq!(
+            notification(0x5d).event(),
+            Some(FnEvent::TouchpadToggle {
+                legacy_enabled: false
+            })
+        );
+        assert_eq!(notification(0xd7).event(), Some(FnEvent::GpuTurbo));
+        assert_eq!(notification(0x85).event(), Some(FnEvent::BacklightToggle));
+        // The vendor dispatch sends these two to its default branch, so the
+        // firmware emits them but no vendor action exists.
+        assert_eq!(notification(0xfa).event(), None);
+        assert_eq!(notification(0xfb).event(), None);
     }
 
     #[test]

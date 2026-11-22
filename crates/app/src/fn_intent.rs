@@ -152,6 +152,7 @@ pub(crate) fn event_title(event: FnEvent) -> &'static str {
         FnEvent::ComboSwap(_) => tr("Win / Fn swap"),
         FnEvent::FlexiAccess(_) => tr("FlexiKey access"),
         FnEvent::DiscreteGpuSwitch(_) => tr("Discrete GPU"),
+        FnEvent::GpuTurbo => tr("GPU Turbo"),
     }
 }
 

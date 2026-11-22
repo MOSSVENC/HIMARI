@@ -67,6 +67,20 @@ pub(crate) fn execute(event: FnEvent) -> Result<Option<OsdView>, String> {
             toggle_combo_swap()?,
             Glyph::Keyboard,
         ))),
+        FnEvent::GpuTurbo => {
+            // The vendor branch only acts on SDCA029 / SDC4143 and writes a GPU
+            // OC setting this transport does not expose yet. Report the real
+            // capability instead of pretending the toggle happened.
+            let device = open_dchu()?;
+            let capabilities = device
+                .read_capabilities()
+                .map_err(|error| error.to_string())?;
+            if capabilities.simple_gpu_oc {
+                Err(tr("GPU Turbo control is not implemented yet").to_owned())
+            } else {
+                Err(tr("This platform does not report GPU Turbo").to_owned())
+            }
+        }
         _ => Ok(None),
     }
 }

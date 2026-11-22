@@ -1831,3 +1831,39 @@ The unsafe ratchet also caught that the gamma capability probe added three FFI
 calls to `system_controls/display.rs` without a ceiling update (the build gate
 printed `unsafe regression: ... has 6 (ceiling 3)`). The ceiling is now 6 with the
 reason in the script and the total 113 → 116.
+
+
+## 2026-11-22 Physical Fn capture and offline vendor-string decryption
+
+A 10-minute capture window (`--fn-capture 600`, timestamps added) produced real
+notifications while the vendor listener was stopped:
+
+```text
+75.2s  0x95 -> ControlCenterToggle
+76.7s  0x5d -> (was unmapped)
+77.5s  0xd7 -> (was unmapped)
+78.2s  0xfb -> vendor default branch
+79.4s  0xfa -> vendor default branch
+80.8s  0xfa -> vendor default branch
+85.0s  0xf7 -> Camera(true)
+85.7s  0x85 -> (was unmapped)
+101.0s 0x82 -> BacklightStep(Up)
+101.3s 0x82 -> BacklightStep(Up)
+```
+
+Vendor strings are obfuscated through `\u000f\u0010::\u0003(int)`, which reads
+a resource from the calling assembly; calling it from a probe assembly returned
+`X0X`. A `DynamicMethod` owned by the FnKey module fixes the caller context and
+decrypts the real strings:
+
+```text
+IL_0cd9 (0x5d): w_arg253^ / \TPStatus.exe
+IL_2460 (0xd7): SDCA029 / SDC4143 / clevofnkey^1ff / GPU Turbo off / GPU Turbo on
+IL_1c1b (0x85): clevofnkey^201   (same setting as the 0x82 backlight branch)
+```
+
+The decoder now maps 0x5d to touchpad toggle, 0xd7 to `GpuTurbo`, 0x85 to
+backlight toggle, and leaves 0xfa/0xfb unhandled because the vendor dispatch
+itself sends them to the default branch. `fn_events` tests pin all five IDs; the
+protocol suite is 38 tests. GPU Turbo reports the real capability: this machine
+does not expose `simple_gpu_oc`, so the action says so instead of pretending.
