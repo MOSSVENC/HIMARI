@@ -306,6 +306,36 @@ mod tests {
 
     /// Every decoded event must have a title, otherwise the failure OSD would
     /// present an empty first line.
+    /// Every firmware state notification keeps the glyph that identifies its
+    /// control; a shared fallback icon would make the card ambiguous.
+    #[test]
+    fn every_state_event_keeps_its_glyph() {
+        use crate::osd_glyph::Glyph;
+        let cases: [(FnEvent, Glyph); 12] = [
+            (FnEvent::FanNotice(FanNotice::Turbo), Glyph::Fan),
+            (FnEvent::FanNotice(FanNotice::AntiDustRunning), Glyph::Fan),
+            (FnEvent::SilentMode(true), Glyph::Moon),
+            (FnEvent::SilentMode(false), Glyph::Moon),
+            (FnEvent::MobileRadio(true), Glyph::Waves),
+            (FnEvent::CapsLock(true), Glyph::Key),
+            (FnEvent::NumLock(true), Glyph::Key),
+            (FnEvent::ScrollLock(true), Glyph::Key),
+            (FnEvent::FlexiAccess(true), Glyph::Key),
+            (FnEvent::DiscreteGpuSwitch(true), Glyph::Bolt),
+            (FnEvent::CameraMicrophone(true), Glyph::Microphone),
+            (FnEvent::Docking(true), Glyph::Dock),
+        ];
+        for (event, glyph) in cases {
+            let view = state_view(event, None).expect("state event must present");
+            assert_eq!(view.glyph, glyph, "glyph drifted for {event:?}");
+        }
+        // Anti-dust is the only state event whose glyph keeps turning.
+        let dust = state_view(FnEvent::FanNotice(FanNotice::AntiDustRunning), None).unwrap();
+        assert!(dust.spin);
+        let turbo = state_view(FnEvent::FanNotice(FanNotice::Turbo), None).unwrap();
+        assert!(!turbo.spin);
+    }
+
     #[test]
     fn every_decoded_event_has_a_title() {
         let events = [

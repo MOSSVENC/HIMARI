@@ -1607,3 +1607,7 @@ exited.
 Still unverified by a new boot: the 1be0ba8 processor-hot-limit release and USB
 input survival after a cold start. Those need a fresh Windows reboot, which this
 workspace cannot trigger without the user.
+
+One more typography experiment: `FanReadout`'s four columns were moved from 12 px
+to 11 px (matching the curve cells). Page 2 first visit stayed at 17.2-18.3 ms,
+so the cost does not track a single font-size class either. Reverted.
