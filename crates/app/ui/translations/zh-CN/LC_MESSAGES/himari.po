@@ -1658,3 +1658,6 @@ msgstr "主窗口不可用"
 
 msgid "This display driver rejects gamma ramps, so blue-light is unavailable"
 msgstr "此显示器驱动不支持伽马校正，蓝光滤镜不可用"
+
+msgid "Reading ten-point fan table"
+msgstr "正在读取十点风扇表"

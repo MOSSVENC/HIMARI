@@ -227,41 +227,44 @@ export component FanReadout inherits Rectangle {
     height: 40px;
 
     HorizontalLayout {
-        spacing: 10px;
+        width: parent.width;
+        // Same column widths and spacing as the Live fans header, so the values
+        // sit under their labels instead of drifting to the left of the card.
+        spacing: 8px;
         cross-axis-alignment: center;
         Text {
-            width: 38px;
+            horizontal-stretch: 1;
             text: root.name;
             color: Palette.text;
             font-family: "Bahnschrift";
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             vertical-alignment: center;
         }
         Text {
-            width: 86px;
+            width: 80px;
             text: root.rpm + " rpm";
             color: Palette.cyan;
             font-family: "Cascadia Mono";
-            font-size: 12px;
+            font-size: 11px;
             horizontal-alignment: right;
             vertical-alignment: center;
         }
         Text {
-            width: 54px;
+            width: 50px;
             text: root.temp;
             color: Palette.text-dim;
             font-family: "Cascadia Mono";
-            font-size: 12px;
+            font-size: 11px;
             horizontal-alignment: right;
             vertical-alignment: center;
         }
         Text {
-            width: 52px;
+            width: 48px;
             text: root.duty + "%";
             color: Palette.text-dim;
             font-family: "Cascadia Mono";
-            font-size: 12px;
+            font-size: 11px;
             horizontal-alignment: right;
             vertical-alignment: center;
         }

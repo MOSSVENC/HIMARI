@@ -1709,3 +1709,18 @@ disabled and the localized reason:
 [image](images/input-io-blue-light-disabled-2026-11-22.png) — the rest of the
 page (brightness, volume, device switches) stays enabled. This closes the
 visual-evidence gap from the previous round.
+
+## 2026-11-22 Full-page snapshot audit found two Cooling defects
+
+`--snapshot=0..10` captured all eleven pages. On Cooling:
+
+- the runtime label under the page title was still English ("Reading ten-point
+fan table"); the zh-CN catalog lacked that msgid, so the Chinese page mixed
+languages;
+- `FanReadout` used fixed 38/86/54/52 px columns from the left while the Live
+fans header right-aligned 80/50/48 px columns, so values did not sit under their
+labels.
+
+Both are fixed: `FanReadout` now uses `width: parent.width`, the same 8 px
+spacing and the same 80/50/48 column widths as the header, and the catalog gained
+"正在读取十点风扇表". [After snapshot](images/cooling-2026-11-22.png).
