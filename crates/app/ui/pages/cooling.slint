@@ -188,7 +188,9 @@ import {
                     }
                     Hairline {}
                     HorizontalLayout {
-                        width: parent.width;
+                        // Width comes from the padded VerticalLayout; setting
+                        // parent.width here would add the padding back and
+                        // overflow the card by 36 px.
                         spacing: 8px;
                         MicroLabel { text: @tr("CHANNEL"); horizontal-stretch: 1; }
                         MicroLabel { text: @tr("SPEED"); width: 80px; horizontal-alignment: right; }

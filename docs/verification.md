@@ -1724,3 +1724,9 @@ labels.
 Both are fixed: `FanReadout` now uses `width: parent.width`, the same 8 px
 spacing and the same 80/50/48 column widths as the header, and the catalog gained
 "正在读取十点风扇表". [After snapshot](images/cooling-2026-11-22.png).
+
+The "占空比" label that touched the card edge was a padding mistake: the header
+row and `FanReadout` set `width: parent.width`, but the parent `VerticalLayout`
+has 18 px padding, so the row was 36 px wider than the content area and overflowed
+the card. Removing the width override lets the padded parent size the row; the
+header and values now sit inside the card.

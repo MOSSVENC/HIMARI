@@ -227,9 +227,8 @@ export component FanReadout inherits Rectangle {
     height: 40px;
 
     HorizontalLayout {
-        width: parent.width;
         // Same column widths and spacing as the Live fans header, so the values
-        // sit under their labels instead of drifting to the left of the card.
+        // sit under their labels; the padded parent decides the width.
         spacing: 8px;
         cross-axis-alignment: center;
         Text {
