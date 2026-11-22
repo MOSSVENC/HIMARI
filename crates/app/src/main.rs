@@ -156,12 +156,14 @@ fn settings_backend_smoke() -> i32 {
 
 #[cfg(any(debug_assertions, feature = "snapshot-tools"))]
 fn run_snapshot(page: usize, path: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
-    let ui = MainWindow::new()?;
-    ui_callbacks::apply_persisted_theme(&ui);
-    ui_callbacks::apply_capabilities(&ui);
+    // Select the bundle before the component tree exists: @tr defaults are
+    // evaluated at instantiation, so selecting afterwards leaves them English.
     if let Err(error) = slint::select_bundled_translation("zh-CN") {
         log_action(&format!("snapshot translation unavailable: {error}"));
     }
+    let ui = MainWindow::new()?;
+    ui_callbacks::apply_persisted_theme(&ui);
+    ui_callbacks::apply_capabilities(&ui);
     ui.set_language_zh(true);
     let dchu = himari_protocol::Dchu::open();
     ui.set_transport_ready(dchu.is_ok());

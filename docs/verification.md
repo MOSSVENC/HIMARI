@@ -1737,3 +1737,15 @@ The page snapshot showed a 420 px accent circle at 45 % opacity reaching down to
 FAN 3/4 and the DCHU badge, lowering their contrast. The halo is now 360 px at
 18 % and sits wholly in the card corner; the fan rows and the badge are readable
 again. [snapshot](images/overview-2026-11-22.png).
+
+## 2026-11-22 System page: hard-coded English statuses
+
+The page snapshot showed `Connected` and `Not located` in an otherwise Chinese
+page. Both were literals bypassing `@tr`: the transport row used
+`root.transport-ready ? "Connected" : "Unavailable"`, and the root
+`transport-device-path` default was `"Not located"`. They now use `@tr`, and the
+snapshot reads `已连接` and `设备路径 未找到`
+([image](images/system-2026-11-22.png)).
+
+`--snapshot` now also selects the translation bundle before creating the
+component tree, because `@tr` property defaults are evaluated at instantiation.

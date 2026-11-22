@@ -12,7 +12,7 @@ import {
     in property <string> power-label: @tr("Performance");
     in property <string> capabilities-text: @tr("--");
     in property <string> platform-text: @tr("--");
-    in property <string> transport-device-path: "Not located";
+    in property <string> transport-device-path: @tr("Not located");
     in property <bool> toggle-fn-value: false;
     in property <bool> toggle-fn-known: false;
     in property <bool> toggle-win-value: false;
@@ -156,7 +156,7 @@ import {
                 spacing: 8px;
                 SectionTitle { text: @tr("Signed transport"); }
                 Hairline {}
-                InfoRow { label: @tr("Transport"); value: root.transport-ready ? "Connected" : "Unavailable"; value-tone: root.transport-ready ? Palette.green : Palette.amber; }
+                InfoRow { label: @tr("Transport"); value: root.transport-ready ? @tr("Connected") : @tr("Unavailable"); value-tone: root.transport-ready ? Palette.green : Palette.amber; }
                 InfoRow { label: @tr("Capabilities"); value: root.capabilities-text; }
                 InfoRow { label: @tr("Platform ID"); value: root.platform-text; }
                 InfoRow { label: @tr("Power mode"); value: root.power-label; }
