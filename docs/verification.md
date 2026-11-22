@@ -1381,3 +1381,16 @@ run 3  page 2 total 16.81 ms  draw 15.45 ms
 The page moved from the worst gap (`24.16 ms`, recorded above) to 16.8–18.4 ms:
 inside the 16.67 ms budget on the warm run and 0.1–1.7 ms over on the other.
 It stays an open item until repeated runs are consistently under the budget.
+
+Eight further warm runs of the same build (`co2.exe`) put the distribution on
+record instead of one number:
+
+```text
+global max ms   16.34 16.56 17.48 18.97 19.25 20.12 21.34 21.62   gaps_over_33ms 0 in all
+page 2 max ms   16.29 16.51 16.52 16.66 16.75 17.80 18.77 19.01
+```
+
+Page 2 is at or just under the 16.67 ms budget in four of eight runs (median
+16.7 ms); the remaining 1–2 ms is the open gap. Nothing exceeded 33 ms, so the
+user-visible stall is gone, but "consistently under budget" is not yet true and
+is not claimed.

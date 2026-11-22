@@ -231,6 +231,34 @@ mod tier_tests {
     /// The GPU tier must appear whenever the platform can power the discrete
     /// GPU down, because it is the only tier that changes what the discrete GPU
     /// consumes.
+    /// The four vendor power tiers carry four distinct glyphs; sharing one
+    /// gauge was a real regression before this test existed.
+    #[test]
+    fn every_power_tier_keeps_its_own_glyph() {
+        assert_eq!(
+            PowerTier::Profile(PowerMode::Performance).glyph(),
+            Glyph::Bolt
+        );
+        assert_eq!(
+            PowerTier::Profile(PowerMode::Entertainment).glyph(),
+            Glyph::Film
+        );
+        assert_eq!(
+            PowerTier::Profile(PowerMode::PowerSaving).glyph(),
+            Glyph::Leaf
+        );
+        assert_eq!(PowerTier::Profile(PowerMode::Quiet).glyph(), Glyph::Moon);
+        assert_eq!(PowerTier::QuietWithoutDiscreteGpu.glyph(), Glyph::Moon);
+        let glyphs = [
+            PowerTier::Profile(PowerMode::Performance).glyph(),
+            PowerTier::Profile(PowerMode::Entertainment).glyph(),
+            PowerTier::Profile(PowerMode::PowerSaving).glyph(),
+        ];
+        assert_eq!(glyphs[0].id(), 4);
+        assert_eq!(glyphs[1].id(), 15);
+        assert_eq!(glyphs[2].id(), 16);
+    }
+
     #[test]
     fn gpu_tier_is_offered_when_the_platform_supports_it() {
         let caps = PlatformCapabilities {
