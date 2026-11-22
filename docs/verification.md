@@ -1507,3 +1507,24 @@ The script fix is verified on the reference machine. The cooperative release in
 the owner loop is code-complete and host-tested, but the installed binary predates
 it: deploying needs a startup-task change, which the project constraints reserve
 for the user, so its hardware run is still pending.
+
+## 2026-11-22 Cooling first visit: the optimisations that did not help
+
+Four experiments were built, measured on the reference machine and reverted.
+They are listed so the next attempt does not repeat them.
+
+```text
+removed all four FanReadout rows (kept their 40px slots)
+    page 2 max_total 18.58 ms   (baseline 16.8-19.0)  -> text rows are not the cost
+removed opacity from StageButton and ToggleStatusRow (no extra layers)
+    page 2 max_total 17.48-20.07 ms                   -> button layers are not the cost
+removed the page opacity fade (no cross-fade at all)
+    page 2 max_total 21.24-21.89 ms                   -> the fade is not the cost
+cache-rendering-hint always on for the page Flickable
+    page 2 max_total 19.95-27.35 ms, global max 57-73 ms -> actively worse
+```
+
+What remains is not one element: the page's 24 nested layouts and roughly forty
+Text runs make the first frame's raster and text shaping the floor. `gaps_over_33ms`
+stays 0, so there is no visible stall; the open gap is the last 1-2 ms above
+16.67 ms on some runs.
