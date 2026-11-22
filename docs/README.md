@@ -33,6 +33,8 @@ says which notes are **current** and which are **historical evidence**.
   notes and reproducible defects for the directory-governance plugin.
 - [handoff-2026-11-21.md](handoff-2026-11-21.md) — takeover record: where the
   work stopped, what was verified, what is still open.
+- [visual-audit-2026-11-22.md](visual-audit-2026-11-22.md) — page-by-page visual
+  audit of all eleven screens and the defects it found.
 
 ## Historical records
 
