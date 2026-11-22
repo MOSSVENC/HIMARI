@@ -1482,3 +1482,28 @@ spinning fan glyph and reports both fan speeds in one line. This is the same
 path the platform-profile placement change runs through, so the card position
 and the per-monitor work-area query are exercised by the real overlay, not only
 by unit tests.
+
+## 2026-11-22 Fn capture and the resident instance: a real side effect, fixed twice
+
+Running the first capture test while the installed HIMARI was resident exposed a
+defect in the test procedure, not in the listener: when FnKey stopped, the
+resident app's owner thread acquired the channel; when the script restored
+FnKey, the resident app kept the subscription and the vendor listener was left
+without it. The log showed `Fn notification channel acquired` as the last line
+while `FnKey.exe` was running again.
+
+Two fixes:
+
+1. `scripts/fn-capture.ps1` now stops resident `himari.exe` instances for the
+   capture window (never the executable under test) and starts them again with
+   `--background` afterwards. An 8-second run then logged the capture lifecycle,
+   restored the vendor services, and brought the resident app back as PID 20084
+   with `Fn ownership deferred: FnKey.exe is running`.
+2. `fn_owner` no longer waits forever. It waits in five-second slices and, when
+   `FnKey.exe` reappears, logs `Fn ownership released: FnKey.exe returned` and
+   drops the subscription so the vendor listener can register again.
+
+The script fix is verified on the reference machine. The cooperative release in
+the owner loop is code-complete and host-tested, but the installed binary predates
+it: deploying needs a startup-task change, which the project constraints reserve
+for the user, so its hardware run is still pending.

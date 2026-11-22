@@ -27,11 +27,22 @@ foreach ($taskService in $taskServices) {
 }
 $taskRunning = @($taskServices | Where-Object Status -eq 'Running' | ForEach-Object Name)
 
+# A resident HIMARI keeps polling for the channel and would grab it the moment
+# FnKey stops, leaving the vendor listener without it after restoration. Stop
+# the resident instances for the capture window (never the executable under
+# test) and start them again afterwards.
+$taskResident = @(Get-CimInstance Win32_Process -Filter "Name='himari.exe'" |
+    Where-Object { $_.ExecutablePath -and $_.ExecutablePath -ne $Executable })
+$taskResidentPaths = @($taskResident | ForEach-Object ExecutablePath)
+
 $stdout = Join-Path $OutputDirectory 'fn-capture.stdout.log'
 $stderr = Join-Path $OutputDirectory 'fn-capture.stderr.log'
 Remove-Item -LiteralPath $stdout, $stderr -ErrorAction SilentlyContinue
 
 try {
+    foreach ($taskProcess in $taskResident) {
+        Stop-Process -Id $taskProcess.ProcessId -Force -ErrorAction Stop
+    }
     Stop-Process -Id $taskFnKey[0].ProcessId -Force -ErrorAction Stop
     foreach ($taskName in $taskRunning) {
         Stop-Service -Name $taskName -ErrorAction Stop
@@ -80,6 +91,11 @@ try {
             Start-Sleep -Milliseconds 100
         } while ($true)
     } catch { $taskRestoreErrors.Add("Restore FnKey: $_") }
+    foreach ($taskPath in $taskResidentPaths) {
+        try {
+            Start-Process -FilePath $taskPath -ArgumentList '--background' | Out-Null
+        } catch { $taskRestoreErrors.Add("Restore resident ${taskPath}: $_") }
+    }
     if ($taskRestoreErrors.Count) { throw ($taskRestoreErrors -join [Environment]::NewLine) }
     Write-Output 'Original vendor services and FnKey restored'
 }
