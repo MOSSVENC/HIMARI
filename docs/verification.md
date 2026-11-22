@@ -1425,3 +1425,23 @@ acquires it when the vendor listener stops, and the diagnostic restores both
 services and the original FnKey process. This does not yet prove a physical Fn
 keypress reaches our decoder: that needs a capture window while FnKey is stopped,
 which is still open.
+
+## 2026-11-22 Discrete GPU backend naming and capability status
+
+`discrete_gpu_power_supported` became `DiscreteGpuBackend`
+(`nvidia-platform-controller` / `unsupported`), so the capability decision has a
+name that is separate from the vendor command encoding. `--gpu-power-status`
+now prints both:
+
+```text
+GPU_POWER_BACKEND=nvidia-platform-controller
+GPU_POWER_SUPPORTED=true
+NVPCF_INSTANCE=ACPI\NVDA0820\NPCF
+NVPCF_STATUS=OK
+```
+
+A model without `nvidia_power_off` reports `unsupported` and the NVPCF path
+returns "does not report discrete GPU power control" before touching the node.
+The command encoding itself stays inside `gpu_power`; moving it behind a second
+backend needs a non-NVIDIA machine to test against, which this workspace does
+not have.

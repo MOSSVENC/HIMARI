@@ -62,16 +62,43 @@ pub(crate) fn card_origin(work: Rect, scale: f32, border: (f32, f32)) -> (i32, i
     (x.clamp(work.left, max_x), y.clamp(work.top, max_y))
 }
 
-/// True when this platform reports discrete-GPU power control.
+/// Which backend, if any, can switch the discrete GPU's power.
 ///
-/// The reference machine exposes `nvidia_power_off`; another CC4.0 model that
-/// does not must be told the control is unsupported instead of receiving a
-/// failing `NVPCF` command.
+/// The signed ACPI transport exposes the capability as a vendor flag, not as a
+/// backend name. Naming the backend here keeps the decision separate from the
+/// command encoding: a model without the flag is `Unsupported` and must not
+/// receive an `NVPCF` write, while the reference machine is the NVIDIA platform
+/// controller whose node lives in `gpu_power`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum DiscreteGpuBackend {
+    NvidiaPlatformController,
+    Unsupported,
+}
+
+impl DiscreteGpuBackend {
+    #[cfg_attr(not(windows), allow(dead_code))]
+    pub(crate) const fn is_supported(self) -> bool {
+        matches!(self, Self::NvidiaPlatformController)
+    }
+
+    #[cfg_attr(not(windows), allow(dead_code))]
+    pub(crate) const fn name(self) -> &'static str {
+        match self {
+            Self::NvidiaPlatformController => "nvidia-platform-controller",
+            Self::Unsupported => "unsupported",
+        }
+    }
+}
+
 #[cfg_attr(not(windows), allow(dead_code))]
-pub(crate) fn discrete_gpu_power_supported(
+pub(crate) fn discrete_gpu_backend(
     capabilities: &himari_protocol::PlatformCapabilities,
-) -> bool {
-    capabilities.nvidia_power_off
+) -> DiscreteGpuBackend {
+    if capabilities.nvidia_power_off {
+        DiscreteGpuBackend::NvidiaPlatformController
+    } else {
+        DiscreteGpuBackend::Unsupported
+    }
 }
 
 /// Work area of the monitor nearest to `anchor`, in physical pixels.
@@ -202,11 +229,16 @@ mod tests {
     #[test]
     fn discrete_gpu_power_is_gated_by_the_capability_flag() {
         let off = himari_protocol::PlatformCapabilities::default();
-        assert!(!discrete_gpu_power_supported(&off));
+        assert_eq!(discrete_gpu_backend(&off), DiscreteGpuBackend::Unsupported);
+        assert!(!discrete_gpu_backend(&off).is_supported());
         let on = himari_protocol::PlatformCapabilities {
             nvidia_power_off: true,
             ..Default::default()
         };
-        assert!(discrete_gpu_power_supported(&on));
+        assert_eq!(
+            discrete_gpu_backend(&on),
+            DiscreteGpuBackend::NvidiaPlatformController
+        );
+        assert!(discrete_gpu_backend(&on).is_supported());
     }
 }

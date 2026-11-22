@@ -61,6 +61,14 @@ mod platform {
     }
 
     pub(super) fn status() -> i32 {
+        match Dchu::open().and_then(|device| device.read_capabilities()) {
+            Ok(capabilities) => {
+                let backend = crate::platform_profile::discrete_gpu_backend(&capabilities);
+                println!("GPU_POWER_BACKEND={}", backend.name());
+                println!("GPU_POWER_SUPPORTED={}", backend.is_supported());
+            }
+            Err(error) => println!("GPU_POWER_BACKEND=unknown ({error})"),
+        }
         match device_status() {
             Ok(status) => {
                 println!("NVPCF_INSTANCE={NVPCF_INSTANCE}");
@@ -81,7 +89,7 @@ mod platform {
         // be told this control is unsupported, not handed a failing NVPCF write.
         match dchu.read_capabilities() {
             Ok(capabilities)
-                if !crate::platform_profile::discrete_gpu_power_supported(&capabilities) =>
+                if !crate::platform_profile::discrete_gpu_backend(&capabilities).is_supported() =>
             {
                 return Err("this platform does not report discrete GPU power control".to_owned());
             }
