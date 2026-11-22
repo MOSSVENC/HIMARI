@@ -1730,3 +1730,10 @@ row and `FanReadout` set `width: parent.width`, but the parent `VerticalLayout`
 has 18 px padding, so the row was 36 px wider than the content area and overflowed
 the card. Removing the width override lets the padded parent size the row; the
 header and values now sit inside the card.
+
+## 2026-11-22 Overview: the corner halo was washing out the fan rows
+
+The page snapshot showed a 420 px accent circle at 45 % opacity reaching down to
+FAN 3/4 and the DCHU badge, lowering their contrast. The halo is now 360 px at
+18 % and sits wholly in the card corner; the fan rows and the badge are readable
+again. [snapshot](images/overview-2026-11-22.png).

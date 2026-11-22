@@ -110,13 +110,15 @@ import {
         clip: true;
 
         Rectangle {
-            x: parent.width - 280px;
-            y: -180px;
-            width: 420px;
-            height: 420px;
-            border-radius: 210px;
+            // Ambient accent in the card corner only: the old 420 px circle at
+            // 45 % reached down into the fan rows and washed their labels out.
+            x: parent.width - 240px;
+            y: -210px;
+            width: 360px;
+            height: 360px;
+            border-radius: 180px;
             background: Palette.accent-soft;
-            opacity: 0.45;
+            opacity: 0.18;
         }
 
         VerticalLayout {
