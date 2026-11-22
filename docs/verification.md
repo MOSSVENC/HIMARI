@@ -1581,3 +1581,29 @@ placement and alpha, not theming; do not use it as palette evidence.
 `runtime_state::theme_dark()` and shares `osd::card_palette`, so the raw overlay
 smoke and the product path render the same colours. Recaptured with `dark=0`,
 the card pixel is again `R=174 G=183 B=199`, matching the AntiDust capture above.
+
+## 2026-11-22 Cold-boot replay: what the logs actually prove
+
+`(Get-CimInstance Win32_OperatingSystem).LastBootUpTime` is **2026-11-19
+20:41:17**. The `uptime` reset seen at 23:54 on 11-21 was WSL restarting, not a
+Windows reboot; it must not be cited as cold-boot evidence.
+
+`boot-agent.log` has an entry at that boot (`uptime_ms=25468`, i.e. +28.0 s):
+
+```text
+1795092105074 agent start: target power=2 fan=0 wait_ms=120000 observe_ms=60000
+1795092105146 power reapplied and read back: Performance
+1795092105146 policy replay complete in 82 ms (1 attempts)
+1795092105146 CPU observation start: duration_ms=60000 uptime_ms=25468
+... 60 samples, clock 4613-4854 MHz, nominal 3601 MHz, profile=2, policy=2
+```
+
+So the boot service did start at a real Windows boot, replayed the saved
+`power=2 / fan=0` policy and read it back in **82 ms**, then observed the CPU for
+60 s. `Get-CimInstance Win32_Service -Filter "Name='HimariBoot'"` reports
+`StartMode=Auto`, `State=Stopped`, `ExitCode=0` — a one-shot service that ran and
+exited.
+
+Still unverified by a new boot: the 1be0ba8 processor-hot-limit release and USB
+input survival after a cold start. Those need a fresh Windows reboot, which this
+workspace cannot trigger without the user.
