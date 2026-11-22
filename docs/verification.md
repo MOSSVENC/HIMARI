@@ -1466,3 +1466,19 @@ Original vendor services and FnKey restored
 So the capture path itself is proven: registration, a full window, a clean close
 and vendor restoration. The remaining evidence is a run where physical Fn
 combinations are pressed inside that window; the tool now exists for it.
+
+## 2026-11-22 Anti-dust card with both fans, after the platform-profile change
+
+`cap.exe --fn-event-smoke 0x40` presented the AntiDust notification and the card
+was captured 1.3 s in ([image](images/osd-antidust-2026-11-22.png)):
+
+```text
+散热
+正在运行防尘 · CPU 4216 / GPU 2001
+```
+
+The card is 320×84 logical at the bottom centre of the work area, carries the
+spinning fan glyph and reports both fan speeds in one line. This is the same
+path the platform-profile placement change runs through, so the card position
+and the per-monitor work-area query are exercised by the real overlay, not only
+by unit tests.
