@@ -15,6 +15,30 @@ use crate::platform_profile;
 
 static MAIN_WINDOW: OnceLock<Mutex<Option<Weak<crate::MainWindow>>>> = OnceLock::new();
 
+/// Colours of one overlay card for the persisted theme.
+#[derive(Clone, Copy)]
+pub(crate) struct CardPalette {
+    pub(crate) panel: [f32; 3],
+    pub(crate) title: [f32; 3],
+    pub(crate) detail: [f32; 3],
+}
+
+pub(crate) fn card_palette(dark: bool) -> CardPalette {
+    if dark {
+        CardPalette {
+            panel: [0.11, 0.13, 0.18],
+            title: [0.96, 0.95, 0.98],
+            detail: [0.65, 0.67, 0.73],
+        }
+    } else {
+        CardPalette {
+            panel: [0.93, 0.95, 0.98],
+            title: [0.08, 0.10, 0.14],
+            detail: [0.35, 0.40, 0.47],
+        }
+    }
+}
+
 pub(crate) fn install(main_window: Weak<crate::MainWindow>) {
     let main = MAIN_WINDOW.get_or_init(|| Mutex::new(None));
     if let Ok(mut main) = main.lock() {
@@ -50,21 +74,10 @@ pub(crate) fn show_with(
             return;
         };
         let dark = ui.global::<crate::Palette>().get_blend() >= 0.5;
-        let panel = if dark {
-            [0.11, 0.13, 0.18]
-        } else {
-            [0.93, 0.95, 0.98]
-        };
-        let title_colour = if dark {
-            [0.96, 0.95, 0.98]
-        } else {
-            [0.08, 0.10, 0.14]
-        };
-        let detail_colour = if dark {
-            [0.65, 0.67, 0.73]
-        } else {
-            [0.35, 0.40, 0.47]
-        };
+        let palette = card_palette(dark);
+        let panel = palette.panel;
+        let title_colour = palette.title;
+        let detail_colour = palette.detail;
         let accent = [
             f32::from(accent.red()) / 255.0,
             f32::from(accent.green()) / 255.0,
@@ -134,5 +147,20 @@ pub(crate) fn show_with(
         crate::diagnostics::log_action(
             "OSD update could not be dispatched to the Slint event loop",
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::card_palette;
+
+    #[test]
+    fn card_palette_follows_the_theme_instead_of_being_fixed() {
+        let dark = card_palette(true);
+        let light = card_palette(false);
+        let sum = |c: [f32; 3]| c.iter().sum::<f32>();
+        assert!(sum(dark.panel) < sum(light.panel));
+        assert!(sum(dark.title) > sum(light.title));
+        assert!(sum(dark.detail) > sum(light.detail));
     }
 }

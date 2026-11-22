@@ -857,16 +857,18 @@ pub(crate) fn smoke() -> Result<(), Box<dyn std::error::Error>> {
         .map(|(left, _, right, bottom)| (left + (right - left - 320) / 2, bottom - 84 - 24))
         .unwrap_or((600, 500));
     overlay.move_to(origin.0, origin.1);
+    // Same palette the product path uses, so the capture is theme evidence.
+    let palette = crate::osd::card_palette(crate::runtime_state::theme_dark());
     let steps = 24;
     for step in 0..=steps {
         let reveal = step as f32 / steps as f32;
         overlay.compose(
             reveal,
             FrameStyle {
-                panel: [0.07, 0.08, 0.11],
+                panel: palette.panel,
                 accent: [0.26, 0.83, 1.0],
-                title: [0.96, 0.95, 0.98],
-                detail: [0.65, 0.67, 0.73],
+                title: palette.title,
+                detail: palette.detail,
                 glyph: 3,
                 level: -1.0,
             },

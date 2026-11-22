@@ -1576,3 +1576,8 @@ not only the main window. The theme file was restored to `dark=0` after the run.
 `--osd-layer-smoke` is a different path: it builds the overlay directly with a
 fixed dark style, bypassing the persisted palette. Its CAPS LOCK capture proves
 placement and alpha, not theming; do not use it as palette evidence.
+
+`--osd-layer-smoke` is no longer palette-blind: it now reads
+`runtime_state::theme_dark()` and shares `osd::card_palette`, so the raw overlay
+smoke and the product path render the same colours. Recaptured with `dark=0`,
+the card pixel is again `R=174 G=183 B=199`, matching the AntiDust capture above.
