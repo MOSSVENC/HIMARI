@@ -155,6 +155,41 @@ fn settings_backend_smoke() -> i32 {
 }
 
 #[cfg(any(debug_assertions, feature = "snapshot-tools"))]
+/// Diagnostic probe: show the window far off-screen, walk every page once and
+/// exit. Used to judge whether a startup glyph prewarm would flash a window or a
+/// taskbar button before it is moved on-screen.
+fn run_prewarm_probe() -> Result<(), Box<dyn std::error::Error>> {
+    let ui = MainWindow::new()?;
+    ui.window()
+        .set_position(slint::LogicalPosition::new(-4000.0, -4000.0));
+    ui.show()?;
+    let weak = ui.as_weak();
+    let step = std::rc::Rc::new(std::cell::Cell::new(0_i32));
+    fn advance(ui: slint::Weak<MainWindow>, step: std::rc::Rc<std::cell::Cell<i32>>) {
+        let Some(window) = ui.upgrade() else { return };
+        let page = step.get();
+        if page > 10 {
+            window.hide().ok();
+            let _ = slint::quit_event_loop();
+            return;
+        }
+        window.set_selected_page(page);
+        window.set_navigation_page(page);
+        step.set(page + 1);
+        let weak = window.as_weak();
+        let step = std::rc::Rc::clone(&step);
+        slint::Timer::single_shot(std::time::Duration::from_millis(40), move || {
+            advance(weak, step);
+        });
+    }
+    slint::Timer::single_shot(std::time::Duration::from_millis(150), move || {
+        advance(weak, std::rc::Rc::clone(&step));
+    });
+    slint::run_event_loop()?;
+    println!("prewarm probe complete pages=11");
+    Ok(())
+}
+
 fn run_snapshot(page: usize, path: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     // Select the bundle before the component tree exists: @tr defaults are
     // evaluated at instantiation, so selecting afterwards leaves them English.
@@ -400,6 +435,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--control-sync-smoke"
                 | "--settings-smoke"
                 | "--graphics-smoke"
+                | "--prewarm-probe"
                 | "--tray-smoke"
                 | "--flexikey-ui-smoke"
         ) || (cfg!(any(debug_assertions, feature = "snapshot-tools"))
@@ -457,6 +493,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match std::env::args().nth(1).as_deref() {
         Some("--control-sync-smoke") => std::process::exit(control_sync_smoke::run()),
         Some("--settings-smoke") => std::process::exit(settings_backend_smoke()),
+        #[cfg(any(debug_assertions, feature = "snapshot-tools"))]
+        Some("--prewarm-probe") => return run_prewarm_probe(),
         Some("--graphics-smoke") => return graphics_smoke::run(),
         Some("--tray-smoke") => return resident_ui::smoke(start_background),
         Some("--flexikey-ui-smoke") => return flexikey_smoke::run(),

@@ -1754,3 +1754,23 @@ Another font hypothesis was tested and rejected: `MicroLabel` moved from
 Bahnschrift to Microsoft YaHei UI (to avoid CJK fallback in the Cooling header and
 elsewhere). Four runs: page 2 median 18.95 ms (range 15.58-54.81), against the
 18.60 ms baseline, so fallback is not the cost either. Reverted.
+
+## 2026-11-22 Off-screen prewarm probe: no visible flash
+
+`--prewarm-probe` (snapshot-tools build) creates the window, moves it to
+(-4000, -4000), shows it, walks all eleven pages on 40 ms timers and hides it.
+
+```text
+prewarm probe complete pages=11      (process exit code 2170 from Slint's quit path)
+```
+
+A screen capture taken 350 ms into the walk shows only the desktop, taskbar and
+the already-open PowerShell window: no HIMARI window, no taskbar button, no
+flicker ([capture](images/prewarm-probe-2026-11-22.png)). So an off-screen glyph
+prewarm is technically possible without a visible artifact on this single-monitor
+desktop.
+
+It is not wired into startup yet. Two open questions remain: whether Slint can
+run the probe's event loop and then the resident UI's own loop in one process, and
+what the extra 11 × 40 ms adds to the tray-resident start path. Both need the
+user's acceptance of a startup-path change.
