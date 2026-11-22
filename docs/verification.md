@@ -1642,3 +1642,26 @@ font-size class or fractional page offsets. The systemic fix is a startup
 prewarm of every page while the window is still off-screen or hidden; that is a
 startup-path change with a real risk of a taskbar/window flash, so it is designed
 and not executed without the user watching it.
+
+## 2026-11-22 Reversible hardware smoke on the current build
+
+`scripts/hardware-smoke.ps1` now runs every mode and reports the full failure
+list instead of throwing on the first one. Against `theme-smoke.exe`:
+
+```text
+--control-sync-smoke    passed (stale readbacks, rapid edits, failed writes, drafts)
+--input-hooks-smoke     passed (100 acknowledged transitions, empty/keyboard/mouse/both/removal/install failure)
+--settings-smoke        passed
+--system-smoke          brightness 75% reapplied, audio 69% unmuted, airplane false,
+                        blue_light: the display driver rejected the gamma ramp
+--io-smoke              camera toggled/restored, touchpad mirror 0-32 ms, airplane toggled/restored
+--display-care-smoke    taskbar/transparency/dark/monitor timeouts/saver + DCHU offsets 45-48 readback
+failures: --system-smoke (exit 1)
+```
+
+The blue-light failure is environmental, not a regression: a direct probe with
+an **identity** gamma ramp also returns false from `SetDeviceGammaRamp` with
+Win32 error 298, so this display state rejects every ramp (HDR or driver policy).
+The other five modes and the rest of the system smoke pass on the refactored
+build. Blue-light control stays unverified on this display until the ramp is
+accepted again.
