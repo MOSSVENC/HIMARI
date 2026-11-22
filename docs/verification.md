@@ -1807,3 +1807,27 @@ So prewarm stays **opt-in** (`HIMARI_PREWARM=1`); it is not on by default. The
 remaining problem is windowing, not glyphs: the window must be created off-screen
 (or cloaked) before its first map. Until then the budget claim stays open for the
 default start path even though the mechanism is proven.
+
+## 2026-11-22 DWM cloak attempt: rejected, prewarm stays opt-in
+
+To make the prewarm default without the 0,0 flash, the window was cloaked with
+`DwmSetWindowAttribute(DWMWA_CLOAK)` right after `show()`, moved off-screen, walked,
+then the cloak was released after the resident UI's show. Two variants were tried
+(release at the end of the walk, and release 60 ms after show). Both left the
+window invisible:
+
+```text
+250 ms  screen clean, window rect 0,0 (cloak appears to work)
+750 ms  no window on screen
+1700 ms no window on screen, taskbar icon present
+```
+
+A hidden window ignores the cloak release, and the release after show did not
+recover it either. The cloak code and the default-on gate were reverted; the
+prewarm remains opt-in (`HIMARI_PREWARM=1`). A working solution needs a window
+created off-screen or cloaked before its first map, not a post-show attribute flip.
+
+The unsafe ratchet also caught that the gamma capability probe added three FFI
+calls to `system_controls/display.rs` without a ceiling update (the build gate
+printed `unsafe regression: ... has 6 (ceiling 3)`). The ceiling is now 6 with the
+reason in the script and the total 113 → 116.
