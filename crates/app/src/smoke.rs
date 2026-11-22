@@ -152,13 +152,17 @@ pub(crate) fn system_smoke() -> i32 {
             .first()
             .copied()
             .unwrap_or(0);
-        system_controls::set_blue_light_filter(level).map_err(|error| {
-            himari_protocol::DchuError::ControlFailed {
-                operation: "system smoke blue light",
-                detail: error,
-            }
-        })?;
-        println!("blue_light: {level} reapplied");
+        if system_controls::gamma_ramp_supported() {
+            system_controls::set_blue_light_filter(level).map_err(|error| {
+                himari_protocol::DchuError::ControlFailed {
+                    operation: "system smoke blue light",
+                    detail: error,
+                }
+            })?;
+            println!("blue_light: {level} reapplied");
+        } else {
+            println!("blue_light: skipped, this display driver rejects gamma ramps");
+        }
         Ok(())
     }) {
         Ok(()) => {}

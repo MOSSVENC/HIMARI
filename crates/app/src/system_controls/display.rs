@@ -96,6 +96,57 @@ pub fn set_blue_light_filter(level: u8) -> Result<(), String> {
     Ok(())
 }
 
+/// True when this display accepts a gamma ramp at all.
+///
+/// An identity ramp changes nothing visible; a driver that rejects it will also
+/// reject the blue-light ramp, so the capability is probed once and cached.
+#[cfg(windows)]
+pub fn gamma_ramp_supported() -> bool {
+    use std::sync::OnceLock;
+
+    use windows_sys::Win32::Graphics::Gdi::{GetDC, HDC, ReleaseDC};
+    use windows_sys::Win32::UI::ColorSystem::SetDeviceGammaRamp;
+
+    #[repr(C)]
+    struct GammaRamp {
+        red: [u16; 256],
+        green: [u16; 256],
+        blue: [u16; 256],
+    }
+
+    static SUPPORTED: OnceLock<bool> = OnceLock::new();
+    *SUPPORTED.get_or_init(|| {
+        // SAFETY: a null HWND requests the screen DC; the handle is released
+        // before returning and the ramp buffer lives for the call.
+        let dc: HDC = unsafe { GetDC(std::ptr::null_mut()) };
+        if dc.is_null() {
+            return false;
+        }
+        let mut ramp = GammaRamp {
+            red: [0; 256],
+            green: [0; 256],
+            blue: [0; 256],
+        };
+        for index in 0..256 {
+            let linear = (index as f64 * 256.0).min(65535.0) as u16;
+            ramp.red[index] = linear;
+            ramp.green[index] = linear;
+            ramp.blue[index] = linear;
+        }
+        // SAFETY: `dc` is a live screen DC and `ramp` is the repr(C) 3×256 u16
+        // layout SetDeviceGammaRamp expects; the identity ramp writes nothing.
+        let written = unsafe { SetDeviceGammaRamp(dc, (&ramp as *const GammaRamp).cast()) };
+        // SAFETY: releasing a DC acquired above with the same null HWND.
+        unsafe { ReleaseDC(std::ptr::null_mut(), dc) };
+        written != 0
+    })
+}
+
+#[cfg(not(windows))]
+pub fn gamma_ramp_supported() -> bool {
+    false
+}
+
 #[cfg(not(windows))]
 pub fn set_blue_light_filter(_level: u8) -> Result<(), String> {
     Err("blue-light control is only available on Windows".to_owned())

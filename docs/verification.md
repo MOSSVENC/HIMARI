@@ -1665,3 +1665,24 @@ Win32 error 298, so this display state rejects every ramp (HDR or driver policy)
 The other five modes and the rest of the system smoke pass on the refactored
 build. Blue-light control stays unverified on this display until the ramp is
 accepted again.
+
+The blue-light failure above is now a capability, not a red run. `gamma_ramp_supported`
+probes with an identity ramp once (cached in a `OnceLock`), releases the screen DC
+and returns false when the driver rejects it. `--system-smoke` then prints
+`blue_light: skipped, this display driver rejects gamma ramps` instead of failing:
+
+```text
+--system-smoke exit=0
+brightness: 75% reapplied
+audio: 69% unmuted reapplied
+airplane: false
+blue_light: skipped, this display driver rejects gamma ramps
+
+scripts/hardware-smoke.ps1 -Executable gamma.exe
+hardware smoke passed
+```
+
+So all six reversible modes pass on the refactored build; blue-light control itself
+remains unverified while the display rejects every ramp. The UI still attempts the
+write and reports the driver error; gating the control on the same probe is the
+next step if this display state persists.
