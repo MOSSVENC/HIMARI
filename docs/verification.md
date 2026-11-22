@@ -1774,3 +1774,36 @@ It is not wired into startup yet. Two open questions remain: whether Slint can
 run the probe's event loop and then the resident UI's own loop in one process, and
 what the extra 11 × 40 ms adds to the tray-resident start path. Both need the
 user's acceptance of a startup-path change.
+
+## 2026-11-22 Opt-in prewarm closes the budget, but the window flashes first
+
+With `HIMARI_PREWARM=1`, the graphics smoke walks all pages off-screen before
+measuring. Three runs:
+
+```text
+global max median 11.57 ms  gaps_over_33ms 0
+
+page  median  min    max
+0      4.45   3.62   5.15
+1      5.46   4.91   5.64
+2      5.31   4.99   6.90     <- was 18.60
+3-10   2.65-3.85             all yes
+```
+
+Every page is inside 16.67 ms. The tray-resident start path also logged
+`prewarm pages=11 elapsed_ms=792` and stayed hidden.
+
+But the position trace at 100 ms intervals shows the window maps at its default
+position before the move lands:
+
+```text
+100-200 ms   0,0        <- visible flash
+300-500 ms   -4000,-4000
+600-700 ms   0,0        <- after hide, before the centred restore
+800 ms+      370,106    centred
+```
+
+So prewarm stays **opt-in** (`HIMARI_PREWARM=1`); it is not on by default. The
+remaining problem is windowing, not glyphs: the window must be created off-screen
+(or cloaked) before its first map. Until then the budget claim stays open for the
+default start path even though the mechanism is proven.

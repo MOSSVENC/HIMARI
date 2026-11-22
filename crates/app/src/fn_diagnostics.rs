@@ -143,12 +143,9 @@ pub(crate) fn capture(seconds: u64) -> i32 {
             let deadline = Instant::now() + Duration::from_secs(seconds);
             let mut seen = 0_u32;
             while Instant::now() < deadline {
-                match listener.wait_next_timeout(Duration::from_millis(200))? {
-                    Some(value) => {
-                        seen += 1;
-                        println!("Fn capture: {seen} {}", describe(value));
-                    }
-                    None => {}
+                if let Some(value) = listener.wait_next_timeout(Duration::from_millis(200))? {
+                    seen += 1;
+                    println!("Fn capture: {seen} {}", describe(value));
                 }
             }
             println!("Fn capture: window ended after {seconds}s, events={seen}");

@@ -40,6 +40,7 @@ mod osd_glyph;
 mod osd_layer;
 mod platform_profile;
 #[allow(dead_code)]
+mod prewarm;
 mod process_query;
 #[allow(dead_code)]
 mod product;
@@ -159,6 +160,7 @@ fn settings_backend_smoke() -> i32 {
 /// exit. Used to judge whether a startup glyph prewarm would flash a window or a
 /// taskbar button before it is moved on-screen.
 fn run_prewarm_probe() -> Result<(), Box<dyn std::error::Error>> {
+    let started = std::time::Instant::now();
     let ui = MainWindow::new()?;
     ui.window()
         .set_position(slint::LogicalPosition::new(-4000.0, -4000.0));
@@ -186,10 +188,22 @@ fn run_prewarm_probe() -> Result<(), Box<dyn std::error::Error>> {
         advance(weak, std::rc::Rc::clone(&step));
     });
     slint::run_event_loop()?;
-    println!("prewarm probe complete pages=11");
+    println!(
+        "prewarm probe complete pages=11 elapsed_ms={}",
+        started.elapsed().as_millis()
+    );
+    // The resident UI starts its own event loop after this function returns.
+    // A second run_event_loop on the same process and window must work, or the
+    // prewarm cannot be wired into startup at all.
+    slint::Timer::single_shot(std::time::Duration::from_millis(120), || {
+        let _ = slint::quit_event_loop();
+    });
+    slint::run_event_loop()?;
+    println!("prewarm probe second_event_loop=passed");
     Ok(())
 }
 
+#[cfg(any(debug_assertions, feature = "snapshot-tools"))]
 fn run_snapshot(page: usize, path: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     // Select the bundle before the component tree exists: @tr defaults are
     // evaluated at instantiation, so selecting afterwards leaves them English.

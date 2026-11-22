@@ -36,6 +36,10 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     // placeholder. This isolated fixture wires navigation only and writes no hardware.
     ui.set_rgb_available(true);
     println!("ui_fixture=lighting-controls-enabled hardware_workers=disabled");
+    if std::env::var_os("HIMARI_PREWARM").is_some() {
+        crate::prewarm::run(&ui)?;
+        println!("prewarm=on");
+    }
     crate::ui_callbacks::wire_navigation(&ui);
     let measurements = Rc::new(RefCell::new(Measurements::default()));
     let rendering = Rc::clone(&measurements);
