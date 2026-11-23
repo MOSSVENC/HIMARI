@@ -82,3 +82,18 @@ pwsh -ExecutionPolicy Bypass -File scripts\keyboard-probe.ps1 -Seconds 120
 - `HKMouFltr` 没有对应的 USB 旁路控制；鼠标拖动异常可能仍来自它。
 - 低级钩子不能归因到具体设备；Raw Input + `GetRawInputDeviceInfo` 的探针尚未实现。
 - `input-guard.log` 没有时间戳，开机时刻只能靠文件时间和邻近日志推断。
+
+## 2026-11-23 现场更新：Hub 已被排除
+
+用户实测：外接键盘直插电脑（不经 Hub）后仍出现同样的 Ctrl/Win 错乱与“按内置键盘恢复”，因此：
+
+- 排除 USB Hub 拓扑、Hub 供电、Hub 固件、端口级枚举问题；
+- 类过滤器 `HKKbdFltr` / `HKMouFltr` 对键盘/鼠标**类**生效，不因换端口而绕过，仍是首要嫌疑；
+- 若直插测试时无线接收器仍插着，则“多键盘/无线接收器”这条尚未排除，需要单键盘隔离。
+
+后续验证顺序相应改为：
+
+1. 下一次开机先跑 `keyboard-evidence.ps1` 与 `keyboard-probe.ps1`，不要先碰内置键盘；
+2. 只保留一把外接键盘（先有线 GAME KEYBOARD，拔掉无线接收器）复测；
+3. 再用 `--keyboard-filter-probe clear` / `boot-state` 做受控过滤器实验；
+4. 最后才做 `HKKbdFltr` / `HKMouFltr` 的 UpperFilters 二分。
