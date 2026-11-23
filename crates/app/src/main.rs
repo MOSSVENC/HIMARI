@@ -203,7 +203,6 @@ fn run_prewarm_probe() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[cfg(any(debug_assertions, feature = "snapshot-tools"))]
 /// Diagnostic access to the signed keyboard class filter. Actions are explicit
 /// because every write is blind: the device exposes no read-back.
 fn run_keyboard_filter_probe(action: &str) -> Result<(), Box<dyn std::error::Error>> {
@@ -229,9 +228,11 @@ fn run_keyboard_filter_probe(action: &str) -> Result<(), Box<dyn std::error::Err
         other => return Err(format!("unknown filter action: {other}").into()),
     }
     println!("keyboard filter probe: {action} ok");
+    log_action(&format!("keyboard filter probe: {action} ok"));
     Ok(())
 }
 
+#[cfg(any(debug_assertions, feature = "snapshot-tools"))]
 fn run_snapshot(page: usize, path: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     // Select the bundle before the component tree exists: @tr defaults are
     // evaluated at instantiation, so selecting afterwards leaves them English.
@@ -480,6 +481,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 | "--prewarm-probe"
                 | "--tray-smoke"
                 | "--flexikey-ui-smoke"
+                | "--keyboard-filter-probe"
         ) || (cfg!(any(debug_assertions, feature = "snapshot-tools"))
             && (argument.starts_with("--snapshot=")
                 || argument.starts_with("--transition-snapshot=")))
