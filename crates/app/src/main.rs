@@ -204,6 +204,34 @@ fn run_prewarm_probe() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(any(debug_assertions, feature = "snapshot-tools"))]
+/// Diagnostic access to the signed keyboard class filter. Actions are explicit
+/// because every write is blind: the device exposes no read-back.
+fn run_keyboard_filter_probe(action: &str) -> Result<(), Box<dyn std::error::Error>> {
+    use himari_protocol::KeyboardFilter;
+
+    let filter = KeyboardFilter::open()?;
+    match action {
+        "disable" => filter.set_enabled(false)?,
+        "enable" => filter.set_enabled(true)?,
+        "usb-off" => filter.set_usb_enabled(false)?,
+        "usb-on" => filter.set_usb_enabled(true)?,
+        "clear" => filter.clear_macros()?,
+        // Same order the boot guard uses.
+        "safe" => {
+            filter.set_usb_enabled(false)?;
+            filter.set_enabled(false)?;
+        }
+        // Simulate the early-boot state for a controlled reproduction.
+        "boot-state" => {
+            filter.set_usb_enabled(true)?;
+            filter.set_enabled(true)?;
+        }
+        other => return Err(format!("unknown filter action: {other}").into()),
+    }
+    println!("keyboard filter probe: {action} ok");
+    Ok(())
+}
+
 fn run_snapshot(page: usize, path: std::path::PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     // Select the bundle before the component tree exists: @tr defaults are
     // evaluated at instantiation, so selecting afterwards leaves them English.
@@ -509,6 +537,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some("--settings-smoke") => std::process::exit(settings_backend_smoke()),
         #[cfg(any(debug_assertions, feature = "snapshot-tools"))]
         Some("--prewarm-probe") => return run_prewarm_probe(),
+        Some("--keyboard-filter-probe") => {
+            let action = std::env::args().nth(2).unwrap_or_else(|| "safe".to_owned());
+            return run_keyboard_filter_probe(&action);
+        }
         Some("--graphics-smoke") => return graphics_smoke::run(),
         Some("--tray-smoke") => return resident_ui::smoke(start_background),
         Some("--flexikey-ui-smoke") => return flexikey_smoke::run(),
