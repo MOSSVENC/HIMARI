@@ -1869,3 +1869,32 @@ itself sends them to the default branch. The keycaps supplied by the user
 line up with this mapping. `fn_events` tests pin all five IDs; the
 protocol suite is 38 tests. GPU Turbo reports the real capability: this machine
 does not expose `simple_gpu_oc`, so the action says so instead of pretending.
+
+
+## 2026-11-25 Application icon replaced
+
+The previous icon was a hand-drawn chibi portrait that did not match the
+intended tone. It is replaced with artwork supplied by the user
+(`assets/art/himari-art-clean.jpg`, 1328x1776). The "元宝 AI生成" watermark at
+x 1170-1310 / y 1660-1748 was removed in place: the region is filled by cloning
+the same-width texture from immediately above it, blended with a 14 px feather
+and averaged against a second sample further up to break vertical streaking. At
+normal viewing size the patch is invisible; at 3x zoom a faint horizontal smear
+remains. `assets/art/himari-art-crop.jpg` keeps the alternative that simply cuts
+the bottom 126 px losslessly.
+
+Icon pipeline:
+
+- `assets/himari_logo.png` is the source of truth: a 720x720 crop at (266, 90)
+  scaled to 512, with 112 px rounded corners, a radial vignette and a soft
+  top-left sheen. It carries alpha.
+- `scripts/export-logo.py` renders 16/20/24/32/40/48/64/128/256 from that PNG
+  through librsvg and packs `assets/himari_logo.ico` (9 entries, 200,403 bytes).
+  It no longer rewrites the PNG, so repeated runs cannot degrade the artwork;
+  the earlier version regenerated the PNG from an SVG that referenced the PNG.
+- `assets/himari_logo.svg` is a thin wrapper for SVG consumers and is not used
+  by the app; `crates/app/ui/main.slint` now points at the PNG for both the
+  window icon and the in-app mark.
+- Verified on the host: the built `himari.exe` reports a 32x32 associated icon
+  showing the new portrait, and the running window shows it in the sidebar.
+- 118 host tests still pass; the Windows release build succeeds.

@@ -1,6 +1,7 @@
 fn main() {
     println!("cargo:rerun-if-changed=ui");
     println!("cargo:rerun-if-changed=../../assets/himari_logo.svg");
+    println!("cargo:rerun-if-changed=../../assets/himari_logo.png");
     println!("cargo:rerun-if-changed=../../assets/himari_logo.ico");
     println!("cargo:rerun-if-changed=app.rc");
     println!("cargo:rerun-if-changed=ui/translations");
