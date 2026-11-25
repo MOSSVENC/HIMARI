@@ -27,11 +27,11 @@ mod platform {
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         AppendMenuW, CreateIconFromResourceEx, CreatePopupMenu, CreateWindowExW, DefWindowProcW,
         DestroyIcon, DestroyMenu, DestroyWindow, DispatchMessageW, FindWindowW, GetCursorPos,
-        GetMessageW, HICON, IDI_APPLICATION, LR_DEFAULTCOLOR, LoadIconW, MF_STRING, PostMessageW,
-        PostQuitMessage, RegisterClassW, RegisterWindowMessageW, SetForegroundWindow, TPM_NONOTIFY,
-        TPM_RETURNCMD, TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WM_APP, WM_CLOSE,
-        WM_COMMAND, WM_CONTEXTMENU, WM_DESTROY, WM_LBUTTONUP, WM_RBUTTONUP, WNDCLASSW,
-        WS_OVERLAPPED,
+        GetMessageW, GetSystemMetrics, HICON, IDI_APPLICATION, LR_DEFAULTCOLOR, LoadIconW,
+        MF_STRING, PostMessageW, PostQuitMessage, RegisterClassW, RegisterWindowMessageW,
+        SM_CXSMICON, SetForegroundWindow, TPM_NONOTIFY, TPM_RETURNCMD, TPM_RIGHTBUTTON,
+        TrackPopupMenu, TranslateMessage, WM_APP, WM_CLOSE, WM_COMMAND, WM_CONTEXTMENU, WM_DESTROY,
+        WM_LBUTTONUP, WM_RBUTTONUP, WNDCLASSW, WS_OVERLAPPED,
     };
 
     use crate::MainWindow;
@@ -429,6 +429,7 @@ mod platform {
                     crate::log_action(&format!("resident window show failed: {error}"));
                     return;
                 }
+                crate::window_icon::apply(&ui);
                 ui.window().set_minimized(false);
                 ui.window().request_redraw();
                 let handle = ui.window().window_handle();
@@ -466,10 +467,20 @@ mod platform {
         (icon, false)
     }
 
+    /// Small-icon edge the shell will ask for at the current DPI. Handing it a
+    /// 32 px image and letting it scale down is what makes tray icons look soft.
+    fn tray_icon_target() -> u32 {
+        // SAFETY: GetSystemMetrics reads a documented system metric and takes no
+        // pointer arguments.
+        let metric = unsafe { GetSystemMetrics(SM_CXSMICON) };
+        if metric > 0 { metric as u32 } else { 16 }
+    }
+
     fn icon_from_ico(bytes: &[u8]) -> Option<HICON> {
         if bytes.len() < 6 {
             return None;
         }
+        let target = tray_icon_target();
         let count = u16::from_le_bytes([bytes[4], bytes[5]]) as usize;
         let mut best = None;
         for index in 0..count {
@@ -485,7 +496,7 @@ mod platform {
             if data_offset.checked_add(size)? > bytes.len() {
                 return None;
             }
-            let score = width.abs_diff(32) + height.abs_diff(32);
+            let score = width.abs_diff(target) + height.abs_diff(target);
             if best.is_none_or(|(_, best_score)| score < best_score) {
                 best = Some(((width, height, data_offset, size), score));
             }

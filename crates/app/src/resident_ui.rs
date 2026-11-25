@@ -31,6 +31,7 @@ pub(crate) fn run(
     let result = (|| {
         if !start_background {
             ui.show()?;
+            crate::window_icon::apply(ui);
         }
         // The native tray thread requests quit when the user selects Exit.
         // Keeping the event loop alive does not require showing the main window.

@@ -56,6 +56,7 @@ mod thermal_cache;
 mod tray;
 mod ui_callbacks;
 mod ui_update;
+mod window_icon;
 mod worker;
 
 use std::cell::Cell;

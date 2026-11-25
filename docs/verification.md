@@ -1912,3 +1912,35 @@ bytes) from it. Verified on the host: `ExtractAssociatedIcon` on the built
 `himari.exe` returns a 32x32 icon showing the new portrait, and the running
 window shows it in the sidebar header next to "HIMARI". The previous black-dress
 artwork stays in `assets/art/` for reference.
+
+## 2026-11-25 Icon sharpness: three real causes, all fixed
+
+The deployed binary was replaced through the product's own life cycle this time:
+`himari-uninstaller.exe --remove` (refuses while HIMARI runs; it reported
+"Exit HIMARI from its tray menu before uninstalling" until the process was
+stopped), then `scripts/deploy.ps1` with a staged release directory. The
+uninstaller removed `himari.exe`, the `HimariBoot` service and the `Run` value,
+retained recovery data, and reported a restart-pending entry for itself. The
+deployment re-registered everything and reported
+`Sha256 B95D92292BA1DEDEF5F7A19C5F9A3A807F5D1903A716AE9C0D3E92A0BC6D3A0D`,
+`BootExitCode 0`.
+
+The blur had three independent causes:
+
+1. `tray.rs` scored every ICO entry against a hard-coded 32 px
+   (`width.abs_diff(32)`), so the tray always received a 32 px image. This
+   machine reports `SM_CXSMICON=16`, so Windows scaled 32 → 16. The selection now
+   targets `GetSystemMetrics(SM_CXSMICON)`.
+2. The ICO stored PNG-compressed payloads at every size. `scripts/export-logo.py`
+   now emits 32-bit DIBs for 16/20/24/32/40/48/64 and keeps PNG only for
+   128/256 (7 DIB + 2 PNG, 205,389 bytes). The decoder is a small pure-Python
+   PNG reader, so the script needs only `rsvg-convert`.
+3. `main.slint` set `icon:` to one 512 px image, which the backend scaled for the
+   titlebar and taskbar. That property is gone; the new `window_icon.rs` loads
+   the executable's own icon at `SM_CXICON` and `SM_CXSMICON` and applies both
+   with `WM_SETICON` right after the window is shown (visible start and tray
+   show). The unsafe ratchet gained the four documented FFI calls (116 → 120).
+
+Verified: `ExtractAssociatedIcon` on the installed binary returns the new
+portrait at 32x32, and the 16 px extraction shows the same colours, which
+confirms the DIB encoder's channel order and alpha mask.

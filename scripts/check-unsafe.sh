@@ -33,13 +33,16 @@ declare -A ceilings=(
     # MonitorFromPoint + GetMonitorInfoW: the only FFI in the platform profile;
     # everything else there is pure geometry.
     ["crates/app/src/platform_profile.rs"]=2
+    # Window and taskbar icons loaded from the executable's own resource:
+    # GetModuleHandleW + LoadImageW, GetSystemMetrics, and SendMessageW.
+    ["crates/app/src/window_icon.rs"]=4
 )
 
 total=0
 failed=0
 # Includes the five audited hook handle/event boundaries and six uninstaller
 # boundaries; the dispatcher and tray ceilings were lowered after refactoring.
-max_total=116
+max_total=120
 
 while IFS= read -r file; do
     count=$(grep -o -E '\bunsafe\b' "$file" | wc -l)

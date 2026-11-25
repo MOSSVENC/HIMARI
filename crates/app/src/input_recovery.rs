@@ -125,7 +125,13 @@ fn log_guard(message: &str) {
         .append(true)
         .open(root.join("input-guard.log"))
     {
-        let _ = writeln!(file, "{message}");
+        // The boot-time ordering question ("did the guard run before the first
+        // key press?") is unanswerable without a timestamp on every line.
+        let stamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|elapsed| elapsed.as_millis())
+            .unwrap_or_default();
+        let _ = writeln!(file, "{stamp} {message}");
     }
 }
 
