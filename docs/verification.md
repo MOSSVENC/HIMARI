@@ -1898,3 +1898,17 @@ Icon pipeline:
 - Verified on the host: the built `himari.exe` reports a 32x32 associated icon
   showing the new portrait, and the running window shows it in the sidebar.
 - 118 host tests still pass; the Windows release build succeeds.
+
+## 2026-11-25 Icon takes the full artwork, uncropped
+
+The user supplied a second, cleaner illustration (1536x1536, no watermark) and
+asked for it to be used whole rather than cropped. `assets/himari_logo.png` is
+now that image scaled to 512 with only the 112 px rounded corner mask: no crop,
+no vignette, no extra compositing. Source kept as
+`assets/art/himari-icon-source.jpg`.
+
+`scripts/export-logo.py` rebuilt `assets/himari_logo.ico` (9 entries, 190,890
+bytes) from it. Verified on the host: `ExtractAssociatedIcon` on the built
+`himari.exe` returns a 32x32 icon showing the new portrait, and the running
+window shows it in the sidebar header next to "HIMARI". The previous black-dress
+artwork stays in `assets/art/` for reference.
