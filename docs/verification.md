@@ -1977,3 +1977,25 @@ Verified from a live screen capture at native pixels:
 - tray (16 px): flat mark, single-pixel edges, no blur — previously an
   unreadable smear;
 - taskbar button (32 px): the artwork portrait, sharp as a 32 px render can be.
+
+## 2026-11-26 Correction: the flat mark only helps at 16 px
+
+The first attempt applied the flat mark to 16/20/24. A side-by-side render at
+16/24/32/48 ([comparison](images/icon-size-comparison-2026-11-26.png), left
+artwork, right flat mark) shows that was wrong: from 24 px upward the artwork is
+clearly better and the flat mark reads as a plain helmet-shaped head. The split
+is therefore 16 px only:
+
+```text
+16        flat mark   (the artwork is colour noise at this size)
+20 - 256  artwork
+```
+
+Reinstalled through the life cycle (uninstaller `--remove`, then `deploy.ps1`),
+`Sha256 456129ADE8961A4E323D83FCE175B81D58023FBB0E56B5644B6006F211BB9085`,
+`BootExitCode 0`; tray cache cleared and Explorer restarted.
+
+Standing limitation, measured rather than assumed: this display reports
+`SM_CXSMICON=16`, and a 1536 px illustration reduced to 16 px cannot stay sharp
+in the tray or title bar. Sharpness there would require a purpose-drawn icon, not
+a further scaling change.

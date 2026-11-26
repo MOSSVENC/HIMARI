@@ -21,9 +21,10 @@ from pathlib import Path
 
 DIB_SIZES = (16, 20, 24, 32, 40, 48, 64)
 PNG_SIZES = (128, 256)
-# Sizes below this use the flat mark: a detailed illustration cannot resolve at
-# 16-24 px, where the shell wants one or two pixels per facial feature.
-SMALL_MARK_SIZES = (16, 20, 24)
+# Only the 16 px entry uses the flat mark. A 16x16 tile gives about six pixels to
+# the face, where the artwork collapses into colour noise; every larger size
+# reads better as the artwork, which a side-by-side at 16/24/32/48 confirmed.
+SMALL_MARK_SIZES = (16,)
 
 
 def render(png_bytes: bytes, size: int) -> bytes:
