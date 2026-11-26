@@ -21,6 +21,9 @@ from pathlib import Path
 
 DIB_SIZES = (16, 20, 24, 32, 40, 48, 64)
 PNG_SIZES = (128, 256)
+# Sizes below this use the flat mark: a detailed illustration cannot resolve at
+# 16-24 px, where the shell wants one or two pixels per facial feature.
+SMALL_MARK_SIZES = (16, 20, 24)
 
 
 def render(png_bytes: bytes, size: int) -> bytes:
@@ -150,14 +153,28 @@ def dib_entry(png: bytes, size: int) -> bytes:
     return header + bytes(xor) + bytes(mask)
 
 
+def render_vector(svg_text: str, size: int) -> bytes:
+    with tempfile.TemporaryDirectory() as directory:
+        source = Path(directory) / "vector.svg"
+        source.write_text(svg_text)
+        return subprocess.check_output(
+            ["rsvg-convert", "-w", str(size), "-h", str(size), str(source)]
+        )
+
+
 def main():
     assets = Path(__file__).resolve().parent.parent / "assets"
-    source_png = assets / "himari_logo.png"
-    png_bytes = source_png.read_bytes()
+    png_bytes = (assets / "himari_logo.png").read_bytes()
+    small_svg = (assets / "himari_logo_small.svg").read_text()
 
     entries = []
     for size in DIB_SIZES:
-        entries.append((size, dib_entry(render(png_bytes, size), size)))
+        payload = (
+            render_vector(small_svg, size)
+            if size in SMALL_MARK_SIZES
+            else render(png_bytes, size)
+        )
+        entries.append((size, dib_entry(payload, size)))
     for size in PNG_SIZES:
         entries.append((size, render(png_bytes, size)))
 

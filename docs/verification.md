@@ -1944,3 +1944,36 @@ The blur had three independent causes:
 Verified: `ExtractAssociatedIcon` on the installed binary returns the new
 portrait at 32x32, and the 16 px extraction shows the same colours, which
 confirms the DIB encoder's channel order and alpha mask.
+
+## 2026-11-26 16 px cannot hold a detailed illustration: flat mark for small sizes
+
+Measured evidence: the tray on this machine is 16 px (`SM_CXSMICON=16`), and a
+12x nearest-neighbour zoom of the tray icon showed the artwork reduced to
+unreadable colour noise — the face occupies about six pixels. The 32 px taskbar
+entry from the same ICO renders the portrait correctly, so this was never a
+scaling bug at that size.
+
+`assets/himari_logo_small.svg` is a flat mark that keeps the identity (silver
+hair mass, skin, crimson lips, deep-crimson tile) with shapes wide enough to
+survive 16 px. `scripts/export-logo.py` now renders 16/20/24 from that mark and
+32 and above from the artwork, so:
+
+```text
+16 DIB  small mark      32 DIB  artwork
+20 DIB  small mark      40 DIB  artwork
+24 DIB  small mark      48 DIB  artwork
+                        64 DIB  artwork
+                        128 PNG artwork
+                        256 PNG artwork
+```
+
+Reinstalled through the product life cycle again (uninstaller `--remove`, then
+`deploy.ps1`), `Sha256 AA7C23780CE633A98FFCD8881AAFABEE6E772BBAA106A96F7C28157FA2F12C8C`,
+`BootExitCode 0`. The tray cache was cleared and Explorer restarted before
+capture.
+
+Verified from a live screen capture at native pixels:
+
+- tray (16 px): flat mark, single-pixel edges, no blur — previously an
+  unreadable smear;
+- taskbar button (32 px): the artwork portrait, sharp as a 32 px render can be.
