@@ -38,6 +38,34 @@ declare -A ceilings=(
     ["crates/app/src/window_icon.rs"]=4
 )
 
+# Every unsafe block must state its safety argument. A block without a SAFETY
+# comment is a review gap even when the count is unchanged, so this is checked
+# separately from the ratchet. Declarations (`unsafe fn`, `unsafe extern`,
+# `unsafe impl`) are excluded: their contract is documented at the call sites.
+python3 - <<'PY_GATE'
+import pathlib, re, sys
+
+undocumented = []
+total = 0
+for path in pathlib.Path('crates').rglob('*.rs'):
+    lines = path.read_text().splitlines()
+    for index, line in enumerate(lines):
+        if not re.search(r'\bunsafe\b', line):
+            continue
+        if 'unsafe extern' in line or 'unsafe fn' in line or 'unsafe impl' in line:
+            continue
+        total += 1
+        window = ' '.join(lines[max(0, index - 4):index + 1])
+        if 'SAFETY' not in window:
+            undocumented.append(f'{path}:{index + 1}: {line.strip()[:70]}')
+
+print(f'unsafe blocks: {total}, undocumented: {len(undocumented)}')
+if undocumented:
+    for entry in undocumented[:20]:
+        print(f'  no SAFETY comment -> {entry}')
+    sys.exit(1)
+PY_GATE
+
 total=0
 failed=0
 # Includes the five audited hook handle/event boundaries and six uninstaller
