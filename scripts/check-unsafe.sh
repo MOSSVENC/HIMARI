@@ -14,7 +14,7 @@ declare -A ceilings=(
     ["crates/app/src/system_controls/registry.rs"]=1
     ["crates/app/src/system_controls/display_care.rs"]=5
     ["crates/app/src/system_controls/power.rs"]=6
-    ["crates/protocol/src/win_device.rs"]=6
+    ["crates/protocol/src/win_device.rs"]=5
     ["crates/protocol/src/bin/neo-acpi-probe.rs"]=3
     # Brightness plus the identity-ramp capability probe: GetDC, the probe's
     # SetDeviceGammaRamp and ReleaseDC join the existing gamma write.
@@ -73,7 +73,7 @@ total=0
 failed=0
 # Includes the five audited hook handle/event boundaries and six uninstaller
 # boundaries; the dispatcher and tray ceilings were lowered after refactoring.
-max_total=120
+max_total=119
 
 while IFS= read -r file; do
     count=$(grep -o -E '\bunsafe\b' "$file" | wc -l)

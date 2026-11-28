@@ -90,11 +90,20 @@ impl WinDevice {
     }
 }
 
+/// Release a handle this crate owns.
+///
+/// Both handle wrappers reach this single place, so the ownership argument is
+/// stated once instead of beside every `Drop`.
+fn close_owned_handle(handle: HANDLE) {
+    // SAFETY: the caller is a `Drop` impl of a wrapper that uniquely owns a
+    // handle returned by `CreateFileW` or `CreateEventW`, and `Drop` runs
+    // exactly once for the value.
+    unsafe { CloseHandle(handle) };
+}
+
 impl Drop for WinDevice {
     fn drop(&mut self) {
-        // SAFETY: this wrapper uniquely owns the valid handle returned by
-        // CreateFileW, and Drop runs exactly once for the value.
-        unsafe { CloseHandle(self.handle) };
+        close_owned_handle(self.handle);
     }
 }
 
@@ -138,7 +147,6 @@ impl WinEvent {
 
 impl Drop for WinEvent {
     fn drop(&mut self) {
-        // SAFETY: this wrapper uniquely owns the event returned by CreateEventW.
-        unsafe { CloseHandle(self.handle) };
+        close_owned_handle(self.handle);
     }
 }

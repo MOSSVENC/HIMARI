@@ -2035,3 +2035,27 @@ no resize). 156 tests pass; the Windows release builds.
 
 Still open: a measurement path that does not show a window at all, and the
 Cooling first-visit budget itself.
+
+## 2026-11-28 Why the unsafe count cannot reach 60 without deleting features
+
+Measured before attempting further reduction:
+
+```text
+unsafe occurrences in crates/            119
+distinct Win32/ACPI/NVML calls             63
+repeated calls worth sharing                1  (CloseHandle, 5 sites in 4 files)
+unsafe fn / extern declarations            11
+```
+
+Every block is one documented FFI boundary; there is almost no duplication to
+collapse. Deduplicating `CloseHandle` behind `close_owned_handle` in the protocol
+crate removed exactly one block (120 -> 119, ratchet lowered to match). Reaching
+60 would mean either merging unrelated calls into shared blocks, which makes the
+safety argument weaker and the review harder, or deleting the capability behind
+the FFI. Neither is a quality improvement, so the count target is replaced by
+properties that can be enforced:
+
+- every unsafe expression carries a SAFETY rationale (gate in
+  `scripts/check-unsafe.sh`, verified to fail when one is removed);
+- unsafe appears only inside `#[cfg(windows)]` platform sections;
+- the per-file ratchet only ever moves down.
