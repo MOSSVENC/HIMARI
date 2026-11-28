@@ -2059,3 +2059,36 @@ properties that can be enforced:
   `scripts/check-unsafe.sh`, verified to fail when one is removed);
 - unsafe appears only inside `#[cfg(windows)]` platform sections;
 - the per-file ratchet only ever moves down.
+
+## 2026-11-28 Cooling first visit now inside the frame budget, measured off-screen
+
+Two changes made the measurement both trustworthy and non-intrusive:
+
+1. `--graphics-smoke` parks the window at 2x2 before its first map and keeps it at
+   (-4000, -4000) for the whole run, so measuring no longer puts a window on the
+   user's screen. Guarded run: 300 samples at 100 ms, `onscreen_violations=0`.
+2. The prewarm walks Cooling a second time at the end, because its 40-cell table
+   is the last thing to settle, and each page keeps 30 ms instead of 20 ms.
+
+Result with no `HIMARI_PREWARM` set, three runs:
+
+```text
+global max_ms: median 14.24  min 13.59  max 14.59  gaps_over_33ms 0
+
+page  median  min    max    <=16.67
+0      9.75   9.39   9.79   yes
+1     13.74  13.43  14.12   yes
+2     13.54  13.24  13.84   yes     <- Cooling, was 18.60
+3      9.84   9.45  10.04   yes
+4     10.29   9.90  10.69   yes
+5      9.73   9.69  10.91   yes
+6      9.84   9.75  10.06   yes
+7      9.65   9.60  10.14   yes
+8     10.04   9.75  10.83   yes
+9      9.71   9.41   9.88   yes
+10     9.57   9.50   9.87   yes
+```
+
+Every page is inside one 60 Hz frame with the default startup path. Deployed
+through the product life cycle: `Sha256 3E557B752D3FC29896D9BC8F75E50B578C69AAEB20FFB9F0AF2B34E3C4E369D2`,
+`BootExitCode 0`.

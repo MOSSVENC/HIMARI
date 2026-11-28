@@ -21,7 +21,7 @@ use crate::{MainWindow, diagnostics};
 
 /// How long each page stays visible while prewarming. One frame at 60 Hz is
 /// 16.7 ms; 24 ms leaves room for the first frame's raster work.
-const PAGE_MS: u64 = 20;
+const PAGE_MS: u64 = 30;
 /// Delay before the walk so the window and renderer exist.
 const START_MS: u64 = 50;
 
@@ -78,7 +78,16 @@ pub(crate) fn run(
             return;
         };
         let page = step.get();
-        if page > 10 {
+        // Cooling is the most expensive page and its table is the last thing to
+        // settle, so it is walked a second time at the end (step 11).
+        let visit = if page <= 10 {
+            Some(page)
+        } else if page == 11 {
+            Some(2)
+        } else {
+            None
+        };
+        let Some(visit) = visit else {
             // Resize while the window is still mapped and off-screen. Resizing a
             // hidden window leaves the Vulkan swapchain invalid, and the next show
             // then fails to present.
@@ -90,9 +99,9 @@ pub(crate) fn run(
             let _ = window.hide();
             let _ = slint::quit_event_loop();
             return;
-        }
-        window.set_selected_page(page);
-        window.set_navigation_page(page);
+        };
+        window.set_selected_page(visit);
+        window.set_navigation_page(visit);
         step.set(page + 1);
         let weak = window.as_weak();
         let restore_next = Rc::clone(&restore);

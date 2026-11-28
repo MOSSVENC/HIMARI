@@ -75,7 +75,16 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
             data.frame_timings.push((step, timings));
         }
     });
+    // Keep the measurement window off every monitor. Slint maps a window at its
+    // default position before `set_position` applies, so park it at 2x2 first:
+    // the only thing that can appear is a two-pixel dot, and the window then
+    // stays at (-4000, -4000) for the whole run.
+    let window = ui.window();
+    let real_size = window.size();
+    window.set_size(slint::LogicalSize::new(2.0, 2.0));
+    window.set_position(slint::LogicalPosition::new(-4000.0, -4000.0));
     ui.show()?;
+    window.set_size(real_size);
     schedule(ui.as_weak(), Rc::clone(&measurements), 0);
     slint::run_event_loop()?;
     let mut data = measurements.borrow_mut();
