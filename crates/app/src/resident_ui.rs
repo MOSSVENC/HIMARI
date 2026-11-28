@@ -12,8 +12,11 @@ pub(crate) fn run(
     // Opt-in only: Slint maps the window at its default position before the
     // off-screen move lands, which flashes a 0,0 window for ~200 ms. The prewarm
     // itself works (page 2 18.6 -> 5.3 ms); the windowing must be solved first.
-    if std::env::var_os("HIMARI_PREWARM").is_some_and(|value| value == "1")
-        && let Err(error) = crate::prewarm::run(ui)
+    // On by default: the window is parked at 2x2 before its first map, moved
+    // off-screen, walked, then hidden until the tray or the user opens it.
+    // HIMARI_PREWARM=0 opts out.
+    if std::env::var("HIMARI_PREWARM").as_deref() != Ok("0")
+        && let Err(error) = crate::prewarm::run(ui, crate::prewarm::Concealment::Parked)
     {
         diagnostics::log_action(&format!("prewarm failed: {error}"));
     }

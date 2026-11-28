@@ -27,6 +27,8 @@ pub use keyboard_filter::{
     encode_filter_macro, encode_filter_macro_removal,
 };
 #[cfg(windows)]
+mod windows_backend;
+#[cfg(windows)]
 pub use windows_backend::AcpiNotificationListener;
 
 mod model;

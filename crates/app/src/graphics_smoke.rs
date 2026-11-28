@@ -36,8 +36,8 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     // placeholder. This isolated fixture wires navigation only and writes no hardware.
     ui.set_rgb_available(true);
     println!("ui_fixture=lighting-controls-enabled hardware_workers=disabled");
-    if std::env::var_os("HIMARI_PREWARM").is_some() {
-        crate::prewarm::run(&ui)?;
+    if std::env::var("HIMARI_PREWARM").as_deref() != Ok("0") {
+        crate::prewarm::run(&ui, crate::prewarm::Concealment::Solid)?;
         println!("prewarm=on");
     }
     crate::ui_callbacks::wire_navigation(&ui);

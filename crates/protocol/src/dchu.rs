@@ -3,8 +3,11 @@
 //! Windows uses the signed AcpiBridge transport; every other target gets a
 //! stub with the same surface so the UI and tests build everywhere.
 
+#[cfg(not(windows))]
 use crate::error::{DchuError, Result};
+#[cfg(not(windows))]
 use crate::fn_events::FnNotification;
+#[cfg(not(windows))]
 use crate::model::*;
 
 #[cfg_attr(not(windows), allow(dead_code))]
@@ -13,10 +16,7 @@ pub(crate) fn readback_confirmed(expected: u8, actual: Option<u8>) -> bool {
 }
 
 #[cfg(windows)]
-mod windows_backend;
-
-#[cfg(windows)]
-pub use windows_backend::Dchu;
+pub use crate::windows_backend::Dchu;
 
 #[cfg(not(windows))]
 #[derive(Debug)]

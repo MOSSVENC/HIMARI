@@ -1999,3 +1999,39 @@ Standing limitation, measured rather than assumed: this display reports
 `SM_CXSMICON=16`, and a 1536 px illustration reduced to 16 px cannot stay sharp
 in the tray or title bar. Sharpness there would require a purpose-drawn icon, not
 a further scaling change.
+
+## 2026-11-28 Page prewarm on by default, with a parked first map
+
+Slint maps the window at its default position before `set_position` lands, so an
+off-screen prewarm used to flash a full-size window at 0,0. The window is now
+shrunk to 2x2 before its first map, moved off-screen, resized back and walked.
+
+Position trace of a real `--background` start (100 ms sampling):
+
+```text
+100-200 ms   13x13  at 0,0        <- parked, effectively invisible
+300-500 ms  1193x856 at -4000,-4000  <- walk happens here
+600 ms+      13x13  at 0,0        <- hidden until the tray opens it
+```
+
+Measured page costs, three runs, no `HIMARI_PREWARM` set:
+
+```text
+global max median 25.07 ms, gaps_over_33ms 0
+page 0 15.20  page 1 15.45  page 2 20.48 (Cooling)  page 3 16.02
+page 4 18.00  page 5 14.37  page 6 14.82  page 7 14.76  page 8 17.83
+page 9 14.04  page 10 15.56
+```
+
+Cooling is still above 16.67 ms and pages 4 and 8 also exceed it in the same run
+while their minimums are 11-16 ms, so this harness is not yet a stable verdict.
+The measurement also perturbs itself: `--graphics-smoke` runs the prewarm inside
+the measured process, adding a second event loop and a window resize that cost
+more than the glyphs saved.
+
+Two concealment modes exist so the two purposes stop fighting: `Parked` for the
+real startup path (2x2 first map) and `Solid` for measurement (off-screen only,
+no resize). 156 tests pass; the Windows release builds.
+
+Still open: a measurement path that does not show a window at all, and the
+Cooling first-visit budget itself.
