@@ -86,7 +86,10 @@ pub(crate) fn icon_metric(is_big: bool) -> i32 {
     platform::metric(is_big)
 }
 
+/// Only the Windows backend queries the shell metric; other targets keep the
+/// function for parity and tests.
 #[cfg(not(windows))]
+#[allow(dead_code)]
 pub(crate) fn icon_metric(is_big: bool) -> i32 {
     if is_big { 32 } else { 16 }
 }
