@@ -9,7 +9,7 @@ cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 declare -A ceilings=(
     ["crates/app/src/telemetry.rs"]=26
     ["crates/app/src/driver_manager.rs"]=7
-    ["crates/app/src/tray.rs"]=18
+    ["crates/app/src/tray.rs"]=19
     ["crates/app/src/flexikey_engine.rs"]=8
     ["crates/app/src/system_controls/registry.rs"]=1
     ["crates/app/src/system_controls/display_care.rs"]=5
@@ -33,6 +33,9 @@ declare -A ceilings=(
     # MonitorFromPoint + GetMonitorInfoW: the only FFI in the platform profile;
     # everything else there is pure geometry.
     ["crates/app/src/platform_profile.rs"]=2
+    # The tray ceiling rose by one for GetSystemMetrics(SM_CXSMICON): the shell
+    # asks for a specific small-icon size and handing it a 32 px image made every
+    # tray icon soft.
     # Window and taskbar icons loaded from the executable's own resource:
     # GetModuleHandleW + LoadImageW, GetSystemMetrics, and SendMessageW.
     ["crates/app/src/window_icon.rs"]=4
